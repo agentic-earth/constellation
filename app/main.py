@@ -73,6 +73,7 @@ The Constellation API is a FastAPI-based application designed to manage pipeline
 """
 
 
+import uvicorn
 from fastapi import FastAPI, HTTPException
 from app.routes import blocks, edges, pipelines, audit_logs, users
 from app.utils.helpers import SupabaseClientManager
@@ -88,7 +89,7 @@ supabase_manager = SupabaseClientManager()
 
 # Create the FastAPI application instance
 app = FastAPI(
-    title="Hybrid Model Application API",
+    title="Constellation API",
     description="API for managing Users, Blocks, Edges, Pipelines, and Audit Logs.",
     version="1.0.0",
 )
@@ -108,7 +109,7 @@ async def root():
     Returns:
         dict: A dictionary containing a welcome message.
     """
-    return {"message": "Welcome to the Hybrid Model Application API!"}
+    return {"message": "Welcome to the Constellation API!"}
 
 @app.get("/health", tags=["Health Check"])
 async def health_check():
