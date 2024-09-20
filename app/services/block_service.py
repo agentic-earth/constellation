@@ -284,3 +284,51 @@ class BlockService:
                 f"Exception during assigning version to block: {e}"
             )
             return False
+        
+    def search_blocks(self, query: Dict[str, Any]) -> Optional[List[BlockResponseSchema]]:
+        """
+        Searches for blocks based on provided query parameters.
+
+        Args:
+            query (Dict[str, Any]): A dictionary of query parameters for filtering.
+
+        Returns:
+            Optional[List[BlockResponseSchema]]: A list of blocks matching the search criteria.
+        """
+        try:
+            supabase_query = self.supabase_manager.client.table("blocks").select("*")
+
+            # Apply filters based on the query parameters
+            for key, value in query.items():
+                if isinstance(value, list):
+                    supabase_query = supabase_query.in_(key, value)
+                else:
+                    supabase_query = supabase_query.ilike(key, f"%{value}%")  # Case-insensitive LIKE
+
+            response = supabase_query.execute()
+
+            if response.status_code == 200 and response.data:
+                blocks = [BlockResponseSchema(**block) for block in response.data]
+                self.logger.log(
+                    "BlockService",
+                    "info",
+                    f"{len(blocks)} blocks found matching the search criteria.",
+                    query=query
+                )
+                return blocks
+            else:
+                self.logger.log(
+                    "BlockService",
+                    "warning",
+                    "No blocks found matching the search criteria.",
+                    query=query,
+                    status_code=response.status_code
+                )
+                return []
+        except Exception as e:
+            self.logger.log(
+                "BlockService",
+                "critical",
+                f"Exception during block search: {e}"
+            )
+            return None

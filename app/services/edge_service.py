@@ -282,3 +282,54 @@ class EdgeService:
                 f"Exception during assigning version to edge: {e}"
             )
             return False
+        
+
+   # Existing CRUD methods...
+
+    def search_edges(self, query: Dict[str, Any]) -> Optional[List[EdgeResponseSchema]]:
+        """
+        Searches for edges based on provided query parameters.
+
+        Args:
+            query (Dict[str, Any]): A dictionary of query parameters for filtering.
+
+        Returns:
+            Optional[List[EdgeResponseSchema]]: A list of edges matching the search criteria.
+        """
+        try:
+            supabase_query = self.supabase_manager.client.table("edges").select("*")
+
+            # Apply filters based on the query parameters
+            for key, value in query.items():
+                if isinstance(value, list):
+                    supabase_query = supabase_query.in_(key, value)
+                else:
+                    supabase_query = supabase_query.ilike(key, f"%{value}%")  # Case-insensitive LIKE
+
+            response = supabase_query.execute()
+
+            if response.status_code == 200 and response.data:
+                edges = [EdgeResponseSchema(**edge) for edge in response.data]
+                self.logger.log(
+                    "EdgeService",
+                    "info",
+                    f"{len(edges)} edges found matching the search criteria.",
+                    query=query
+                )
+                return edges
+            else:
+                self.logger.log(
+                    "EdgeService",
+                    "warning",
+                    "No edges found matching the search criteria.",
+                    query=query,
+                    status_code=response.status_code
+                )
+                return []
+        except Exception as e:
+            self.logger.log(
+                "EdgeService",
+                "critical",
+                f"Exception during edge search: {e}"
+            )
+            return None
