@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+supabase-py
+pydantic
+python-dotenv
+loguru
+pytest
+requests
