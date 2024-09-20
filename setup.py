@@ -1,16 +1,22 @@
+import os
 from setuptools import setup, find_packages
 
-with open("README.md", "r", encoding="utf-8") as fh:
+# Get the absolute path of the directory containing this script
+base_dir = os.path.abspath(os.path.dirname(__file__))
+
+# Read the README.md file
+with open(os.path.join(base_dir, "README.md"), "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-with open("requirements.txt", "r", encoding="utf-8") as f:
+# Read the requirements.txt file
+with open(os.path.join(base_dir, "requirements.txt"), "r", encoding="utf-8") as f:
     requirements = f.read().splitlines()
 
 setup(
     name="constellation-api",
     version="1.0.0",
-    author="Your Name",
-    author_email="your.email@example.com",
+    author="Mason Lee",
+    author_email="mason_lee@brown.edu",
     description="A robust and scalable FastAPI application for managing pipelines, blocks, edges, and audit logs",
     long_description=long_description,
     long_description_content_type="text/markdown",
