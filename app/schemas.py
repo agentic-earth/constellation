@@ -1,6 +1,6 @@
 # app/schemas.py
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, validator
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
@@ -22,8 +22,20 @@ from app.models import (
 class UserCreateSchema(BaseModel):
     username: str
     email: EmailStr
-    password_hash: str
-    role: str  # Consider using a separate Enum for roles
+    password: str
+
+    @validator('password')
+    def password_strength(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        # Add more checks (e.g., uppercase, numbers, special characters) if needed
+        return v
+
+    @validator('username')
+    def username_no_spaces(cls, v):
+        if ' ' in v:
+            raise ValueError('Username must not contain spaces')
+        return v
 
 
 class UserUpdateSchema(BaseModel):
@@ -43,6 +55,7 @@ class UserResponseSchema(BaseModel):
 
     class Config:
         orm_mode = True
+        exclude = ['password_hash']
 
 
 # -------------------

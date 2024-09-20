@@ -14,6 +14,7 @@ class Settings(BaseSettings):
         LOG_LEVEL (str): The logging level (e.g., INFO, DEBUG).
         LOG_FORMAT (str): The format string for log messages.
         DATABASE_URL (Optional[AnyHttpUrl]): The database URL if needed separately.
+        SECRET_KEY (str): The secret key for JWT token generation.
     """
     
     SUPABASE_URL: AnyHttpUrl = Field(..., env="SUPABASE_URL")
@@ -23,6 +24,7 @@ class Settings(BaseSettings):
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s", 
         env="LOG_FORMAT"
     )
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "default-secret-key")
     # Add more configuration variables as needed
     
     class Config:

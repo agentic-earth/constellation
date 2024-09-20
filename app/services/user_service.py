@@ -287,3 +287,34 @@ class UserService:
                 f"Exception during user authentication: {e}"
             )
             return None
+
+    def get_user_by_email(self, email: str) -> Optional[User]:
+        """
+        Retrieves a user by their email.
+        """
+        try:
+            response = self.supabase_manager.client.table("users").select("*").eq("email", email).single().execute()
+            if response.status_code == 200 and response.data:
+                user = User(**response.data)
+                self.logger.log(
+                    "UserService",
+                    "info",
+                    "User retrieved successfully by email",
+                    email=user.email
+                )
+                return user
+            else:
+                self.logger.log(
+                    "UserService",
+                    "warning",
+                    "User not found by email",
+                    email=email
+                )
+                return None
+        except Exception as e:
+            self.logger.log(
+                "UserService",
+                "critical",
+                f"Exception during user retrieval by email: {e}"
+            )
+            return None

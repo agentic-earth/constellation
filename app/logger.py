@@ -98,7 +98,9 @@ class ConstellationLogger:
             raise ValueError(f"Invalid log level: {level}")
 
         if kwargs:
-            formatted_kwargs = " - ".join(f"{k}={v}" for k, v in kwargs.items())
+            sensitive_fields = ['password', 'password_hash', 'access_token', 'token']
+            sanitized_kwargs = {k: ('***' if k in sensitive_fields else v) for k, v in kwargs.items()}
+            formatted_kwargs = " - ".join(f"{k}={v}" for k, v in sanitized_kwargs.items())
             message = f"{message} - {formatted_kwargs}"
 
         log_method(message)
