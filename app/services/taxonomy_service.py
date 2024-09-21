@@ -19,7 +19,7 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime
 
-from app.schemas import Taxonomy, GeneralTaxonomy, EarthObservationModelTaxonomy, WeatherClimateModelTaxonomy, DatasetTaxonomy
+from app.taxonomy import Taxonomy, GeneralTaxonomy, EarthObservationModelTaxonomy, WeatherClimateModelTaxonomy, DatasetTaxonomy
 from app.logger import ConstellationLogger
 from app.database import get_supabase_client
 from app.utils.serialization_utils import serialize_dict

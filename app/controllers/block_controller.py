@@ -35,10 +35,9 @@ from app.schemas import (
     BlockCreateSchema,
     BlockUpdateSchema,
     BlockResponseSchema,
-    SearchQuery,
-    SearchResult,
     VectorRepresentationSchema
 )
+from app.taxonomy import SearchQuery, SearchResult
 from app.logger import ConstellationLogger
 
 
@@ -67,7 +66,7 @@ class BlockController:
 
     def create_block(self, block_data: BlockCreateSchema) -> Optional[BlockResponseSchema]:
         """
-        Creates a new block along with its optional taxonomy and vector embedding.
+        Creates a new block along with its optional taxonomy.
 
         Args:
             block_data (BlockCreateSchema): The data required to create a new block, including optional taxonomy and metadata.
@@ -85,32 +84,11 @@ class BlockController:
             if block_data.taxonomy:
                 taxonomy_success = self.taxonomy_service.create_taxonomy_for_block(block_id=block.block_id, taxonomy=block_data.taxonomy)
                 if not taxonomy_success:
-                    self.logger.log(
-                        "BlockController",
-                        "warning",
-                        f"Block {block.block_id} created without taxonomy associations.",
-                        extra={"block_id": str(block.block_id)}
-                    )
-                    # Optionally, decide to rollback block creation or handle accordingly
-                    # For now, proceeding without taxonomy association
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid taxonomy data.")
+                    # Optionally, handle rollback of block creation
+
 
             # Step 3: Create Vector Embedding (if metadata provided)
-            if block_data.metadata:
-                text_for_embedding = block_data.metadata.get("text")  # Assuming 'text' field exists in metadata
-                if text_for_embedding:
-                    vector_embedding = self.vector_embedding_service.create_vector_embedding(
-                        block_id=block.block_id,
-                        text=text_for_embedding,
-                        taxonomy_filters=block_data.taxonomy.dict() if block_data.taxonomy else None
-                    )
-                    if not vector_embedding:
-                        self.logger.log(
-                            "BlockController",
-                            "warning",
-                            f"Block {block.block_id} created without vector embedding.",
-                            extra={"block_id": str(block.block_id)}
-                        )
-                        # Optionally, handle accordingly
 
             # Step 4: Log the creation in Audit Logs
             audit_log = {
@@ -131,6 +109,7 @@ class BlockController:
             return block
 
         except HTTPException as he:
+            # Existing exception handling
             self.logger.log(
                 "BlockController",
                 "error",
@@ -139,6 +118,7 @@ class BlockController:
             )
             raise he
         except Exception as e:
+            # Existing exception handling
             self.logger.log(
                 "BlockController",
                 "critical",

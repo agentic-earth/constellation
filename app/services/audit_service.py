@@ -15,7 +15,8 @@ Design Philosophy:
 
 from typing import Optional, List, Dict, Any
 from uuid import UUID
-from app.models import AuditLog, AuditLogCreateSchema, AuditLogResponseSchema
+from app.models import AuditLog
+from app.schemas import AuditLogCreateSchema, AuditLogResponseSchema
 from app.logger import ConstellationLogger
 from app.database import get_supabase_client
 from app.schemas import AuditLogResponseSchema
