@@ -1,6 +1,6 @@
 # app/models.py
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
@@ -14,6 +14,10 @@ from enum import Enum
 class BlockTypeEnum(str, Enum):
     dataset = 'dataset'
     model = 'model'
+
+    @classmethod
+    def has_value(cls, value):
+        return value in cls._value2member_map_
 
 
 class EntityTypeEnum(str, Enum):
@@ -62,7 +66,10 @@ class AuditEntityTypeEnum(str, Enum):
 # Model Definitions
 # -------------------
 
-class User(BaseModel):
+class BaseModelConfig(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+class User(BaseModelConfig):
     user_id: UUID
     username: str
     email: EmailStr
@@ -71,11 +78,8 @@ class User(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
 
-
-class APIKey(BaseModel):
+class APIKey(BaseModelConfig):
     api_key_id: UUID
     user_id: UUID
     encrypted_api_key: str
@@ -83,35 +87,26 @@ class APIKey(BaseModel):
     expires_at: datetime
     is_active: bool
 
-    class Config:
-        orm_mode = True
 
-
-class TaxonomyCategory(BaseModel):
+class TaxonomyCategory(BaseModelConfig):
     category_id: UUID
     name: str
     parent_id: Optional[UUID]
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
 
-
-class Block(BaseModel):
+class Block(BaseModelConfig):
     block_id: UUID
     name: str
     block_type: BlockTypeEnum
     description: Optional[str]
     created_at: datetime
     updated_at: datetime
-    current_version_id: Optional[UUID]
-
-    class Config:
-        orm_mode = True
+    created_by: Optional[UUID]
 
 
-class BlockVersion(BaseModel):
+class BlockVersion(BaseModelConfig):
     version_id: UUID
     block_id: UUID
     version_number: int
@@ -120,21 +115,15 @@ class BlockVersion(BaseModel):
     created_by: UUID
     is_active: bool
 
-    class Config:
-        orm_mode = True
 
-
-class BlockTaxonomy(BaseModel):
+class BlockTaxonomy(BaseModelConfig):
     block_taxonomy_id: UUID
     block_id: UUID
     category_id: UUID
     created_at: datetime
 
-    class Config:
-        orm_mode = True
 
-
-class CodeRepo(BaseModel):
+class CodeRepo(BaseModelConfig):
     repo_id: UUID
     entity_type: EntityTypeEnum
     entity_id: UUID
@@ -142,11 +131,8 @@ class CodeRepo(BaseModel):
     branch: str
     last_updated: datetime
 
-    class Config:
-        orm_mode = True
 
-
-class DockerImage(BaseModel):
+class DockerImage(BaseModelConfig):
     image_id: UUID
     entity_type: EntityTypeEnum
     entity_id: UUID
@@ -157,22 +143,16 @@ class DockerImage(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
 
-
-class Dependency(BaseModel):
+class Dependency(BaseModelConfig):
     dependency_id: UUID
     entity_type: EntityTypeEnum
     entity_id: UUID
     dependency_type: DependencyTypeEnum
     dependency_detail: str
 
-    class Config:
-        orm_mode = True
 
-
-class Edge(BaseModel):
+class Edge(BaseModelConfig):
     edge_id: UUID
     name: str
     description: Optional[str]
@@ -180,11 +160,8 @@ class Edge(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
 
-
-class EdgeVersion(BaseModel):
+class EdgeVersion(BaseModelConfig):
     version_id: UUID
     edge_id: UUID
     version_number: int
@@ -193,11 +170,8 @@ class EdgeVersion(BaseModel):
     created_by: UUID
     is_active: bool
 
-    class Config:
-        orm_mode = True
 
-
-class EdgeVerification(BaseModel):
+class EdgeVerification(BaseModelConfig):
     verification_id: UUID
     edge_version_id: UUID
     verification_status: VerificationStatusEnum
@@ -207,11 +181,8 @@ class EdgeVerification(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
 
-
-class Pipeline(BaseModel):
+class Pipeline(BaseModelConfig):
     pipeline_id: UUID
     name: str
     description: Optional[str]
@@ -222,22 +193,16 @@ class Pipeline(BaseModel):
     times_run: int
     average_runtime: float
 
-    class Config:
-        orm_mode = True
 
-
-class PipelineBlock(BaseModel):
+class PipelineBlock(BaseModelConfig):
     pipeline_block_id: UUID
     pipeline_id: UUID
     block_id: UUID
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
 
-
-class PipelineEdge(BaseModel):
+class PipelineEdge(BaseModelConfig):
     pipeline_edge_id: UUID
     pipeline_id: UUID
     edge_id: UUID
@@ -246,11 +211,8 @@ class PipelineEdge(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
 
-
-class BlockVectorRepresentation(BaseModel):
+class BlockVectorRepresentation(BaseModelConfig):
     vector_id: UUID
     block_id: UUID
     vector_db: str
@@ -259,11 +221,8 @@ class BlockVectorRepresentation(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
 
-
-class EdgeVectorRepresentation(BaseModel):
+class EdgeVectorRepresentation(BaseModelConfig):
     vector_id: UUID
     edge_id: UUID
     vector_db: str
@@ -272,11 +231,8 @@ class EdgeVectorRepresentation(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
 
-
-class AuditLog(BaseModel):
+class AuditLog(BaseModelConfig):
     log_id: UUID
     user_id: UUID
     action_type: ActionTypeEnum
@@ -284,6 +240,3 @@ class AuditLog(BaseModel):
     entity_id: UUID
     timestamp: datetime
     details: Optional[dict]
-
-    class Config:
-        orm_mode = True

@@ -1,0 +1,2 @@
+[console_scripts]
+constellation-api = app.main:main

@@ -13,13 +13,22 @@ Design Philosophy:
 - Ensure flexibility to adapt to schema changes with minimal modifications.
 """
 
+import traceback
 from typing import Optional, List, Dict, Any
 from uuid import UUID
-from app.models import Block, BlockCreateSchema, BlockUpdateSchema, BlockResponseSchema
-from app.logger import ConstellationLogger
-from app.utils.helpers import SupabaseClientManager
-from app.schemas import BlockResponseSchema
 from datetime import datetime
+
+from app.schemas import (
+    BlockResponseSchema,
+    BlockCreateSchema,
+    BlockUpdateSchema,
+)
+
+from app.models import BlockTypeEnum
+
+from app.logger import ConstellationLogger
+from app.database import get_supabase_client
+from app.utils.serialization_utils import serialize_dict
 
 
 class BlockService:
@@ -31,7 +40,7 @@ class BlockService:
         """
         Initializes the BlockService with the Supabase client and logger.
         """
-        self.supabase_manager = SupabaseClientManager()
+        self.client = get_supabase_client()
         self.logger = ConstellationLogger()
 
     def create_block(self, block_data: BlockCreateSchema) -> Optional[BlockResponseSchema]:
@@ -46,18 +55,44 @@ class BlockService:
         """
         try:
             # Convert Pydantic schema to dictionary
-            data = block_data.dict()
-            response = self.supabase_manager.client.table("blocks").insert(data).execute()
+            data = block_data.dict(exclude_unset=True)
 
-            if response.status_code in [200, 201] and response.data:
-                created_block = BlockResponseSchema(**response.data[0])
+            # Ensure block_type is a valid enum value
+            if not BlockTypeEnum.has_value(data['block_type']):
+                self.logger.log(
+                    "BlockService",
+                    "error",
+                    f"Invalid block_type: {data['block_type']}",
+                    extra={"block_type": data['block_type']}
+                )
+                return None
+
+            # Add created_at and updated_at if not provided
+            current_time = datetime.utcnow()
+            data.setdefault('created_at', current_time)
+            data.setdefault('updated_at', current_time)
+
+            # Serialize the data
+            serialized_data = serialize_dict(data)
+
+            # Insert the new block into the database
+            response = self.client.table("blocks").insert(serialized_data).execute()
+
+            if response.data:
+                # If created_by is not in the response data, set it to None
+                response_data = response.data[0]
+                response_data.setdefault('created_by', None)
+
+                created_block = BlockResponseSchema(**response_data)
                 self.logger.log(
                     "BlockService",
                     "info",
-                    "Block created successfully",
-                    block_id=created_block.block_id,
-                    name=created_block.name,
-                    block_type=created_block.block_type
+                    f"Block created successfully: {created_block.block_id}",
+                    extra={
+                        "block_id": str(created_block.block_id),
+                        "name": created_block.name,
+                        "block_type": created_block.block_type.value
+                    }
                 )
                 return created_block
             else:
@@ -65,15 +100,15 @@ class BlockService:
                     "BlockService",
                     "error",
                     "Failed to create block",
-                    status_code=response.status_code,
-                    error=response.error
+                    extra={"error": str(response.error)}
                 )
                 return None
         except Exception as e:
             self.logger.log(
                 "BlockService",
                 "critical",
-                f"Exception during block creation: {e}"
+                f"Exception during block creation: {str(e)}",
+                extra={"traceback": traceback.format_exc()}
             )
             return None
 
@@ -88,17 +123,19 @@ class BlockService:
             Optional[BlockResponseSchema]: The block data if found, None otherwise.
         """
         try:
-            response = self.supabase_manager.client.table("blocks").select("*").eq("block_id", str(block_id)).single().execute()
+            response = self.client.table("blocks").select("*").eq("block_id", str(block_id)).single().execute()
 
-            if response.status_code == 200 and response.data:
+            if response.data:
                 block = BlockResponseSchema(**response.data)
                 self.logger.log(
                     "BlockService",
                     "info",
                     "Block retrieved successfully",
-                    block_id=block.block_id,
-                    name=block.name,
-                    block_type=block.block_type
+                    extra={
+                        "block_id": str(block.block_id),
+                        "name": block.name,
+                        "block_type": block.block_type.value
+                    }
                 )
                 return block
             else:
@@ -106,15 +143,15 @@ class BlockService:
                     "BlockService",
                     "warning",
                     "Block not found",
-                    block_id=block_id,
-                    status_code=response.status_code
+                    extra={"block_id": str(block_id)}
                 )
                 return None
         except Exception as e:
             self.logger.log(
                 "BlockService",
                 "critical",
-                f"Exception during block retrieval: {e}"
+                f"Exception during block retrieval: {e}",
+                extra={"traceback": traceback.format_exc()}
             )
             return None
 
@@ -131,16 +168,35 @@ class BlockService:
         """
         try:
             data = update_data.dict(exclude_unset=True)
-            response = self.supabase_manager.client.table("blocks").update(data).eq("block_id", str(block_id)).execute()
 
-            if response.status_code == 200 and response.data:
+            if not data:
+                self.logger.log(
+                    "BlockService",
+                    "warning",
+                    "No update data provided",
+                    extra={"block_id": str(block_id)}
+                )
+                return None
+
+            # Update the 'updated_at' field
+            data['updated_at'] = datetime.utcnow()
+
+            # Serialize the data
+            serialized_data = serialize_dict(data)
+
+            # Update the block in the database
+            response = self.client.table("blocks").update(serialized_data).eq("block_id", str(block_id)).execute()
+
+            if response.data:
                 updated_block = BlockResponseSchema(**response.data[0])
                 self.logger.log(
                     "BlockService",
                     "info",
                     "Block updated successfully",
-                    block_id=updated_block.block_id,
-                    updated_fields=list(data.keys())
+                    extra={
+                        "block_id": str(updated_block.block_id),
+                        "updated_fields": list(data.keys())
+                    }
                 )
                 return updated_block
             else:
@@ -148,22 +204,21 @@ class BlockService:
                     "BlockService",
                     "error",
                     "Failed to update block",
-                    block_id=block_id,
-                    status_code=response.status_code,
-                    error=response.error
+                    extra={"block_id": str(block_id), "error": str(response.error)}
                 )
                 return None
         except Exception as e:
             self.logger.log(
                 "BlockService",
                 "critical",
-                f"Exception during block update: {e}"
+                f"Exception during block update: {e}",
+                extra={"traceback": traceback.format_exc()}
             )
             return None
 
     def delete_block(self, block_id: UUID) -> bool:
         """
-        Deletes a block from the Supabase database.
+        Deletes a block from the Supabase database and validates the deletion.
 
         Args:
             block_id (UUID): The UUID of the block to delete.
@@ -172,57 +227,79 @@ class BlockService:
             bool: True if deletion was successful, False otherwise.
         """
         try:
-            response = self.supabase_manager.client.table("blocks").delete().eq("block_id", str(block_id)).execute()
+            # Perform the delete operation
+            response = self.client.table("blocks").delete().eq("block_id", str(block_id)).execute()
 
-            if response.status_code == 200 and response.count > 0:
+            if response.data and len(response.data) > 0:
                 self.logger.log(
                     "BlockService",
                     "info",
                     "Block deleted successfully",
-                    block_id=block_id
+                    extra={"block_id": str(block_id)}
                 )
-                return True
+
+                # Validate deletion by attempting to retrieve the block without using .single()
+                validation_response = self.client.table("blocks").select("*").eq("block_id", str(block_id)).execute()
+
+                if not validation_response.data:
+                    self.logger.log(
+                        "BlockService",
+                        "info",
+                        "Deletion validated: Block no longer exists",
+                        extra={"block_id": str(block_id)}
+                    )
+                    return True
+                else:
+                    self.logger.log(
+                        "BlockService",
+                        "error",
+                        "Deletion validation failed: Block still exists",
+                        extra={"block_id": str(block_id)}
+                    )
+                    return False
             else:
                 self.logger.log(
                     "BlockService",
                     "warning",
                     "Block not found or already deleted",
-                    block_id=block_id,
-                    status_code=response.status_code
+                    extra={"block_id": str(block_id)}
                 )
                 return False
         except Exception as e:
             self.logger.log(
                 "BlockService",
                 "critical",
-                f"Exception during block deletion: {e}"
+                f"Exception during block deletion: {e}",
+                extra={"traceback": traceback.format_exc()}
             )
             return False
 
-    def list_blocks(self, filters: Optional[Dict[str, Any]] = None) -> Optional[List[BlockResponseSchema]]:
+    def list_blocks(self, filters: Optional[Dict[str, Any]] = None, limit: int = 100, offset: int = 0) -> Optional[List[BlockResponseSchema]]:
         """
-        Retrieves a list of blocks with optional filtering.
+        Retrieves a list of blocks with optional filtering and pagination.
 
         Args:
             filters (Optional[Dict[str, Any]]): Key-value pairs to filter the blocks.
+            limit (int): Maximum number of blocks to retrieve.
+            offset (int): Number of blocks to skip for pagination.
 
         Returns:
             Optional[List[BlockResponseSchema]]: A list of blocks if successful, None otherwise.
         """
         try:
-            query = self.supabase_manager.client.table("blocks").select("*")
+            query = self.client.table("blocks").select("*").limit(limit).offset(offset)
             if filters:
                 for key, value in filters.items():
                     query = query.eq(key, value)
             response = query.execute()
 
-            if response.status_code == 200 and response.data:
+            if response.data:
                 blocks = [BlockResponseSchema(**block) for block in response.data]
                 self.logger.log(
                     "BlockService",
                     "info",
                     f"{len(blocks)} blocks retrieved successfully",
-                    filters=filters
+                    extra={"filters": filters, "limit": limit, "offset": offset}
                 )
                 return blocks
             else:
@@ -230,15 +307,15 @@ class BlockService:
                     "BlockService",
                     "warning",
                     "No blocks found",
-                    filters=filters,
-                    status_code=response.status_code
+                    extra={"filters": filters, "limit": limit, "offset": offset}
                 )
                 return []
         except Exception as e:
             self.logger.log(
                 "BlockService",
                 "critical",
-                f"Exception during listing blocks: {e}"
+                f"Exception during listing blocks: {e}",
+                extra={"traceback": traceback.format_exc()}
             )
             return None
 
@@ -254,16 +331,15 @@ class BlockService:
             bool: True if assignment was successful, False otherwise.
         """
         try:
-            data = {"current_version_id": str(version_id)}
-            response = self.supabase_manager.client.table("blocks").update(data).eq("block_id", str(block_id)).execute()
+            data = {"current_version_id": str(version_id), "updated_at": datetime.utcnow()}
+            response = self.client.table("blocks").update(data).eq("block_id", str(block_id)).execute()
 
-            if response.status_code == 200 and response.data:
+            if response.data and len(response.data) > 0:
                 self.logger.log(
                     "BlockService",
                     "info",
                     "Assigned version to block successfully",
-                    block_id=block_id,
-                    version_id=version_id
+                    extra={"block_id": str(block_id), "version_id": str(version_id)}
                 )
                 return True
             else:
@@ -271,64 +347,158 @@ class BlockService:
                     "BlockService",
                     "error",
                     "Failed to assign version to block",
-                    block_id=block_id,
-                    version_id=version_id,
-                    status_code=response.status_code,
-                    error=response.error
+                    extra={"block_id": str(block_id), "version_id": str(version_id), "error": str(response.error)}
                 )
                 return False
-        except Exception as e:
+        except Exception as exc:
             self.logger.log(
                 "BlockService",
                 "critical",
-                f"Exception during assigning version to block: {e}"
+                f"Exception during assigning version to block: {exc}",
+                extra={"traceback": traceback.format_exc()}
             )
             return False
-        
-    def search_blocks(self, query: Dict[str, Any]) -> Optional[List[BlockResponseSchema]]:
+
+    def count_blocks(self, filters: Optional[Dict[str, Any]] = None) -> Optional[int]:
         """
-        Searches for blocks based on provided query parameters.
+        Counts the total number of blocks with optional filtering.
 
         Args:
-            query (Dict[str, Any]): A dictionary of query parameters for filtering.
+            filters (Optional[Dict[str, Any]]): Key-value pairs to filter the blocks.
 
         Returns:
-            Optional[List[BlockResponseSchema]]: A list of blocks matching the search criteria.
+            Optional[int]: The count of blocks matching the filters, None otherwise.
         """
         try:
-            supabase_query = self.supabase_manager.client.table("blocks").select("*")
+            query = self.client.table("blocks").select("*", count='exact')
+            if filters:
+                for key, value in filters.items():
+                    query = query.eq(key, value)
+            response = query.execute()
 
-            # Apply filters based on the query parameters
-            for key, value in query.items():
-                if isinstance(value, list):
-                    supabase_query = supabase_query.in_(key, value)
-                else:
-                    supabase_query = supabase_query.ilike(key, f"%{value}%")  # Case-insensitive LIKE
-
-            response = supabase_query.execute()
-
-            if response.status_code == 200 and response.data:
-                blocks = [BlockResponseSchema(**block) for block in response.data]
+            if response.count is not None:
                 self.logger.log(
                     "BlockService",
                     "info",
-                    f"{len(blocks)} blocks found matching the search criteria.",
-                    query=query
+                    f"Total blocks count: {response.count}",
+                    extra={"filters": filters}
                 )
-                return blocks
+                return response.count
             else:
                 self.logger.log(
                     "BlockService",
                     "warning",
-                    "No blocks found matching the search criteria.",
-                    query=query,
-                    status_code=response.status_code
+                    "Failed to retrieve blocks count",
+                    extra={"filters": filters}
                 )
-                return []
-        except Exception as e:
+                return None
+        except Exception as exc:
             self.logger.log(
                 "BlockService",
                 "critical",
-                f"Exception during block search: {e}"
+                f"Exception during counting blocks: {exc}",
+                extra={"traceback": traceback.format_exc()}
             )
             return None
+
+
+if __name__ == "__main__":
+    import traceback
+
+    print("Starting BlockService tests...")
+    block_service = BlockService()
+
+    # Function to generate a unique block name
+    def generate_unique_name(base_name):
+        import random
+        return f"{base_name}_{random.randint(1000, 9999)}"
+
+    try:
+        # Create a block
+        block_name = generate_unique_name("Test Block")
+        new_block = BlockCreateSchema(
+            name=block_name,
+            block_type=BlockTypeEnum.dataset,
+            description="This is a test block"
+        )
+        print(f"Creating block: {new_block}")
+        created_block = block_service.create_block(new_block)
+
+        if created_block:
+            print(f"Created block: {created_block}")
+
+            # Get the block
+            retrieved_block = block_service.get_block_by_id(created_block.block_id)
+            if retrieved_block:
+                print(f"Retrieved block: {retrieved_block}")
+            else:
+                print("Failed to retrieve the created block.")
+
+            # Update the block
+            update_data = BlockUpdateSchema(description="Updated description")
+            updated_block = block_service.update_block(created_block.block_id, update_data)
+            if updated_block:
+                print(f"Updated block: {updated_block}")
+            else:
+                print("Failed to update the block.")
+
+            # List blocks
+            blocks = block_service.list_blocks()
+            if blocks is not None:
+                print(f"Listed {len(blocks)} blocks:")
+                for block in blocks:
+                    print(block)
+            else:
+                print("Failed to list blocks.")
+
+            # Delete the block
+            if block_service.delete_block(created_block.block_id):
+                print("Block deleted successfully.")
+            else:
+                print("Failed to delete block.")
+
+            # Verify deletion
+            post_delete_block = block_service.get_block_by_id(created_block.block_id)
+            if post_delete_block:
+                print("Error: Block still exists after deletion.")
+            else:
+                print("Deletion verified: Block no longer exists.")
+
+            # Create another block with a different name
+            another_block_name = generate_unique_name("Another Test Block")
+            another_block = BlockCreateSchema(
+                name=another_block_name,
+                block_type=BlockTypeEnum.model,
+                description="This is another test block"
+            )
+            created_another_block = block_service.create_block(another_block)
+            if created_another_block:
+                print(f"Created another block: {created_another_block}")
+
+                # Get the new block
+                retrieved_another_block = block_service.get_block_by_id(created_another_block.block_id)
+                if retrieved_another_block:
+                    print(f"Retrieved another block: {retrieved_another_block}")
+                else:
+                    print("Failed to retrieve the created another block.")
+
+                # Clean up: delete the second block
+                if block_service.delete_block(created_another_block.block_id):
+                    print("Second block deleted successfully.")
+                else:
+                    print("Failed to delete second block.")
+
+                # Verify deletion of the second block
+                post_delete_another_block = block_service.get_block_by_id(created_another_block.block_id)
+                if post_delete_another_block:
+                    print("Error: Second block still exists after deletion.")
+                else:
+                    print("Deletion verified: Second block no longer exists.")
+            else:
+                print("Failed to create another block.")
+        else:
+            print("Failed to create initial block.")
+    except Exception as exc:
+        print(f"An error occurred during the test: {str(exc)}")
+        print("Traceback:")
+        print(traceback.format_exc())
