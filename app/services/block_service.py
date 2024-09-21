@@ -1,120 +1,160 @@
-# app/services/block_service.py
+# app/controllers/block_controller.py
 
 """
-Block Service Module
+Block Controller Module
 
-This module encapsulates all block-related business logic and interactions with the Supabase backend.
-It provides functions to create, retrieve, update, and delete blocks, ensuring that all operations are
-logged appropriately using the Constellation Logger.
+This module defines the BlockController class responsible for managing block-related operations.
+It orchestrates interactions between BlockService, TaxonomyService, and VectorEmbeddingService to
+perform operations that involve blocks, taxonomy, and vector embeddings. Additionally, it handles
+search functionalities based on taxonomy filters and vector similarity.
+
+Responsibilities:
+- Coordinating between BlockService, TaxonomyService, and VectorEmbeddingService to perform complex workflows.
+- Handling CRUD operations for blocks, including optional taxonomy and vector embeddings.
+- Managing similarity searches with optional taxonomy filters.
+- Ensuring transactional integrity and robust error handling.
+- Managing audit logs through AuditService.
 
 Design Philosophy:
-- Utilize Supabase's REST API for standard CRUD operations for performance and reliability.
-- Use Python only for advanced logic that cannot be handled directly by Supabase.
-- Ensure flexibility to adapt to schema changes with minimal modifications.
+- Maintain high cohesion by focusing solely on block-related orchestration.
+- Promote loose coupling by interacting with services through well-defined interfaces.
+- Ensure robustness through comprehensive error handling and logging.
 """
 
 import traceback
-from typing import Optional, List, Dict, Any
+from typing import List, Optional, Dict, Any
 from uuid import UUID
-from datetime import datetime
 
+from fastapi import HTTPException, status
+
+from app.services.block_service import BlockService
+from app.services.taxonomy_service import TaxonomyService
+from app.services.vector_embedding_service import VectorEmbeddingService
+from app.services.audit_service import AuditService
 from app.schemas import (
-    BlockResponseSchema,
     BlockCreateSchema,
     BlockUpdateSchema,
+    BlockResponseSchema,
+    SearchQuery,
+    SearchResult,
+    FullPaper  # Assuming FullPaper schema exists for search results
 )
-
-from app.models import BlockTypeEnum
-
 from app.logger import ConstellationLogger
-from app.database import get_supabase_client
-from app.utils.serialization_utils import serialize_dict
 
 
-class BlockService:
+class BlockController:
     """
-    BlockService class encapsulates all block-related operations.
+    BlockController manages all block-related operations, coordinating between BlockService,
+    TaxonomyService, and VectorEmbeddingService to perform CRUD operations, manage taxonomy,
+    handle vector embeddings, and execute similarity searches.
     """
 
     def __init__(self):
         """
-        Initializes the BlockService with the Supabase client and logger.
+        Initializes the BlockController with instances of BlockService, TaxonomyService,
+        VectorEmbeddingService, and AuditService, along with the ConstellationLogger for
+        logging purposes.
         """
-        self.client = get_supabase_client()
+        self.block_service = BlockService()
+        self.taxonomy_service = TaxonomyService()
+        self.vector_embedding_service = VectorEmbeddingService()
+        self.audit_service = AuditService()
         self.logger = ConstellationLogger()
+
+    # -------------------
+    # Block CRUD Operations
+    # -------------------
 
     def create_block(self, block_data: BlockCreateSchema) -> Optional[BlockResponseSchema]:
         """
-        Creates a new block in the Supabase database.
+        Creates a new block along with its optional taxonomy and vector embedding.
 
         Args:
-            block_data (BlockCreateSchema): The data required to create a new block.
+            block_data (BlockCreateSchema): The data required to create a new block, including optional taxonomy and metadata.
 
         Returns:
             Optional[BlockResponseSchema]: The created block data if successful, None otherwise.
         """
         try:
-            # Convert Pydantic schema to dictionary
-            data = block_data.dict(exclude_unset=True)
+            # Step 1: Create Block
+            block = self.block_service.create_block(block_data)
+            if not block:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Block creation failed.")
 
-            # Ensure block_type is a valid enum value
-            if not BlockTypeEnum.has_value(data['block_type']):
-                self.logger.log(
-                    "BlockService",
-                    "error",
-                    f"Invalid block_type: {data['block_type']}",
-                    extra={"block_type": data['block_type']}
-                )
-                return None
+            # Step 2: Associate Taxonomy (if provided)
+            if block_data.taxonomy:
+                taxonomy_success = self.taxonomy_service.create_taxonomy_for_block(block_id=block.block_id, taxonomy=block_data.taxonomy)
+                if not taxonomy_success:
+                    self.logger.log(
+                        "BlockController",
+                        "warning",
+                        f"Block {block.block_id} created without taxonomy associations.",
+                        extra={"block_id": str(block.block_id)}
+                    )
+                    # Optionally, decide to rollback block creation or handle accordingly
+                    # For now, proceeding without taxonomy association
 
-            # Add created_at and updated_at if not provided
-            current_time = datetime.utcnow()
-            data.setdefault('created_at', current_time)
-            data.setdefault('updated_at', current_time)
+            # Step 3: Create Vector Embedding (if metadata provided)
+            if block_data.metadata:
+                vector_data = block_data.metadata.get("vector")  # Assuming 'vector' field exists and contains the embedding
+                if vector_data:
+                    vector_embedding = VectorRepresentationSchema(
+                        vector_id=uuid4(),
+                        entity_type="block",
+                        entity_id=block.block_id,
+                        vector=vector_data,
+                        taxonomy_filter=block_data.taxonomy.dict() if block_data.taxonomy else None,
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow()
+                    )
+                    vector_creation = self.vector_embedding_service.create_vector_embedding(vector_embedding)
+                    if not vector_creation:
+                        self.logger.log(
+                            "BlockController",
+                            "warning",
+                            f"Block {block.block_id} created without vector embedding.",
+                            extra={"block_id": str(block.block_id)}
+                        )
+                        # Optionally, handle accordingly
 
-            # Serialize the data
-            serialized_data = serialize_dict(data)
+            # Step 4: Log the creation in Audit Logs
+            audit_log = {
+                "user_id": block_data.created_by,  # Assuming `created_by` exists in BlockCreateSchema
+                "action_type": "CREATE",
+                "entity_type": "block",
+                "entity_id": str(block.block_id),
+                "details": f"Block '{block.name}' created with taxonomy and vector embedding."
+            }
+            self.audit_service.create_audit_log(audit_log)
 
-            # Insert the new block into the database
-            response = self.client.table("blocks").insert(serialized_data).execute()
+            self.logger.log(
+                "BlockController",
+                "info",
+                "Block created successfully with taxonomy and vector embedding.",
+                block_id=block.block_id
+            )
+            return block
 
-            if response.data:
-                # If created_by is not in the response data, set it to None
-                response_data = response.data[0]
-                response_data.setdefault('created_by', None)
-
-                created_block = BlockResponseSchema(**response_data)
-                self.logger.log(
-                    "BlockService",
-                    "info",
-                    f"Block created successfully: {created_block.block_id}",
-                    extra={
-                        "block_id": str(created_block.block_id),
-                        "name": created_block.name,
-                        "block_type": created_block.block_type.value
-                    }
-                )
-                return created_block
-            else:
-                self.logger.log(
-                    "BlockService",
-                    "error",
-                    "Failed to create block",
-                    extra={"error": str(response.error)}
-                )
-                return None
+        except HTTPException as he:
+            self.logger.log(
+                "BlockController",
+                "error",
+                f"HTTPException during block creation: {he.detail}",
+                extra={"status_code": he.status_code, "detail": he.detail}
+            )
+            raise he
         except Exception as e:
             self.logger.log(
-                "BlockService",
+                "BlockController",
                 "critical",
                 f"Exception during block creation: {str(e)}",
                 extra={"traceback": traceback.format_exc()}
             )
-            return None
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error.")
 
     def get_block_by_id(self, block_id: UUID) -> Optional[BlockResponseSchema]:
         """
-        Retrieves a block by its unique identifier.
+        Retrieves a block by its unique identifier, including its taxonomy and vector embedding.
 
         Args:
             block_id (UUID): The UUID of the block to retrieve.
@@ -123,102 +163,155 @@ class BlockService:
             Optional[BlockResponseSchema]: The block data if found, None otherwise.
         """
         try:
-            response = self.client.table("blocks").select("*").eq("block_id", str(block_id)).single().execute()
+            # Step 1: Retrieve Block
+            block = self.block_service.get_block_by_id(block_id)
+            if not block:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Block not found.")
 
-            if response.data:
-                block = BlockResponseSchema(**response.data)
-                self.logger.log(
-                    "BlockService",
-                    "info",
-                    "Block retrieved successfully",
-                    extra={
-                        "block_id": str(block.block_id),
-                        "name": block.name,
-                        "block_type": block.block_type.value
-                    }
-                )
-                return block
+            # Step 2: Retrieve Taxonomy
+            taxonomy = self.taxonomy_service.get_taxonomy_for_block(block_id=block.block_id)
+            if taxonomy:
+                block.taxonomy = taxonomy
             else:
                 self.logger.log(
-                    "BlockService",
+                    "BlockController",
                     "warning",
-                    "Block not found",
-                    extra={"block_id": str(block_id)}
+                    f"No taxonomy found for block {block.block_id}.",
+                    extra={"block_id": str(block.block_id)}
                 )
-                return None
+
+            # Step 3: Retrieve Vector Embedding
+            vector_embedding = self.vector_embedding_service.get_vector_embedding(block_id=block.block_id)
+            if vector_embedding:
+                block.vector_embedding = vector_embedding
+            else:
+                self.logger.log(
+                    "BlockController",
+                    "warning",
+                    f"No vector embedding found for block {block.block_id}.",
+                    extra={"block_id": str(block.block_id)}
+                )
+
+            # Step 4: Log the retrieval in Audit Logs
+            audit_log = {
+                "user_id": None,  # Replace with actual user ID if available
+                "action_type": "READ",
+                "entity_type": "block",
+                "entity_id": str(block.block_id),
+                "details": f"Block '{block.name}' retrieved."
+            }
+            self.audit_service.create_audit_log(audit_log)
+
+            self.logger.log(
+                "BlockController",
+                "info",
+                "Block retrieved successfully.",
+                block_id=block.block_id
+            )
+            return block
+
+        except HTTPException as he:
+            self.logger.log(
+                "BlockController",
+                "error",
+                f"HTTPException during block retrieval: {he.detail}",
+                extra={"status_code": he.status_code, "detail": he.detail}
+            )
+            raise he
         except Exception as e:
             self.logger.log(
-                "BlockService",
+                "BlockController",
                 "critical",
-                f"Exception during block retrieval: {e}",
+                f"Exception during block retrieval: {str(e)}",
                 extra={"traceback": traceback.format_exc()}
             )
-            return None
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error.")
 
     def update_block(self, block_id: UUID, update_data: BlockUpdateSchema) -> Optional[BlockResponseSchema]:
         """
-        Updates an existing block's information.
+        Updates an existing block's information, including optional taxonomy and vector embedding.
 
         Args:
             block_id (UUID): The UUID of the block to update.
-            update_data (BlockUpdateSchema): The data to update for the block.
+            update_data (BlockUpdateSchema): The data to update for the block, including optional taxonomy and metadata.
 
         Returns:
             Optional[BlockResponseSchema]: The updated block data if successful, None otherwise.
         """
         try:
-            data = update_data.dict(exclude_unset=True)
+            # Step 1: Update Block Details
+            block = self.block_service.update_block(block_id, update_data)
+            if not block:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Block update failed.")
 
-            if not data:
-                self.logger.log(
-                    "BlockService",
-                    "warning",
-                    "No update data provided",
-                    extra={"block_id": str(block_id)}
-                )
-                return None
+            # Step 2: Update Taxonomy Associations (if taxonomy provided)
+            if update_data.taxonomy:
+                taxonomy_success = self.taxonomy_service.create_taxonomy_for_block(block_id=block.block_id, taxonomy=update_data.taxonomy)
+                if not taxonomy_success:
+                    self.logger.log(
+                        "BlockController",
+                        "warning",
+                        f"Block {block.block_id} updated without taxonomy associations.",
+                        extra={"block_id": str(block.block_id)}
+                    )
+                    # Optionally, handle accordingly
 
-            # Update the 'updated_at' field
-            data['updated_at'] = datetime.utcnow()
+            # Step 3: Update Vector Embedding (if metadata provided)
+            if update_data.metadata:
+                vector_data = update_data.metadata.get("vector")  # Assuming 'vector' field exists and contains the embedding
+                if vector_data:
+                    vector_update_success = self.vector_embedding_service.update_vector_embedding(
+                        block_id=block.block_id,
+                        new_vector=vector_data,
+                        taxonomy_filters=update_data.taxonomy.dict() if update_data.taxonomy else None
+                    )
+                    if not vector_update_success:
+                        self.logger.log(
+                            "BlockController",
+                            "warning",
+                            f"Block {block.block_id} updated without vector embedding.",
+                            extra={"block_id": str(block.block_id)}
+                        )
+                        # Optionally, handle accordingly
 
-            # Serialize the data
-            serialized_data = serialize_dict(data)
+            # Step 4: Log the update in Audit Logs
+            audit_log = {
+                "user_id": update_data.updated_by,  # Assuming `updated_by` exists in BlockUpdateSchema
+                "action_type": "UPDATE",
+                "entity_type": "block",
+                "entity_id": str(block.block_id),
+                "details": f"Block '{block.name}' updated with fields: {list(update_data.dict().keys())}."
+            }
+            self.audit_service.create_audit_log(audit_log)
 
-            # Update the block in the database
-            response = self.client.table("blocks").update(serialized_data).eq("block_id", str(block_id)).execute()
+            self.logger.log(
+                "BlockController",
+                "info",
+                "Block updated successfully.",
+                block_id=block.block_id
+            )
+            return block
 
-            if response.data:
-                updated_block = BlockResponseSchema(**response.data[0])
-                self.logger.log(
-                    "BlockService",
-                    "info",
-                    "Block updated successfully",
-                    extra={
-                        "block_id": str(updated_block.block_id),
-                        "updated_fields": list(data.keys())
-                    }
-                )
-                return updated_block
-            else:
-                self.logger.log(
-                    "BlockService",
-                    "error",
-                    "Failed to update block",
-                    extra={"block_id": str(block_id), "error": str(response.error)}
-                )
-                return None
+        except HTTPException as he:
+            self.logger.log(
+                "BlockController",
+                "error",
+                f"HTTPException during block update: {he.detail}",
+                extra={"status_code": he.status_code, "detail": he.detail}
+            )
+            raise he
         except Exception as e:
             self.logger.log(
-                "BlockService",
+                "BlockController",
                 "critical",
-                f"Exception during block update: {e}",
+                f"Exception during block update: {str(e)}",
                 extra={"traceback": traceback.format_exc()}
             )
-            return None
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error.")
 
     def delete_block(self, block_id: UUID) -> bool:
         """
-        Deletes a block from the Supabase database and validates the deletion.
+        Deletes a block along with its associated taxonomy and vector embedding.
 
         Args:
             block_id (UUID): The UUID of the block to delete.
@@ -227,278 +320,341 @@ class BlockService:
             bool: True if deletion was successful, False otherwise.
         """
         try:
-            # Perform the delete operation
-            response = self.client.table("blocks").delete().eq("block_id", str(block_id)).execute()
-
-            if response.data and len(response.data) > 0:
+            # Step 1: Delete Vector Embedding (if exists)
+            vector_deletion_success = self.vector_embedding_service.delete_vector_embedding(block_id)
+            if not vector_deletion_success:
                 self.logger.log(
-                    "BlockService",
-                    "info",
-                    "Block deleted successfully",
+                    "BlockController",
+                    "warning",
+                    f"Failed to delete vector embedding for block {block_id}.",
                     extra={"block_id": str(block_id)}
                 )
+                # Proceed with block deletion regardless
 
-                # Validate deletion by attempting to retrieve the block without using .single()
-                validation_response = self.client.table("blocks").select("*").eq("block_id", str(block_id)).execute()
-
-                if not validation_response.data:
-                    self.logger.log(
-                        "BlockService",
-                        "info",
-                        "Deletion validated: Block no longer exists",
-                        extra={"block_id": str(block_id)}
-                    )
-                    return True
-                else:
-                    self.logger.log(
-                        "BlockService",
-                        "error",
-                        "Deletion validation failed: Block still exists",
-                        extra={"block_id": str(block_id)}
-                    )
-                    return False
-            else:
+            # Step 2: Delete Taxonomy Associations
+            taxonomy_deletion_success = self.taxonomy_service.delete_taxonomy_for_block(block_id=block_id)
+            if not taxonomy_deletion_success:
                 self.logger.log(
-                    "BlockService",
+                    "BlockController",
                     "warning",
-                    "Block not found or already deleted",
+                    f"Failed to delete taxonomy associations for block {block_id}.",
                     extra={"block_id": str(block_id)}
                 )
-                return False
+                # Proceed with block deletion regardless
+
+            # Step 3: Delete Block
+            block_deletion_success = self.block_service.delete_block(block_id)
+            if not block_deletion_success:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Block deletion failed.")
+
+            # Step 4: Log the deletion in Audit Logs
+            audit_log = {
+                "user_id": None,  # Replace with actual user ID if available
+                "action_type": "DELETE",
+                "entity_type": "block",
+                "entity_id": str(block_id),
+                "details": f"Block with ID '{block_id}' deleted along with its taxonomy and vector embedding."
+            }
+            self.audit_service.create_audit_log(audit_log)
+
+            self.logger.log(
+                "BlockController",
+                "info",
+                "Block deleted successfully along with taxonomy and vector embedding.",
+                block_id=block_id
+            )
+            return True
+
+        except HTTPException as he:
+            self.logger.log(
+                "BlockController",
+                "error",
+                f"HTTPException during block deletion: {he.detail}",
+                extra={"status_code": he.status_code, "detail": he.detail}
+            )
+            raise he
         except Exception as e:
             self.logger.log(
-                "BlockService",
+                "BlockController",
                 "critical",
-                f"Exception during block deletion: {e}",
+                f"Exception during block deletion: {str(e)}",
                 extra={"traceback": traceback.format_exc()}
             )
-            return False
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error.")
 
-    def list_blocks(self, filters: Optional[Dict[str, Any]] = None, limit: int = 100, offset: int = 0) -> Optional[List[BlockResponseSchema]]:
+    # -------------------
+    # Vector Embedding CRUD Operations
+    # -------------------
+
+    def create_vector_embedding(self, block_id: UUID, vector: List[float], taxonomy_filters: Optional[Dict[str, Any]] = None) -> Optional[VectorRepresentationSchema]:
         """
-        Retrieves a list of blocks with optional filtering and pagination.
+        Creates a vector embedding for a specific block.
 
         Args:
-            filters (Optional[Dict[str, Any]]): Key-value pairs to filter the blocks.
-            limit (int): Maximum number of blocks to retrieve.
-            offset (int): Number of blocks to skip for pagination.
+            block_id (UUID): UUID of the block.
+            vector (List[float]): The vector embedding to associate with the block.
+            taxonomy_filters (Optional[Dict[str, Any]]): Taxonomy constraints for the embedding.
 
         Returns:
-            Optional[List[BlockResponseSchema]]: A list of blocks if successful, None otherwise.
+            Optional[VectorRepresentationSchema]: The created vector embedding schema if successful, None otherwise.
         """
         try:
-            query = self.client.table("blocks").select("*").limit(limit).offset(offset)
-            if filters:
-                for key, value in filters.items():
-                    query = query.eq(key, value)
-            response = query.execute()
+            vector_embedding = VectorRepresentationSchema(
+                vector_id=uuid4(),
+                entity_type="block",
+                entity_id=block_id,
+                vector=vector,
+                taxonomy_filter=taxonomy_filters,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+            creation = self.vector_embedding_service.create_vector_embedding(vector_embedding)
+            if not creation:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Vector embedding creation failed.")
 
-            if response.data:
-                blocks = [BlockResponseSchema(**block) for block in response.data]
-                self.logger.log(
-                    "BlockService",
-                    "info",
-                    f"{len(blocks)} blocks retrieved successfully",
-                    extra={"filters": filters, "limit": limit, "offset": offset}
-                )
-                return blocks
-            else:
-                self.logger.log(
-                    "BlockService",
-                    "warning",
-                    "No blocks found",
-                    extra={"filters": filters, "limit": limit, "offset": offset}
-                )
-                return []
+            # Log the creation in Audit Logs
+            audit_log = {
+                "user_id": None,  # Replace with actual user ID if available
+                "action_type": "CREATE",
+                "entity_type": "vector_embedding",
+                "entity_id": str(vector_embedding.vector_id),
+                "details": f"Vector embedding created for block '{block_id}'."
+            }
+            self.audit_service.create_audit_log(audit_log)
+
+            self.logger.log(
+                "BlockController",
+                "info",
+                "Vector embedding created successfully.",
+                block_id=block_id,
+                vector_id=vector_embedding.vector_id
+            )
+            return vector_embedding
+
+        except HTTPException as he:
+            self.logger.log(
+                "BlockController",
+                "error",
+                f"HTTPException during vector embedding creation: {he.detail}",
+                extra={"status_code": he.status_code, "detail": he.detail}
+            )
+            raise he
         except Exception as e:
             self.logger.log(
-                "BlockService",
+                "BlockController",
                 "critical",
-                f"Exception during listing blocks: {e}",
-                extra={"traceback": traceback.format_exc()}
+                f"Exception during vector embedding creation: {str(e)}",
+                extra={"traceback": traceback.format_exc(), "block_id": str(block_id)}
             )
-            return None
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error.")
 
-    def assign_version_to_block(self, block_id: UUID, version_id: UUID) -> bool:
+    def get_vector_embedding(self, block_id: UUID) -> Optional[VectorRepresentationSchema]:
         """
-        Assigns a specific version to a block by updating the current_version_id.
+        Retrieves the vector embedding associated with a specific block.
 
         Args:
-            block_id (UUID): The UUID of the block.
-            version_id (UUID): The UUID of the version to assign.
+            block_id (UUID): UUID of the block.
 
         Returns:
-            bool: True if assignment was successful, False otherwise.
+            Optional[VectorRepresentationSchema]: The vector embedding schema if found, None otherwise.
         """
         try:
-            data = {"current_version_id": str(version_id), "updated_at": datetime.utcnow()}
-            response = self.client.table("blocks").update(data).eq("block_id", str(block_id)).execute()
+            vector_embedding = self.vector_embedding_service.get_vector_embedding(block_id)
+            if not vector_embedding:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vector embedding not found for the block.")
 
-            if response.data and len(response.data) > 0:
-                self.logger.log(
-                    "BlockService",
-                    "info",
-                    "Assigned version to block successfully",
-                    extra={"block_id": str(block_id), "version_id": str(version_id)}
-                )
-                return True
-            else:
-                self.logger.log(
-                    "BlockService",
-                    "error",
-                    "Failed to assign version to block",
-                    extra={"block_id": str(block_id), "version_id": str(version_id), "error": str(response.error)}
-                )
-                return False
-        except Exception as exc:
+            # Log the retrieval in Audit Logs
+            audit_log = {
+                "user_id": None,  # Replace with actual user ID if available
+                "action_type": "READ",
+                "entity_type": "vector_embedding",
+                "entity_id": str(vector_embedding.vector_id),
+                "details": f"Vector embedding retrieved for block '{block_id}'."
+            }
+            self.audit_service.create_audit_log(audit_log)
+
             self.logger.log(
-                "BlockService",
-                "critical",
-                f"Exception during assigning version to block: {exc}",
-                extra={"traceback": traceback.format_exc()}
+                "BlockController",
+                "info",
+                "Vector embedding retrieved successfully.",
+                block_id=block_id,
+                vector_id=vector_embedding.vector_id
             )
-            return False
+            return vector_embedding
 
-    def count_blocks(self, filters: Optional[Dict[str, Any]] = None) -> Optional[int]:
+        except HTTPException as he:
+            self.logger.log(
+                "BlockController",
+                "error",
+                f"HTTPException during vector embedding retrieval: {he.detail}",
+                extra={"status_code": he.status_code, "detail": he.detail}
+            )
+            raise he
+        except Exception as e:
+            self.logger.log(
+                "BlockController",
+                "critical",
+                f"Exception during vector embedding retrieval: {str(e)}",
+                extra={"traceback": traceback.format_exc(), "block_id": str(block_id)}
+            )
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error.")
+
+    def update_vector_embedding(self, block_id: UUID, new_vector: Optional[List[float]] = None, taxonomy_filters: Optional[Dict[str, Any]] = None) -> bool:
         """
-        Counts the total number of blocks with optional filtering.
+        Updates the vector embedding for a specific block.
 
         Args:
-            filters (Optional[Dict[str, Any]]): Key-value pairs to filter the blocks.
+            block_id (UUID): UUID of the block.
+            new_vector (Optional[List[float]]): New vector data to update.
+            taxonomy_filters (Optional[Dict[str, Any]]): New taxonomy constraints for RAG search.
 
         Returns:
-            Optional[int]: The count of blocks matching the filters, None otherwise.
+            bool: True if the update was successful, False otherwise.
         """
         try:
-            query = self.client.table("blocks").select("*", count='exact')
-            if filters:
-                for key, value in filters.items():
-                    query = query.eq(key, value)
-            response = query.execute()
+            update_success = self.vector_embedding_service.update_vector_embedding(block_id, new_vector, taxonomy_filters)
+            if not update_success:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Vector embedding update failed.")
 
-            if response.count is not None:
-                self.logger.log(
-                    "BlockService",
-                    "info",
-                    f"Total blocks count: {response.count}",
-                    extra={"filters": filters}
-                )
-                return response.count
-            else:
-                self.logger.log(
-                    "BlockService",
-                    "warning",
-                    "Failed to retrieve blocks count",
-                    extra={"filters": filters}
-                )
-                return None
-        except Exception as exc:
+            # Log the update in Audit Logs
+            audit_log = {
+                "user_id": None,  # Replace with actual user ID if available
+                "action_type": "UPDATE",
+                "entity_type": "vector_embedding",
+                "entity_id": str(block_id),  # Assuming entity_id refers to block_id
+                "details": f"Vector embedding updated for block '{block_id}'."
+            }
+            self.audit_service.create_audit_log(audit_log)
+
             self.logger.log(
-                "BlockService",
+                "BlockController",
+                "info",
+                "Vector embedding updated successfully.",
+                block_id=block_id
+            )
+            return True
+
+        except HTTPException as he:
+            self.logger.log(
+                "BlockController",
+                "error",
+                f"HTTPException during vector embedding update: {he.detail}",
+                extra={"status_code": he.status_code, "detail": he.detail}
+            )
+            raise he
+        except Exception as e:
+            self.logger.log(
+                "BlockController",
                 "critical",
-                f"Exception during counting blocks: {exc}",
+                f"Exception during vector embedding update: {str(e)}",
+                extra={"traceback": traceback.format_exc(), "block_id": str(block_id)}
+            )
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error.")
+
+    def delete_vector_embedding(self, block_id: UUID) -> bool:
+        """
+        Deletes the vector embedding associated with a specific block.
+
+        Args:
+            block_id (UUID): UUID of the block.
+
+        Returns:
+            bool: True if deletion was successful, False otherwise.
+        """
+        try:
+            deletion_success = self.vector_embedding_service.delete_vector_embedding(block_id)
+            if not deletion_success:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Vector embedding deletion failed.")
+
+            # Log the deletion in Audit Logs
+            audit_log = {
+                "user_id": None,  # Replace with actual user ID if available
+                "action_type": "DELETE",
+                "entity_type": "vector_embedding",
+                "entity_id": str(block_id),  # Assuming entity_id refers to block_id
+                "details": f"Vector embedding deleted for block '{block_id}'."
+            }
+            self.audit_service.create_audit_log(audit_log)
+
+            self.logger.log(
+                "BlockController",
+                "info",
+                "Vector embedding deleted successfully.",
+                block_id=block_id
+            )
+            return True
+
+        except HTTPException as he:
+            self.logger.log(
+                "BlockController",
+                "error",
+                f"HTTPException during vector embedding deletion: {he.detail}",
+                extra={"status_code": he.status_code, "detail": he.detail}
+            )
+            raise he
+        except Exception as e:
+            self.logger.log(
+                "BlockController",
+                "critical",
+                f"Exception during vector embedding deletion: {str(e)}",
+                extra={"traceback": traceback.format_exc(), "block_id": str(block_id)}
+            )
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error.")
+
+    # -------------------
+    # Similarity Search Operation
+    # -------------------
+
+    def perform_similarity_search(self, query_vector: List[float], taxonomy_filters: Optional[Dict[str, Any]] = None, top_k: int = 10) -> Optional[List[BlockResponseSchema]]:
+        """
+        Performs a similarity search over blocks based on the provided query vector and optional taxonomy filters.
+
+        Args:
+            query_vector (List[float]): The vector to search against.
+            taxonomy_filters (Optional[Dict[str, Any]]): Taxonomy constraints to filter the blocks before similarity search.
+            top_k (int): Number of top similar blocks to retrieve.
+
+        Returns:
+            Optional[List[BlockResponseSchema]]: List of blocks matching the similarity search criteria.
+        """
+        try:
+            similar_blocks = self.vector_embedding_service.search_similar_blocks(query_vector, taxonomy_filters, top_k)
+            if similar_blocks is None:
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Similarity search failed.")
+
+            # Log the search in Audit Logs
+            audit_log = {
+                "user_id": None,  # Replace with actual user ID if available
+                "action_type": "SEARCH",
+                "entity_type": "block",
+                "entity_id": None,
+                "details": f"Similarity search performed with query vector and taxonomy filters."
+            }
+            self.audit_service.create_audit_log(audit_log)
+
+            self.logger.log(
+                "BlockController",
+                "info",
+                f"Similarity search completed with {len(similar_blocks)} results.",
+                query_vector=query_vector,
+                taxonomy_filters=taxonomy_filters,
+                top_k=top_k
+            )
+            return similar_blocks
+
+        except HTTPException as he:
+            self.logger.log(
+                "BlockController",
+                "error",
+                f"HTTPException during similarity search: {he.detail}",
+                extra={"status_code": he.status_code, "detail": he.detail}
+            )
+            raise he
+        except Exception as e:
+            self.logger.log(
+                "BlockController",
+                "critical",
+                f"Exception during similarity search: {str(e)}",
                 extra={"traceback": traceback.format_exc()}
             )
-            return None
-
-
-if __name__ == "__main__":
-    import traceback
-
-    print("Starting BlockService tests...")
-    block_service = BlockService()
-
-    # Function to generate a unique block name
-    def generate_unique_name(base_name):
-        import random
-        return f"{base_name}_{random.randint(1000, 9999)}"
-
-    try:
-        # Create a block
-        block_name = generate_unique_name("Test Block")
-        new_block = BlockCreateSchema(
-            name=block_name,
-            block_type=BlockTypeEnum.dataset,
-            description="This is a test block"
-        )
-        print(f"Creating block: {new_block}")
-        created_block = block_service.create_block(new_block)
-
-        if created_block:
-            print(f"Created block: {created_block}")
-
-            # Get the block
-            retrieved_block = block_service.get_block_by_id(created_block.block_id)
-            if retrieved_block:
-                print(f"Retrieved block: {retrieved_block}")
-            else:
-                print("Failed to retrieve the created block.")
-
-            # Update the block
-            update_data = BlockUpdateSchema(description="Updated description")
-            updated_block = block_service.update_block(created_block.block_id, update_data)
-            if updated_block:
-                print(f"Updated block: {updated_block}")
-            else:
-                print("Failed to update the block.")
-
-            # List blocks
-            blocks = block_service.list_blocks()
-            if blocks is not None:
-                print(f"Listed {len(blocks)} blocks:")
-                for block in blocks:
-                    print(block)
-            else:
-                print("Failed to list blocks.")
-
-            # Delete the block
-            if block_service.delete_block(created_block.block_id):
-                print("Block deleted successfully.")
-            else:
-                print("Failed to delete block.")
-
-            # Verify deletion
-            post_delete_block = block_service.get_block_by_id(created_block.block_id)
-            if post_delete_block:
-                print("Error: Block still exists after deletion.")
-            else:
-                print("Deletion verified: Block no longer exists.")
-
-            # Create another block with a different name
-            another_block_name = generate_unique_name("Another Test Block")
-            another_block = BlockCreateSchema(
-                name=another_block_name,
-                block_type=BlockTypeEnum.model,
-                description="This is another test block"
-            )
-            created_another_block = block_service.create_block(another_block)
-            if created_another_block:
-                print(f"Created another block: {created_another_block}")
-
-                # Get the new block
-                retrieved_another_block = block_service.get_block_by_id(created_another_block.block_id)
-                if retrieved_another_block:
-                    print(f"Retrieved another block: {retrieved_another_block}")
-                else:
-                    print("Failed to retrieve the created another block.")
-
-                # Clean up: delete the second block
-                if block_service.delete_block(created_another_block.block_id):
-                    print("Second block deleted successfully.")
-                else:
-                    print("Failed to delete second block.")
-
-                # Verify deletion of the second block
-                post_delete_another_block = block_service.get_block_by_id(created_another_block.block_id)
-                if post_delete_another_block:
-                    print("Error: Second block still exists after deletion.")
-                else:
-                    print("Deletion verified: Second block no longer exists.")
-            else:
-                print("Failed to create another block.")
-        else:
-            print("Failed to create initial block.")
-    except Exception as exc:
-        print(f"An error occurred during the test: {str(exc)}")
-        print("Traceback:")
-        print(traceback.format_exc())
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal Server Error.")

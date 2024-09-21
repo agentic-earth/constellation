@@ -13,13 +13,20 @@ Design Philosophy:
 - Ensure flexibility to adapt to schema changes with minimal modifications.
 """
 
+import traceback
 from typing import Optional, List, Dict, Any
 from uuid import UUID
-from app.models import Edge, EdgeCreateSchema, EdgeUpdateSchema, EdgeResponseSchema
-from app.logger import ConstellationLogger
-from app.utils.helpers import SupabaseClientManager
-from app.schemas import EdgeResponseSchema
 from datetime import datetime
+
+from app.schemas import (
+    EdgeResponseSchema,
+    EdgeCreateSchema,
+    EdgeUpdateSchema,
+)
+from app.models import EdgeTypeEnum
+from app.logger import ConstellationLogger
+from app.database import get_supabase_client
+from app.utils.serialization_utils import serialize_dict
 
 
 class EdgeService:
@@ -31,7 +38,7 @@ class EdgeService:
         """
         Initializes the EdgeService with the Supabase client and logger.
         """
-        self.supabase_manager = SupabaseClientManager()
+        self.client = get_supabase_client()
         self.logger = ConstellationLogger()
 
     def create_edge(self, edge_data: EdgeCreateSchema) -> Optional[EdgeResponseSchema]:
@@ -46,17 +53,44 @@ class EdgeService:
         """
         try:
             # Convert Pydantic schema to dictionary
-            data = edge_data.dict()
-            response = self.supabase_manager.client.table("edges").insert(data).execute()
+            data = edge_data.dict(exclude_unset=True)
 
-            if response.status_code in [200, 201] and response.data:
-                created_edge = EdgeResponseSchema(**response.data[0])
+            # Ensure edge_type is a valid enum value
+            if not EdgeTypeEnum.has_value(data.get('edge_type')):
+                self.logger.log(
+                    "EdgeService",
+                    "error",
+                    f"Invalid edge_type: {data.get('edge_type')}",
+                    extra={"edge_type": data.get('edge_type')}
+                )
+                return None
+
+            # Add created_at and updated_at if not provided
+            current_time = datetime.utcnow()
+            data.setdefault('created_at', current_time)
+            data.setdefault('updated_at', current_time)
+
+            # Serialize the data
+            serialized_data = serialize_dict(data)
+
+            # Insert the new edge into the database
+            response = self.client.table("edges").insert(serialized_data).execute()
+
+            if response.data:
+                # If created_by is not in the response data, set it to None
+                response_data = response.data[0]
+                response_data.setdefault('created_by', None)
+
+                created_edge = EdgeResponseSchema(**response_data)
                 self.logger.log(
                     "EdgeService",
                     "info",
-                    "Edge created successfully",
-                    edge_id=created_edge.edge_id,
-                    name=created_edge.name
+                    f"Edge created successfully: {created_edge.edge_id}",
+                    extra={
+                        "edge_id": str(created_edge.edge_id),
+                        "name": created_edge.name,
+                        "edge_type": created_edge.edge_type.value
+                    }
                 )
                 return created_edge
             else:
@@ -64,15 +98,15 @@ class EdgeService:
                     "EdgeService",
                     "error",
                     "Failed to create edge",
-                    status_code=response.status_code,
-                    error=response.error
+                    extra={"error": str(response.error)}
                 )
                 return None
-        except Exception as e:
+        except Exception as exc:
             self.logger.log(
                 "EdgeService",
                 "critical",
-                f"Exception during edge creation: {e}"
+                f"Exception during edge creation: {exc}",
+                extra={"traceback": traceback.format_exc()}
             )
             return None
 
@@ -87,16 +121,19 @@ class EdgeService:
             Optional[EdgeResponseSchema]: The edge data if found, None otherwise.
         """
         try:
-            response = self.supabase_manager.client.table("edges").select("*").eq("edge_id", str(edge_id)).single().execute()
+            response = self.client.table("edges").select("*").eq("edge_id", str(edge_id)).single().execute()
 
-            if response.status_code == 200 and response.data:
+            if response.data:
                 edge = EdgeResponseSchema(**response.data)
                 self.logger.log(
                     "EdgeService",
                     "info",
                     "Edge retrieved successfully",
-                    edge_id=edge.edge_id,
-                    name=edge.name
+                    extra={
+                        "edge_id": str(edge.edge_id),
+                        "name": edge.name,
+                        "edge_type": edge.edge_type.value
+                    }
                 )
                 return edge
             else:
@@ -104,15 +141,15 @@ class EdgeService:
                     "EdgeService",
                     "warning",
                     "Edge not found",
-                    edge_id=edge_id,
-                    status_code=response.status_code
+                    extra={"edge_id": str(edge_id)}
                 )
                 return None
-        except Exception as e:
+        except Exception as exc:
             self.logger.log(
                 "EdgeService",
                 "critical",
-                f"Exception during edge retrieval: {e}"
+                f"Exception during edge retrieval: {exc}",
+                extra={"traceback": traceback.format_exc()}
             )
             return None
 
@@ -129,16 +166,45 @@ class EdgeService:
         """
         try:
             data = update_data.dict(exclude_unset=True)
-            response = self.supabase_manager.client.table("edges").update(data).eq("edge_id", str(edge_id)).execute()
 
-            if response.status_code == 200 and response.data:
+            if not data:
+                self.logger.log(
+                    "EdgeService",
+                    "warning",
+                    "No update data provided",
+                    extra={"edge_id": str(edge_id)}
+                )
+                return None
+
+            # Ensure edge_type is valid if it's being updated
+            if 'edge_type' in data and not EdgeTypeEnum.has_value(data['edge_type']):
+                self.logger.log(
+                    "EdgeService",
+                    "error",
+                    f"Invalid edge_type: {data.get('edge_type')}",
+                    extra={"edge_type": data.get('edge_type')}
+                )
+                return None
+
+            # Update the 'updated_at' field
+            data['updated_at'] = datetime.utcnow()
+
+            # Serialize the data
+            serialized_data = serialize_dict(data)
+
+            # Update the edge in the database
+            response = self.client.table("edges").update(serialized_data).eq("edge_id", str(edge_id)).execute()
+
+            if response.data:
                 updated_edge = EdgeResponseSchema(**response.data[0])
                 self.logger.log(
                     "EdgeService",
                     "info",
                     "Edge updated successfully",
-                    edge_id=updated_edge.edge_id,
-                    updated_fields=list(data.keys())
+                    extra={
+                        "edge_id": str(updated_edge.edge_id),
+                        "updated_fields": list(data.keys())
+                    }
                 )
                 return updated_edge
             else:
@@ -146,22 +212,21 @@ class EdgeService:
                     "EdgeService",
                     "error",
                     "Failed to update edge",
-                    edge_id=edge_id,
-                    status_code=response.status_code,
-                    error=response.error
+                    extra={"edge_id": str(edge_id), "error": str(response.error)}
                 )
                 return None
-        except Exception as e:
+        except Exception as exc:
             self.logger.log(
                 "EdgeService",
                 "critical",
-                f"Exception during edge update: {e}"
+                f"Exception during edge update: {exc}",
+                extra={"traceback": traceback.format_exc()}
             )
             return None
 
     def delete_edge(self, edge_id: UUID) -> bool:
         """
-        Deletes an edge from the Supabase database.
+        Deletes an edge from the Supabase database and validates the deletion.
 
         Args:
             edge_id (UUID): The UUID of the edge to delete.
@@ -170,57 +235,79 @@ class EdgeService:
             bool: True if deletion was successful, False otherwise.
         """
         try:
-            response = self.supabase_manager.client.table("edges").delete().eq("edge_id", str(edge_id)).execute()
+            # Perform the delete operation
+            response = self.client.table("edges").delete().eq("edge_id", str(edge_id)).execute()
 
-            if response.status_code == 200 and response.count > 0:
+            if response.data and len(response.data) > 0:
                 self.logger.log(
                     "EdgeService",
                     "info",
                     "Edge deleted successfully",
-                    edge_id=edge_id
+                    extra={"edge_id": str(edge_id)}
                 )
-                return True
+
+                # Validate deletion by attempting to retrieve the edge without using .single()
+                validation_response = self.client.table("edges").select("*").eq("edge_id", str(edge_id)).execute()
+
+                if not validation_response.data:
+                    self.logger.log(
+                        "EdgeService",
+                        "info",
+                        "Deletion validated: Edge no longer exists",
+                        extra={"edge_id": str(edge_id)}
+                    )
+                    return True
+                else:
+                    self.logger.log(
+                        "EdgeService",
+                        "error",
+                        "Deletion validation failed: Edge still exists",
+                        extra={"edge_id": str(edge_id)}
+                    )
+                    return False
             else:
                 self.logger.log(
                     "EdgeService",
                     "warning",
                     "Edge not found or already deleted",
-                    edge_id=edge_id,
-                    status_code=response.status_code
+                    extra={"edge_id": str(edge_id)}
                 )
                 return False
-        except Exception as e:
+        except Exception as exc:
             self.logger.log(
                 "EdgeService",
                 "critical",
-                f"Exception during edge deletion: {e}"
+                f"Exception during edge deletion: {exc}",
+                extra={"traceback": traceback.format_exc()}
             )
             return False
 
-    def list_edges(self, filters: Optional[Dict[str, Any]] = None) -> Optional[List[EdgeResponseSchema]]:
+    def list_edges(self, filters: Optional[Dict[str, Any]] = None, limit: int = 100, offset: int = 0) -> Optional[List[EdgeResponseSchema]]:
         """
-        Retrieves a list of edges with optional filtering.
+        Retrieves a list of edges with optional filtering and pagination.
 
         Args:
             filters (Optional[Dict[str, Any]]): Key-value pairs to filter the edges.
+            limit (int): Maximum number of edges to retrieve.
+            offset (int): Number of edges to skip for pagination.
 
         Returns:
             Optional[List[EdgeResponseSchema]]: A list of edges if successful, None otherwise.
         """
         try:
-            query = self.supabase_manager.client.table("edges").select("*")
+            query = self.client.table("edges").select("*").limit(limit).offset(offset)
             if filters:
                 for key, value in filters.items():
                     query = query.eq(key, value)
             response = query.execute()
 
-            if response.status_code == 200 and response.data:
+            if response.data:
                 edges = [EdgeResponseSchema(**edge) for edge in response.data]
                 self.logger.log(
                     "EdgeService",
                     "info",
                     f"{len(edges)} edges retrieved successfully",
-                    filters=filters
+                    extra={"filters": filters, "limit": limit, "offset": offset}
                 )
                 return edges
             else:
@@ -228,15 +315,15 @@ class EdgeService:
                     "EdgeService",
                     "warning",
                     "No edges found",
-                    filters=filters,
-                    status_code=response.status_code
+                    extra={"filters": filters, "limit": limit, "offset": offset}
                 )
                 return []
-        except Exception as e:
+        except Exception as exc:
             self.logger.log(
                 "EdgeService",
                 "critical",
-                f"Exception during listing edges: {e}"
+                f"Exception during listing edges: {exc}",
+                extra={"traceback": traceback.format_exc()}
             )
             return None
 
@@ -252,16 +339,20 @@ class EdgeService:
             bool: True if assignment was successful, False otherwise.
         """
         try:
-            data = {"current_version_id": str(version_id)}
-            response = self.supabase_manager.client.table("edges").update(data).eq("edge_id", str(edge_id)).execute()
+            data = {
+                "current_version_id": str(version_id),
+                "updated_at": datetime.utcnow()
+            }
+            serialized_data = serialize_dict(data)
 
-            if response.status_code == 200 and response.data:
+            response = self.client.table("edges").update(serialized_data).eq("edge_id", str(edge_id)).execute()
+
+            if response.data and len(response.data) > 0:
                 self.logger.log(
                     "EdgeService",
                     "info",
                     "Assigned version to edge successfully",
-                    edge_id=edge_id,
-                    version_id=version_id
+                    extra={"edge_id": str(edge_id), "version_id": str(version_id)}
                 )
                 return True
             else:
@@ -269,38 +360,35 @@ class EdgeService:
                     "EdgeService",
                     "error",
                     "Failed to assign version to edge",
-                    edge_id=edge_id,
-                    version_id=version_id,
-                    status_code=response.status_code,
-                    error=response.error
+                    extra={"edge_id": str(edge_id), "version_id": str(version_id), "error": str(response.error)}
                 )
                 return False
-        except Exception as e:
+        except Exception as exc:
             self.logger.log(
                 "EdgeService",
                 "critical",
-                f"Exception during assigning version to edge: {e}"
+                f"Exception during assigning version to edge: {exc}",
+                extra={"traceback": traceback.format_exc()}
             )
             return False
-        
 
-   # Existing CRUD methods...
-
-    def search_edges(self, query: Dict[str, Any]) -> Optional[List[EdgeResponseSchema]]:
+    def search_edges(self, query_params: Dict[str, Any], limit: int = 100, offset: int = 0) -> Optional[List[EdgeResponseSchema]]:
         """
-        Searches for edges based on provided query parameters.
+        Searches for edges based on provided query parameters with pagination.
 
         Args:
-            query (Dict[str, Any]): A dictionary of query parameters for filtering.
+            query_params (Dict[str, Any]): A dictionary of query parameters for filtering.
+            limit (int): Maximum number of edges to retrieve.
+            offset (int): Number of edges to skip for pagination.
 
         Returns:
             Optional[List[EdgeResponseSchema]]: A list of edges matching the search criteria.
         """
         try:
-            supabase_query = self.supabase_manager.client.table("edges").select("*")
+            supabase_query = self.client.table("edges").select("*").limit(limit).offset(offset)
 
             # Apply filters based on the query parameters
-            for key, value in query.items():
+            for key, value in query_params.items():
                 if isinstance(value, list):
                     supabase_query = supabase_query.in_(key, value)
                 else:
@@ -308,13 +396,13 @@ class EdgeService:
 
             response = supabase_query.execute()
 
-            if response.status_code == 200 and response.data:
+            if response.data:
                 edges = [EdgeResponseSchema(**edge) for edge in response.data]
                 self.logger.log(
                     "EdgeService",
                     "info",
                     f"{len(edges)} edges found matching the search criteria.",
-                    query=query
+                    extra={"query": query_params, "limit": limit, "offset": offset}
                 )
                 return edges
             else:
@@ -322,14 +410,159 @@ class EdgeService:
                     "EdgeService",
                     "warning",
                     "No edges found matching the search criteria.",
-                    query=query,
-                    status_code=response.status_code
+                    extra={"query": query_params, "limit": limit, "offset": offset}
                 )
                 return []
-        except Exception as e:
+        except Exception as exc:
             self.logger.log(
                 "EdgeService",
                 "critical",
-                f"Exception during edge search: {e}"
+                f"Exception during edge search: {exc}",
+                extra={"traceback": traceback.format_exc()}
             )
             return None
+
+    def count_edges(self, filters: Optional[Dict[str, Any]] = None) -> Optional[int]:
+        """
+        Counts the total number of edges with optional filtering.
+
+        Args:
+            filters (Optional[Dict[str, Any]]): Key-value pairs to filter the edges.
+
+        Returns:
+            Optional[int]: The count of edges matching the filters, None otherwise.
+        """
+        try:
+            query = self.client.table("edges").select("*", count='exact')
+            if filters:
+                for key, value in filters.items():
+                    query = query.eq(key, value)
+            response = query.execute()
+
+            if response.count is not None:
+                self.logger.log(
+                    "EdgeService",
+                    "info",
+                    f"Total edges count: {response.count}",
+                    extra={"filters": filters}
+                )
+                return response.count
+            else:
+                self.logger.log(
+                    "EdgeService",
+                    "warning",
+                    "Failed to retrieve edges count",
+                    extra={"filters": filters}
+                )
+                return None
+        except Exception as exc:
+            self.logger.log(
+                "EdgeService",
+                "critical",
+                f"Exception during counting edges: {exc}",
+                extra={"traceback": traceback.format_exc()}
+            )
+            return None
+
+
+if __name__ == "__main__":
+    import traceback
+
+    print("Starting EdgeService tests...")
+    edge_service = EdgeService()
+
+    # Function to generate a unique edge name
+    def generate_unique_name(base_name):
+        import random
+        return f"{base_name}_{random.randint(1000, 9999)}"
+
+    try:
+        # Create an edge
+        edge_name = generate_unique_name("Test-Edge")
+        new_edge = EdgeCreateSchema(
+            name=edge_name,
+            edge_type=EdgeTypeEnum.primary,
+            description="This is a test edge"
+        )
+        print(f"Creating edge: {new_edge}")
+        created_edge = edge_service.create_edge(new_edge)
+
+        if created_edge:
+            print(f"Created edge: {created_edge}")
+
+            # Get the edge
+            retrieved_edge = edge_service.get_edge_by_id(created_edge.edge_id)
+            if retrieved_edge:
+                print(f"Retrieved edge: {retrieved_edge}")
+            else:
+                print("Failed to retrieve the created edge.")
+
+            # Update the edge
+            update_data = EdgeUpdateSchema(description="Updated description")
+            updated_edge = edge_service.update_edge(created_edge.edge_id, update_data)
+            if updated_edge:
+                print(f"Updated edge: {updated_edge}")
+            else:
+                print("Failed to update the edge.")
+
+            # List edges
+            edges = edge_service.list_edges()
+            if edges is not None:
+                print(f"Listed {len(edges)} edges:")
+                for edge in edges:
+                    print(edge)
+            else:
+                print("Failed to list edges.")
+
+            # Delete the edge
+            if edge_service.delete_edge(created_edge.edge_id):
+                print("Edge deleted successfully.")
+            else:
+                print("Failed to delete edge.")
+
+            # Verify deletion
+            post_delete_edge = edge_service.get_edge_by_id(created_edge.edge_id)
+            if post_delete_edge:
+                print("Error: Edge still exists after deletion.")
+            else:
+                print("Deletion verified: Edge no longer exists.")
+
+
+            # Create another edge with a different name
+            another_edge_name = generate_unique_name("Another-Test-Edge")
+            another_edge = EdgeCreateSchema(
+                name=another_edge_name,
+                edge_type=EdgeTypeEnum.secondary,
+                description="This is another test edge"
+            )
+            created_another_edge = edge_service.create_edge(another_edge)
+            if created_another_edge:
+                print(f"Created another edge: {created_another_edge}")
+
+                # Get the new edge
+                retrieved_another_edge = edge_service.get_edge_by_id(created_another_edge.edge_id)
+                if retrieved_another_edge:
+                    print(f"Retrieved another edge: {retrieved_another_edge}")
+                else:
+                    print("Failed to retrieve the created another edge.")
+
+                # Clean up: delete the second edge
+                if edge_service.delete_edge(created_another_edge.edge_id):
+                    print("Second edge deleted successfully.")
+                else:
+                    print("Failed to delete second edge.")
+
+                # Verify deletion of the second edge
+                post_delete_another_edge = edge_service.get_edge_by_id(created_another_edge.edge_id)
+                if post_delete_another_edge:
+                    print("Error: Second edge still exists after deletion.")
+                else:
+                    print("Deletion verified: Second edge no longer exists.")
+            else:
+                print("Failed to create another edge.")
+        else:
+            print("Failed to create initial edge.")
+    except Exception as exc:
+        print(f"An error occurred during the test: {exc}")
+        print("Traceback:")
+        print(traceback.format_exc())

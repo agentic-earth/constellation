@@ -20,6 +20,15 @@ class BlockTypeEnum(str, Enum):
         return value in cls._value2member_map_
 
 
+class EdgeTypeEnum(str, Enum):
+    primary = 'primary'
+    secondary = 'secondary'
+
+    @classmethod
+    def has_value(cls, value):
+        return value in cls._value2member_map_
+
+
 class EntityTypeEnum(str, Enum):
     block = 'block'
     edge = 'edge'
@@ -68,6 +77,7 @@ class AuditEntityTypeEnum(str, Enum):
 
 class BaseModelConfig(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
 
 class User(BaseModelConfig):
     user_id: UUID
@@ -155,6 +165,7 @@ class Dependency(BaseModelConfig):
 class Edge(BaseModelConfig):
     edge_id: UUID
     name: str
+    edge_type: EdgeTypeEnum  # Added edge_type
     description: Optional[str]
     current_version_id: Optional[UUID]
     created_at: datetime
