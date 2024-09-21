@@ -1,7 +1,8 @@
 fastapi
 uvicorn[standard]
-supabase-py
+supabase
 pydantic
+pydantic-settings
 python-dotenv
 loguru
 pytest

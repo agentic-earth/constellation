@@ -17,7 +17,7 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID
 from app.models import AuditLog, AuditLogCreateSchema, AuditLogResponseSchema
 from app.logger import ConstellationLogger
-from app.utils.helpers import SupabaseClientManager
+from app.database import get_supabase_client
 from app.schemas import AuditLogResponseSchema
 from datetime import datetime
 
@@ -31,7 +31,7 @@ class AuditService:
         """
         Initializes the AuditService with the Supabase client and logger.
         """
-        self.supabase_manager = SupabaseClientManager()
+        self.client = get_supabase_client()
         self.logger = ConstellationLogger()
 
     def create_audit_log(self, audit_data: AuditLogCreateSchema) -> Optional[AuditLogResponseSchema]:
@@ -47,7 +47,7 @@ class AuditService:
         try:
             # Convert Pydantic schema to dictionary
             data = audit_data.dict()
-            response = self.supabase_manager.client.table("audit_logs").insert(data).execute()
+            response = self.client.table("audit_logs").insert(data).execute()
 
             if response.status_code in [200, 201] and response.data:
                 created_audit = AuditLogResponseSchema(**response.data[0])
@@ -90,7 +90,7 @@ class AuditService:
             Optional[AuditLogResponseSchema]: The audit log data if found, None otherwise.
         """
         try:
-            response = self.supabase_manager.client.table("audit_logs").select("*").eq("log_id", str(log_id)).single().execute()
+            response = self.client.table("audit_logs").select("*").eq("log_id", str(log_id)).single().execute()
 
             if response.status_code == 200 and response.data:
                 audit_log = AuditLogResponseSchema(**response.data)
@@ -133,7 +133,7 @@ class AuditService:
             Optional[List[AuditLogResponseSchema]]: A list of audit logs if successful, None otherwise.
         """
         try:
-            query = self.supabase_manager.client.table("audit_logs").select("*")
+            query = self.client.table("audit_logs").select("*")
             if filters:
                 for key, value in filters.items():
                     query = query.eq(key, value)
@@ -176,7 +176,7 @@ class AuditService:
             bool: True if deletion was successful, False otherwise.
         """
         try:
-            response = self.supabase_manager.client.table("audit_logs").delete().eq("log_id", str(log_id)).execute()
+            response = self.client.table("audit_logs").delete().eq("log_id", str(log_id)).execute()
 
             if response.status_code == 200 and response.count > 0:
                 self.logger.log(
