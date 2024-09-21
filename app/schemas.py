@@ -4,6 +4,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List, Dict, Any
 from uuid import UUID
 from datetime import datetime
+from pydantic import ConfigDict
 
 from app.models import (
     BlockTypeEnum,
@@ -13,9 +14,10 @@ from app.models import (
     VerificationStatusEnum,
     ActionTypeEnum,
     AuditEntityTypeEnum,
-    EdgeTypeEnum,  # Ensure EdgeTypeEnum is imported
+    EdgeTypeEnum,
 )
 
+# Base configuration for all schemas
 
 # Base configuration for all schemas
 class BaseSchema(BaseModel):
@@ -23,8 +25,8 @@ class BaseSchema(BaseModel):
     BaseSchema serves as the foundational schema for all other Pydantic models.
     It enables ORM mode for seamless integration with database models.
     """
-    class Config:
-        from_attributes = True  
+    model_config = ConfigDict(from_attributes=True)  # Updated for Pydantic v2
+
 
 # -------------------
 # User Schemas
@@ -143,6 +145,8 @@ class BlockCreateSchema(BaseSchema):
     block_type: BlockTypeEnum = Field(..., description="Type of the block (e.g., 'dataset', 'model').")
     description: Optional[str] = Field(None, description="Description of the block.")
     created_by: Optional[UUID] = Field(None, description="UUID of the user creating the block.")
+    taxonomy: Optional[Dict[str, Any]] = Field(None, description="Taxonomy data associated with the block.")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata for the block.")
 
 
 class BlockUpdateSchema(BaseSchema):
@@ -152,6 +156,9 @@ class BlockUpdateSchema(BaseSchema):
     name: Optional[str] = Field(None, description="New name for the block.")
     block_type: Optional[BlockTypeEnum] = Field(None, description="New type for the block.")
     description: Optional[str] = Field(None, description="New description for the block.")
+    updated_by: Optional[UUID] = Field(None, description="UUID of the user updating the block.")
+    taxonomy: Optional[Dict[str, Any]] = Field(None, description="Updated taxonomy data for the block.")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Updated metadata for the block.")
 
 
 class BlockResponseSchema(BaseSchema):
@@ -164,10 +171,12 @@ class BlockResponseSchema(BaseSchema):
     description: str = Field(..., description="Description of the block.")
     created_at: datetime = Field(..., description="Timestamp when the block was created.")
     updated_at: datetime = Field(..., description="Timestamp when the block was last updated.")
-    current_version_id: UUID = Field(..., description="UUID of the current version of the block.")
-    taxonomy: Optional[Dict[str, Any]] = Field(None, description="Taxonomy details associated with the block.")
+    current_version_id: Optional[UUID] = Field(None, description="UUID of the current version of the block.")
+    created_by: Optional[UUID] = Field(None, description="UUID of the user who created the block.")
+    updated_by: Optional[UUID] = Field(None, description="UUID of the user who last updated the block.")
+    taxonomy: Optional[Dict[str, Any]] = Field(None, description="Taxonomy data associated with the block.")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata for the block.")
     vector_embedding: Optional["VectorRepresentationSchema"] = Field(None, description="Vector embedding associated with the block.")
-
 
 
 # -------------------

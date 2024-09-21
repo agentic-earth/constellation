@@ -13,9 +13,10 @@ Design Philosophy:
 - Ensure flexibility to adapt to schema changes with minimal modifications.
 """
 
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from uuid import UUID
-from app.models import User, UserCreateSchema, UserUpdateSchema, UserResponseSchema
+from app.models import User
+from app.schemas import UserCreateSchema, UserUpdateSchema, UserResponseSchema
 from app.logger import ConstellationLogger
 from app.utils.helpers import SupabaseClientManager
 from app.schemas import UserResponseSchema
