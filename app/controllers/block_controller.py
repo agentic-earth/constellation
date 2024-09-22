@@ -231,24 +231,6 @@ class BlockController:
                     )
                     # Optionally, handle accordingly
 
-            # Step 3: Update Vector Embedding (if metadata provided)
-            if update_data.metadata:
-                text_for_embedding = update_data.metadata.get("text")  # Assuming 'text' field exists in metadata
-                if text_for_embedding:
-                    vector_update_success = self.vector_embedding_service.update_vector_embedding(
-                        block_id=block.block_id,
-                        text=text_for_embedding,
-                        taxonomy_filters=update_data.taxonomy.dict() if update_data.taxonomy else None
-                    )
-                    if not vector_update_success:
-                        self.logger.log(
-                            "BlockController",
-                            "warning",
-                            f"Block {block.block_id} updated without vector embedding.",
-                            extra={"block_id": str(block.block_id)}
-                        )
-                        # Optionally, handle accordingly
-
             # Step 4: Log the update in Audit Logs
             audit_log = {
                 "user_id": update_data.updated_by,  # Assuming `updated_by` exists in BlockUpdateSchema
@@ -296,7 +278,7 @@ class BlockController:
         """
         try:
             # Step 1: Delete Vector Embedding (if exists)
-            vector_deletion_success = self.vector_embedding_service.delete_vector_embedding(block_id=block_id)
+            self.vector_embedding_service.delete_vector_embedding(block_id=block_id)
             if not vector_deletion_success:
                 self.logger.log(
                     "BlockController",
@@ -374,7 +356,11 @@ class BlockController:
             Optional[VectorRepresentationSchema]: The created vector embedding schema if successful, None otherwise.
         """
         try:
-            vector_embedding = self.vector_embedding_service.create_vector_embedding(block_id, text, taxonomy_filters)
+            vector_embedding = self.vector_embedding_service.create_vector_embedding(
+                block_id=block_id,
+                text=text,
+                taxonomy_filters=taxonomy_filters
+            )
             if not vector_embedding:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Vector embedding creation failed.")
 
