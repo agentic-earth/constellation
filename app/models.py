@@ -16,16 +16,17 @@ class BlockTypeEnum(str, Enum):
     model = 'model'
 
     @classmethod
-    def has_value(cls, value):
+    def has_value(cls, value: str) -> bool:
         return value in cls._value2member_map_
 
 
 class EdgeTypeEnum(str, Enum):
-    primary = 'primary'
-    secondary = 'secondary'
+    primary = "primary"
+    secondary = "secondary"
+    tertiary = "tertiary"  # Added tertiary member
 
     @classmethod
-    def has_value(cls, value):
+    def has_value(cls, value: str) -> bool:
         return value in cls._value2member_map_
 
 
@@ -33,16 +34,28 @@ class EntityTypeEnum(str, Enum):
     block = 'block'
     edge = 'edge'
 
+    @classmethod
+    def has_value(cls, value: str) -> bool:
+        return value in cls._value2member_map_
+
 
 class BuildStatusEnum(str, Enum):
     pending = 'pending'
     success = 'success'
     failed = 'failed'
 
+    @classmethod
+    def has_value(cls, value: str) -> bool:
+        return value in cls._value2member_map_
+
 
 class DependencyTypeEnum(str, Enum):
     internal = 'internal'
     external = 'external'
+
+    @classmethod
+    def has_value(cls, value: str) -> bool:
+        return value in cls._value2member_map_
 
 
 class VerificationStatusEnum(str, Enum):
@@ -50,12 +63,20 @@ class VerificationStatusEnum(str, Enum):
     passed = 'passed'
     failed = 'failed'
 
+    @classmethod
+    def has_value(cls, value: str) -> bool:
+        return value in cls._value2member_map_
+
 
 class ActionTypeEnum(str, Enum):
     CREATE = 'CREATE'
     READ = 'READ'
     UPDATE = 'UPDATE'
     DELETE = 'DELETE'
+
+    @classmethod
+    def has_value(cls, value: str) -> bool:
+        return value in cls._value2member_map_
 
 
 class AuditEntityTypeEnum(str, Enum):
@@ -69,6 +90,10 @@ class AuditEntityTypeEnum(str, Enum):
     code_repo = 'code_repo'
     docker_image = 'docker_image'
     verification = 'verification'
+
+    @classmethod
+    def has_value(cls, value: str) -> bool:
+        return value in cls._value2member_map_
 
 
 # -------------------

@@ -64,6 +64,7 @@ class UserUpdateSchema(BaseSchema):
     """
     Schema for updating an existing user.
     """
+
     username: Optional[str] = Field(None, description="New username for the user.")
     email: Optional[EmailStr] = Field(None, description="New email address for the user.")
     password_hash: Optional[str] = Field(None, description="New hashed password for the user.")
@@ -347,6 +348,7 @@ class EdgeUpdateSchema(BaseSchema):
     name: Optional[str] = Field(None, description="New name for the edge.")
     edge_type: Optional[EdgeTypeEnum] = Field(None, description="New type for the edge.")
     description: Optional[str] = Field(None, description="New description for the edge.")
+    updated_by: Optional[UUID] = None  # Added updated_by field
 
     @field_validator('name')
     def name_no_spaces(cls, v):

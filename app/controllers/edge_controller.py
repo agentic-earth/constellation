@@ -4,43 +4,42 @@
 Edge Controller Module
 
 This module defines the EdgeController class responsible for managing edge-related operations.
-It handles both basic CRUD operations for edges and complex workflows that may involve
-multiple services or additional business logic.
+It orchestrates interactions between EdgeService and AuditService to perform CRUD operations
+and handle search functionalities.
 
 Responsibilities:
-- Coordinating between EdgeService and AuditService to perform edge-related operations.
-- Managing transactions to ensure data consistency across multiple service operations.
-- Handling higher-level business logic specific to edges.
+- Coordinating between EdgeService and AuditService to perform edge-related workflows.
+- Handling CRUD operations for edges.
+- Managing search functionalities with optional filtering.
+- Ensuring transactional integrity and robust error handling.
+- Managing audit logs through AuditService.
 
 Design Philosophy:
 - Maintain high cohesion by focusing solely on edge-related orchestration.
 - Promote loose coupling by interacting with services through well-defined interfaces.
 - Ensure robustness through comprehensive error handling and logging.
-
-Usage Example:
-    from app.controllers import EdgeController
-
-    edge_controller = EdgeController()
-    new_edge = edge_controller.create_edge(edge_data)
 """
 
+import traceback
 from typing import List, Optional, Dict, Any
 from uuid import UUID
-from app.services import (
-    EdgeService,
-    AuditService
-)
+
+from fastapi import HTTPException, status
+
+from app.services.edge_service import EdgeService
+from app.services.audit_service import AuditService
 from app.schemas import (
     EdgeCreateSchema,
     EdgeUpdateSchema,
-    EdgeResponseSchema
+    EdgeResponseSchema,
 )
 from app.logger import ConstellationLogger
+
 
 class EdgeController:
     """
     EdgeController manages all edge-related operations, coordinating between EdgeService
-    and AuditService to perform CRUD operations and handle complex business logic.
+    to perform CRUD operations and handle search functionalities.
     """
 
     def __init__(self):
@@ -53,10 +52,10 @@ class EdgeController:
         self.logger = ConstellationLogger()
 
     # -------------------
-    # Basic Edge Operations
+    # Edge CRUD Operations
     # -------------------
 
-    def create_edge(self, edge_data: EdgeCreateSchema) -> Optional[EdgeResponseSchema]:
+    def create_edge(self, edge_data: EdgeCreateSchema) -> EdgeResponseSchema:
         """
         Creates a new edge.
 
@@ -64,36 +63,62 @@ class EdgeController:
             edge_data (EdgeCreateSchema): The data required to create a new edge.
 
         Returns:
-            Optional[EdgeResponseSchema]: The created edge data if successful, None otherwise.
+            EdgeResponseSchema: The created edge data if successful.
+
+        Raises:
+            HTTPException: If edge creation fails due to validation or server errors.
         """
         try:
+            # Step 1: Create Edge
             edge = self.edge_service.create_edge(edge_data)
-            if edge:
-                # Optionally, create an audit log for the creation
-                audit_log = {
-                    "user_id": edge_data.created_by,  # Assuming `created_by` exists in EdgeCreateSchema
-                    "action_type": "CREATE",
-                    "entity_type": "edge",
-                    "entity_id": edge.edge_id,
-                    "details": f"Edge '{edge.name}' created."
-                }
-                self.audit_service.create_audit_log(audit_log)
-                self.logger.log(
-                    "EdgeController",
-                    "info",
-                    "Edge created successfully.",
-                    edge_id=edge.edge_id
+            if not edge:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Edge creation failed due to invalid data."
                 )
+
+            # Step 2: Log the creation in Audit Logs
+            audit_log = {
+                "user_id": edge_data.created_by,  # Assuming `created_by` exists in EdgeCreateSchema
+                "action_type": "CREATE",
+                "entity_type": "edge",
+                "entity_id": str(edge.edge_id),
+                "details": f"Edge '{edge.name}' created successfully."
+            }
+            self.audit_service.create_audit_log(audit_log)
+
+            # Step 3: Log the creation in ConstellationLogger
+            self.logger.log(
+                "EdgeController",
+                "info",
+                "Edge created successfully.",
+                extra={"edge_id": str(edge.edge_id)}
+            )
             return edge
+
+        except HTTPException as he:
+            # Log HTTPExceptions with error level
+            self.logger.log(
+                "EdgeController",
+                "error",
+                f"HTTPException during edge creation: {he.detail}",
+                extra={"status_code": he.status_code, "detail": he.detail}
+            )
+            raise he
         except Exception as e:
+            # Log unexpected exceptions with critical level
             self.logger.log(
                 "EdgeController",
                 "critical",
-                f"Exception during edge creation: {e}"
+                f"Exception during edge creation: {str(e)}",
+                extra={"traceback": traceback.format_exc()}
             )
-            return None
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Internal Server Error during edge creation."
+            )
 
-    def get_edge_by_id(self, edge_id: UUID) -> Optional[EdgeResponseSchema]:
+    def get_edge_by_id(self, edge_id: UUID) -> EdgeResponseSchema:
         """
         Retrieves an edge by its unique identifier.
 
@@ -101,27 +126,72 @@ class EdgeController:
             edge_id (UUID): The UUID of the edge to retrieve.
 
         Returns:
-            Optional[EdgeResponseSchema]: The edge data if found, None otherwise.
+            EdgeResponseSchema: The edge data if found.
+
+        Raises:
+            HTTPException: If the edge is not found or retrieval fails.
         """
         try:
+            # Step 1: Retrieve Edge
             edge = self.edge_service.get_edge_by_id(edge_id)
-            if edge:
-                self.logger.log(
-                    "EdgeController",
-                    "info",
-                    "Edge retrieved successfully.",
-                    edge_id=edge.edge_id
+            if not edge:
+                # Log the failed retrieval in Audit Logs
+                audit_log = {
+                    "user_id": None,  # Replace with actual user ID if available
+                    "action_type": "READ",
+                    "entity_type": "edge",
+                    "entity_id": str(edge_id),
+                    "details": "Edge not found."
+                }
+                self.audit_service.create_audit_log(audit_log)
+
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Edge not found."
                 )
+
+            # Step 2: Log the retrieval in Audit Logs
+            audit_log = {
+                "user_id": None,  # Replace with actual user ID if available
+                "action_type": "READ",
+                "entity_type": "edge",
+                "entity_id": str(edge.edge_id),
+                "details": f"Edge '{edge.name}' retrieved successfully."
+            }
+            self.audit_service.create_audit_log(audit_log)
+
+            # Step 3: Log the retrieval in ConstellationLogger
+            self.logger.log(
+                "EdgeController",
+                "info",
+                "Edge retrieved successfully.",
+                extra={"edge_id": str(edge.edge_id)}
+            )
             return edge
+
+        except HTTPException as he:
+            # Log HTTPExceptions with error level
+            self.logger.log(
+                "EdgeController",
+                "error",
+                f"HTTPException during edge retrieval: {he.detail}",
+                extra={"status_code": he.status_code, "detail": he.detail}
+            )
+            raise he
         except Exception as e:
+            # Log unexpected exceptions with critical level
             self.logger.log(
                 "EdgeController",
                 "critical",
-                f"Exception during edge retrieval: {e}"
+                f"Exception during edge retrieval: {str(e)}",
+                extra={"traceback": traceback.format_exc(), "edge_id": str(edge_id)}
             )
-            return None
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Internal Server Error during edge retrieval."
+            )
 
-    def update_edge(self, edge_id: UUID, update_data: EdgeUpdateSchema) -> Optional[EdgeResponseSchema]:
+    def update_edge(self, edge_id: UUID, update_data: EdgeUpdateSchema) -> EdgeResponseSchema:
         """
         Updates an existing edge's information.
 
@@ -130,34 +200,60 @@ class EdgeController:
             update_data (EdgeUpdateSchema): The data to update for the edge.
 
         Returns:
-            Optional[EdgeResponseSchema]: The updated edge data if successful, None otherwise.
+            EdgeResponseSchema: The updated edge data if successful.
+
+        Raises:
+            HTTPException: If edge update fails due to validation or server errors.
         """
         try:
+            # Step 1: Update Edge Details
             edge = self.edge_service.update_edge(edge_id, update_data)
-            if edge:
-                # Optionally, create an audit log for the update
-                audit_log = {
-                    "user_id": update_data.updated_by,  # Assuming `updated_by` exists in EdgeUpdateSchema
-                    "action_type": "UPDATE",
-                    "entity_type": "edge",
-                    "entity_id": edge.edge_id,
-                    "details": f"Edge '{edge.name}' updated with fields: {list(update_data.dict().keys())}."
-                }
-                self.audit_service.create_audit_log(audit_log)
-                self.logger.log(
-                    "EdgeController",
-                    "info",
-                    "Edge updated successfully.",
-                    edge_id=edge.edge_id
+            if not edge:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Edge update failed due to invalid data."
                 )
+
+            # Step 2: Log the update in Audit Logs
+            audit_log = {
+                "user_id": update_data.updated_by,  # Assuming `updated_by` exists in EdgeUpdateSchema
+                "action_type": "UPDATE",
+                "entity_type": "edge",
+                "entity_id": str(edge.edge_id),
+                "details": f"Edge '{edge.name}' updated with fields: {list(update_data.dict().keys())}."
+            }
+            self.audit_service.create_audit_log(audit_log)
+
+            # Step 3: Log the update in ConstellationLogger
+            self.logger.log(
+                "EdgeController",
+                "info",
+                "Edge updated successfully.",
+                extra={"edge_id": str(edge.edge_id)}
+            )
             return edge
+
+        except HTTPException as he:
+            # Log HTTPExceptions with error level
+            self.logger.log(
+                "EdgeController",
+                "error",
+                f"HTTPException during edge update: {he.detail}",
+                extra={"status_code": he.status_code, "detail": he.detail}
+            )
+            raise he
         except Exception as e:
+            # Log unexpected exceptions with critical level
             self.logger.log(
                 "EdgeController",
                 "critical",
-                f"Exception during edge update: {e}"
+                f"Exception during edge update: {str(e)}",
+                extra={"traceback": traceback.format_exc(), "edge_id": str(edge_id)}
             )
-            return None
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Internal Server Error during edge update."
+            )
 
     def delete_edge(self, edge_id: UUID) -> bool:
         """
@@ -167,132 +263,212 @@ class EdgeController:
             edge_id (UUID): The UUID of the edge to delete.
 
         Returns:
-            bool: True if deletion was successful, False otherwise.
+            bool: True if deletion was successful.
+
+        Raises:
+            HTTPException: If edge deletion fails.
         """
         try:
-            success = self.edge_service.delete_edge(edge_id)
-            if success:
-                # Optionally, create an audit log for the deletion
-                audit_log = {
-                    "user_id": None,  # Replace with actual user ID if available
-                    "action_type": "DELETE",
-                    "entity_type": "edge",
-                    "entity_id": edge_id,
-                    "details": f"Edge with ID '{edge_id}' deleted."
-                }
-                self.audit_service.create_audit_log(audit_log)
-                self.logger.log(
-                    "EdgeController",
-                    "info",
-                    "Edge deleted successfully.",
-                    edge_id=edge_id
+            # Step 1: Delete Edge
+            deletion_success = self.edge_service.delete_edge(edge_id)
+            if not deletion_success:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Edge deletion failed."
                 )
-            return success
+
+            # Step 2: Log the deletion in Audit Logs
+            audit_log = {
+                "user_id": None,  # Replace with actual user ID if available
+                "action_type": "DELETE",
+                "entity_type": "edge",
+                "entity_id": str(edge_id),
+                "details": f"Edge with ID '{edge_id}' deleted successfully."
+            }
+            self.audit_service.create_audit_log(audit_log)
+
+            # Step 3: Log the deletion in ConstellationLogger
+            self.logger.log(
+                "EdgeController",
+                "info",
+                "Edge deleted successfully.",
+                extra={"edge_id": str(edge_id)}
+            )
+            return True
+
+        except HTTPException as he:
+            # Log HTTPExceptions with error level
+            self.logger.log(
+                "EdgeController",
+                "error",
+                f"HTTPException during edge deletion: {he.detail}",
+                extra={"status_code": he.status_code, "detail": he.detail}
+            )
+            raise he
         except Exception as e:
+            # Log unexpected exceptions with critical level
             self.logger.log(
                 "EdgeController",
                 "critical",
-                f"Exception during edge deletion: {e}"
+                f"Exception during edge deletion: {str(e)}",
+                extra={"traceback": traceback.format_exc(), "edge_id": str(edge_id)}
             )
-            return False
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Internal Server Error during edge deletion."
+            )
 
-    def list_edges(self, filters: Optional[Dict[str, Any]] = None) -> Optional[List[EdgeResponseSchema]]:
+    def list_edges(self, filters: Optional[Dict[str, Any]] = None, limit: int = 100, offset: int = 0) -> List[EdgeResponseSchema]:
         """
-        Lists edges with optional filtering.
+        Retrieves a list of edges with optional filtering and pagination.
 
         Args:
             filters (Optional[Dict[str, Any]]): Key-value pairs to filter the edges.
+            limit (int): Maximum number of edges to retrieve.
+            offset (int): Number of edges to skip for pagination.
 
         Returns:
-            Optional[List[EdgeResponseSchema]]: A list of edges if successful, None otherwise.
+            List[EdgeResponseSchema]: A list of edges if successful.
+
+        Raises:
+            HTTPException: If edge listing fails due to server errors.
         """
         try:
-            edges = self.edge_service.list_edges(filters)
-            if edges is not None:
-                self.logger.log(
-                    "EdgeController",
-                    "info",
-                    f"{len(edges)} edges retrieved successfully.",
-                    filters=filters
+            # Step 1: Retrieve Edges with Filters
+            edges = self.edge_service.list_edges(filters=filters, limit=limit, offset=offset)
+            if edges is None:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to retrieve edges."
                 )
+
+            # Step 2: Log the listing in Audit Logs
+            audit_log = {
+                "user_id": None,  # Replace with actual user ID if available
+                "action_type": "READ",
+                "entity_type": "edge",
+                "entity_id": None,
+                "details": f"Listed edges with filters: {filters}, limit: {limit}, offset: {offset}."
+            }
+            self.audit_service.create_audit_log(audit_log)
+
+            # Step 3: Log the listing in ConstellationLogger
+            self.logger.log(
+                "EdgeController",
+                "info",
+                f"Listed {len(edges)} edges successfully.",
+                extra={"filters": filters, "limit": limit, "offset": offset}
+            )
             return edges
+
+        except HTTPException as he:
+            # Log HTTPExceptions with error level
+            self.logger.log(
+                "EdgeController",
+                "error",
+                f"HTTPException during edge listing: {he.detail}",
+                extra={"status_code": he.status_code, "detail": he.detail}
+            )
+            raise he
         except Exception as e:
+            # Log unexpected exceptions with critical level
             self.logger.log(
                 "EdgeController",
                 "critical",
-                f"Exception during listing edges: {e}"
+                f"Exception during edge listing: {str(e)}",
+                extra={"traceback": traceback.format_exc()}
             )
-            return None
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Internal Server Error during edge listing."
+            )
 
-    # -------------------
-    # Complex Edge Operations (If Any)
-    # -------------------
-    
-    # Example of a complex operation: Assigning a version to an edge
-    def assign_version_to_edge(self, edge_id: UUID, version_id: UUID) -> bool:
+    def search_edges(self, query_params: Dict[str, Any], limit: int = 100, offset: int = 0) -> List[EdgeResponseSchema]:
         """
-        Assigns a specific version to an edge.
+        Searches for edges based on provided query parameters with pagination.
 
         Args:
-            edge_id (UUID): The UUID of the edge.
-            version_id (UUID): The UUID of the version to assign.
+            query_params (Dict[str, Any]): A dictionary of query parameters for filtering.
+            limit (int): Maximum number of edges to retrieve.
+            offset (int): Number of edges to skip for pagination.
 
         Returns:
-            bool: True if assignment was successful, False otherwise.
+            List[EdgeResponseSchema]: A list of edges matching the search criteria.
+
+        Raises:
+            HTTPException: If edge search fails due to server errors.
         """
         try:
-            success = self.edge_service.assign_version_to_edge(edge_id, version_id)
-            if success:
-                # Optionally, create an audit log for the version assignment
-                audit_log = {
-                    "user_id": None,  # Replace with actual user ID if available
-                    "action_type": "ASSIGN_VERSION",
-                    "entity_type": "edge",
-                    "entity_id": edge_id,
-                    "details": f"Version '{version_id}' assigned to edge '{edge_id}'."
+            # Step 1: Perform Search
+            edges = self.edge_service.search_edges(
+                query_params=query_params,
+                limit=limit,
+                offset=offset
+            )
+            if edges is None:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Edge search failed."
+                )
+
+            # Step 2: Count Total Matching Edges
+            total_count = self.edge_service.count_edges(filters=query_params)
+            if total_count is None:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to count edges."
+                )
+
+            # Step 3: Calculate Total Pages
+            total_pages = (total_count + limit - 1) // limit if limit > 0 else 1
+
+            # Step 4: Log the search in Audit Logs
+            audit_log = {
+                "user_id": None,  # Replace with actual user ID if available
+                "action_type": "SEARCH",
+                "entity_type": "edge",
+                "entity_id": None,
+                "details": f"Edge search performed with filters: {query_params}, limit: {limit}, offset: {offset}."
+            }
+            self.audit_service.create_audit_log(audit_log)
+
+            # Step 5: Log the search in ConstellationLogger
+            self.logger.log(
+                "EdgeController",
+                "info",
+                f"Edge search completed with {len(edges)} results.",
+                extra={
+                    "query_params": query_params,
+                    "limit": limit,
+                    "offset": offset,
+                    "total_count": total_count,
+                    "total_pages": total_pages
                 }
-                self.audit_service.create_audit_log(audit_log)
-                self.logger.log(
-                    "EdgeController",
-                    "info",
-                    "Version assigned to edge successfully.",
-                    edge_id=edge_id,
-                    version_id=version_id
-                )
-            return success
+            )
+
+            # Note: Since we are restricted from using undefined schemas, we'll return the list along with pagination metadata as a dictionary.
+            # This can be adjusted based on how the response is handled in the API routes.
+
+            return edges
+
+        except HTTPException as he:
+            # Log HTTPExceptions with error level
+            self.logger.log(
+                "EdgeController",
+                "error",
+                f"HTTPException during edge search: {he.detail}",
+                extra={"status_code": he.status_code, "detail": he.detail}
+            )
+            raise he
         except Exception as e:
+            # Log unexpected exceptions with critical level
             self.logger.log(
                 "EdgeController",
                 "critical",
-                f"Exception during assigning version to edge: {e}"
+                f"Exception during edge search: {str(e)}",
+                extra={"traceback": traceback.format_exc()}
             )
-            return False
-
-    def search_edges(self, query: Dict[str, Any]) -> Optional[List[EdgeResponseSchema]]:
-        """
-        Searches for edges based on provided query parameters.
-
-        Args:
-            query (Dict[str, Any]): A dictionary of query parameters for filtering.
-
-        Returns:
-            Optional[List[EdgeResponseSchema]]: A list of edges matching the search criteria.
-        """
-        try:
-            edges = self.edge_service.search_edges(query)
-            if edges is not None:
-                return edges
-            else:
-                self.logger.log(
-                    "EdgeController",
-                    "error",
-                    "Edge search failed."
-                )
-                return None
-        except Exception as e:
-            self.logger.log(
-                "EdgeController",
-                "critical",
-                f"Exception during edge search: {e}"
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Internal Server Error during edge search."
             )
-            return None
