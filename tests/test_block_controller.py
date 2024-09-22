@@ -3,18 +3,91 @@
 """
 Test Suite for BlockController
 
-This test suite extensively tests the BlockController's CRUD operations for blocks,
-handling of taxonomies, management of vector embeddings, and execution of vector similarity searches.
-Each test case includes detailed print statements to trace the computation and internal states.
+This module contains comprehensive tests for the BlockController class, focusing on
+CRUD operations, taxonomy management, vector embedding handling, and search functionality.
+It utilizes pytest and unittest.mock for structuring and mocking dependencies respectively.
+
+Functionalities Tested:
+1. Block Creation:
+   - Creating a block with full data
+   - Creating a block with minimal required data
+   - Handling block creation failures
+   - Creating a block without taxonomy
+   - Creating a block without metadata
+   - Validating required fields during creation
+
+2. Block Retrieval:
+   - Getting a block by ID
+   - Handling retrieval of non-existent blocks
+
+3. Block Update:
+   - Updating a block with full data
+   - Updating a block with partial data
+   - Handling update of non-existent blocks
+
+4. Block Deletion:
+   - Deleting an existing block
+   - Handling deletion of non-existent blocks
+   - Handling deletion failures
+
+5. Block Listing:
+   - Retrieving a list of all blocks
+   - Handling empty block lists
+
+6. Taxonomy Management:
+   - Creating taxonomy for a block
+   - Retrieving taxonomy for a block
+   - Deleting taxonomy for a block
+   - Handling blocks without taxonomy
+
+7. Vector Embedding Management:
+   - Adding vector embeddings to blocks
+   - Adding multiple vector embeddings
+   - Retrieving vector embeddings for blocks
+   - Deleting vector embeddings
+   - Handling vector embedding failures
+
+8. Search Functionality:
+   - Searching blocks by similarity
+   - Searching blocks with taxonomy filters
+   - Implementing pagination in block searches
+
+9. Error Handling:
+   - Proper HTTP exceptions for various error scenarios
+   - Validation of error messages and status codes
+
+10. Audit Logging:
+    - Verification of audit log creation for all CRUD operations
+
+11. Input Validation:
+    - Handling of invalid input data for create and update operations
+    - Testing with missing required fields
+
+12. Service Integration:
+    - Correct interaction between BlockController and BlockService
+    - Proper use of mocked TaxonomyService and VectorEmbeddingService
+
+13. Response Formatting:
+    - Correct schema usage for request and response data
+
+14. Block-specific Business Logic:
+    - Validation of block type constraints
+    - Handling of block metadata
+
+This test suite ensures the robustness and reliability of the BlockController,
+covering both happy paths and edge cases to maintain the integrity of block-related
+operations within the application. Each test includes detailed print statements
+for tracing computation and internal states during test execution.
 """
 
 import pytest
 from unittest.mock import MagicMock, patch
 from uuid import UUID, uuid4
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from pydantic import ValidationError
 from datetime import datetime
 from fastapi import HTTPException, status
+import traceback
 
 # Import the BlockController and relevant schemas
 from app.controllers.block_controller import BlockController
@@ -26,8 +99,8 @@ from app.schemas import (
     VectorRepresentationCreateSchema,
     VectorRepresentationResponseSchema,
     AuditLogCreateSchema,
+    EdgeTypeEnum
 )
-
 from app.taxonomy import SearchQuery, SearchResult
 
 # -------------------
@@ -112,7 +185,9 @@ def create_sample_block_create_schema() -> BlockCreateSchema:
         name="Sample Block",
         block_type="dataset",  # Assuming 'dataset' is a valid BlockTypeEnum
         description="This is a sample block for testing.",
-        created_by=generate_uuid()
+        created_by=generate_uuid(),
+        taxonomy=None,
+        metadata=None
     )
 
 def create_sample_block_update_schema() -> BlockUpdateSchema:
@@ -123,36 +198,42 @@ def create_sample_block_update_schema() -> BlockUpdateSchema:
     return BlockUpdateSchema(
         name="Updated Sample Block",
         block_type="model",  # Assuming 'model' is another valid BlockTypeEnum
-        description="This is an updated sample block for testing."
+        description="This is an updated sample block for testing.",
+        updated_by=generate_uuid()  # Added updated_by field
     )
 
-def create_sample_block_response(block_id: UUID, name="Sample Block", block_type="dataset", description="This is a sample block for testing.") -> BlockResponseSchema:
+def create_sample_block_response(block_id: UUID, name="Sample Block", block_type="dataset", description="This is a sample block for testing.", created_by: Optional[UUID] = None) -> BlockResponseSchema:
     print("Creating sample BlockResponseSchema...")
     return BlockResponseSchema(
         block_id=block_id,
         name=name,
         block_type=block_type,
         description=description,
-        created_at="2024-01-01T00:00:00Z",
-        updated_at="2024-01-02T00:00:00Z",
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
         current_version_id=generate_uuid(),
-        
+        created_by=created_by,
+        taxonomy=None,
+        metadata=None,
+        vector_embedding=None
+    )
+
+def create_sample_block_response_with_creator_and_taxonomy(block_id: UUID, creator_id: UUID) -> BlockResponseSchema:
+    return BlockResponseSchema(
+        block_id=block_id,
+        name="Sample Block with Taxonomy",
+        block_type="dataset",
+        description="This is a sample block with taxonomy for testing.",
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+        current_version_id=generate_uuid(),
+        created_by=creator_id,
         taxonomy={"category": "Test Category"},
-        vector_embedding=VectorRepresentationSchema(
-            vector_id=generate_uuid(),
-            entity_type="block",
-            entity_id=block_id,
-            vector=[0.1, 0.2, 0.3],
-            taxonomy_filter={"category": "Test Category"},
-            created_at="2024-01-01T00:00:00Z",
-            updated_at="2024-01-02T00:00:00Z"
-        )
+        metadata={"key": "value"},
+        vector_embedding=create_sample_vector_representation(block_id, [0.1, 0.2, 0.3])
     )
 
 def create_sample_vector_representation(block_id: UUID, vector: List[float]) -> VectorRepresentationSchema:
-    """
-    Creates a sample VectorRepresentationSchema with mock data.
-    """
     print("Creating sample VectorRepresentationSchema...")
     return VectorRepresentationSchema(
         vector_id=generate_uuid(),
@@ -160,42 +241,6 @@ def create_sample_vector_representation(block_id: UUID, vector: List[float]) -> 
         entity_id=block_id,
         vector=vector,
         taxonomy_filter={"category": "Test Category"},
-        created_at="2024-01-01T00:00:00Z",
-        updated_at="2024-01-02T00:00:00Z"
-    )
-
-def create_sample_audit_log_create_schema(action_type: str, entity_type: str, entity_id: UUID, user_id: UUID = None, details: Dict[str, Any] = None) -> AuditLogCreateSchema:
-    """
-    Creates a sample AuditLogCreateSchema with mock data.
-    """
-    print("Creating sample AuditLogCreateSchema...")
-    return AuditLogCreateSchema(
-        user_id=user_id if user_id else generate_uuid(),
-        action_type=action_type,
-        entity_type=entity_type,
-        entity_id=entity_id,
-        details=details if details else {}
-    )
-
-def create_sample_block_create_schema_with_creator() -> BlockCreateSchema:
-    creator_id = generate_uuid()
-    return BlockCreateSchema(
-        name="Sample Block",
-        block_type="dataset",
-        description="This is a sample block for testing.",
-        created_by=creator_id,
-        taxonomy=None,
-        metadata=None
-    )
-
-def create_sample_block_response_with_creator(block_id: UUID, creator_id: UUID) -> BlockResponseSchema:
-    return BlockResponseSchema(
-        block_id=block_id,
-        name="Sample Block",
-        block_type="dataset",
-        description="This is a sample block for testing.",
-        created_by=creator_id,
-        # Add other required fields here
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow()
     )
@@ -233,19 +278,6 @@ def create_sample_block_response_with_creator_and_taxonomy(block_id: UUID, creat
         vector_embedding=create_sample_vector_representation(block_id, [0.1, 0.2, 0.3])
     )
 
-def create_sample_vector_representation(block_id: UUID, vector: List[float]) -> VectorRepresentationSchema:
-    return VectorRepresentationSchema(
-        vector_id=generate_uuid(),
-        entity_type="block",
-        entity_id=block_id,
-        vector=vector,
-        taxonomy_filter=create_sample_taxonomy(),
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
-    )
-
-
-
 def create_multiple_sample_blocks(controller: BlockController, num_blocks: int) -> List[BlockResponseSchema]:
     """
     Creates multiple sample blocks with varying attributes and taxonomy for testing.
@@ -276,32 +308,19 @@ def create_multiple_sample_blocks(controller: BlockController, num_blocks: int) 
         )
         sample_block = create_sample_block_response_with_creator_and_taxonomy(block_id, creator_id)
         sample_block.taxonomy = taxonomy
-        mock_block_service = MagicMock()
-        mock_taxonomy_service = MagicMock()
-        mock_vector_embedding_service = MagicMock()
-        mock_audit_service = MagicMock()
-        mock_logger = MagicMock()
+        blocks.append(sample_block)
 
-        # Mock service methods
-        mock_block_service.create_block.return_value = sample_block
-        mock_taxonomy_service.create_taxonomy_for_block.return_value = True
-        mock_vector_embedding_service.create_vector_embedding.return_value = create_sample_vector_representation(
+        # Mock service methods for block creation
+        controller.block_service.create_block.return_value = sample_block
+        controller.taxonomy_service.create_taxonomy_for_block.return_value = True
+        controller.vector_embedding_service.create_vector_embedding.return_value = create_sample_vector_representation(
             block_id, [0.1 * i, 0.2 * i, 0.3 * i]
         )
 
-        # Assign mocks to controller
-        controller.block_service = mock_block_service
-        controller.taxonomy_service = mock_taxonomy_service
-        controller.vector_embedding_service = mock_vector_embedding_service
-        controller.audit_service = mock_audit_service
-        controller.logger = mock_logger
-
         # Create block
-        block = controller.create_block(block_create_data)
-        blocks.append(block)
+        controller.create_block(block_create_data)
 
     return blocks
-
 
 # -------------------
 # Test Cases
@@ -313,8 +332,7 @@ class TestBlockController:
     vector embedding management, and similarity search.
     """
 
-    def test_search_blocks_by_keywords(self, block_controller, mock_vector_embedding_service, 
-                                    mock_audit_service, mock_logger):
+    def test_search_blocks_by_keywords(self, block_controller, mock_vector_embedding_service, mock_audit_service, mock_logger):
         """
         Test searching blocks by keywords present in their name and description.
         """
@@ -346,11 +364,11 @@ class TestBlockController:
             sample_block.taxonomy = taxonomy
             blocks.append(sample_block)
 
-            # Mock block creation
+            # Mock service methods
             block_controller.block_service.create_block.return_value = sample_block
             block_controller.taxonomy_service.create_taxonomy_for_block.return_value = True
             block_controller.vector_embedding_service.create_vector_embedding.return_value = create_sample_vector_representation(
-                block_id, [0.1 * i, 0.2 * i, 0.3 * i]
+                block_id, [0.1, 0.2, 0.3]
             )
 
             # Create block
@@ -385,9 +403,7 @@ class TestBlockController:
 
         print("test_search_blocks_by_keywords passed.")
 
-
-    def test_search_blocks_by_taxonomy_filters(self, block_controller, mock_vector_embedding_service, 
-                                            mock_audit_service, mock_logger):
+    def test_search_blocks_by_taxonomy_filters(self, block_controller, mock_vector_embedding_service, mock_audit_service, mock_logger):
         """
         Test searching blocks using taxonomy filters.
         """
@@ -421,11 +437,11 @@ class TestBlockController:
             sample_block.taxonomy = taxonomy
             blocks.append(sample_block)
 
-            # Mock block creation
+            # Mock service methods
             block_controller.block_service.create_block.return_value = sample_block
             block_controller.taxonomy_service.create_taxonomy_for_block.return_value = True
             block_controller.vector_embedding_service.create_vector_embedding.return_value = create_sample_vector_representation(
-                block_id, [0.4 * i, 0.5 * i, 0.6 * i]
+                block_id, [0.4, 0.5, 0.6]
             )
 
             # Create block
@@ -456,8 +472,7 @@ class TestBlockController:
 
         print("test_search_blocks_by_taxonomy_filters passed.")
 
-    def test_search_blocks_pagination(self, block_controller, mock_vector_embedding_service, 
-                                    mock_audit_service, mock_logger):
+    def test_search_blocks_pagination(self, block_controller, mock_vector_embedding_service, mock_audit_service, mock_logger):
         """
         Test searching blocks with pagination parameters.
         """
@@ -479,7 +494,7 @@ class TestBlockController:
             }
             block_create_data = BlockCreateSchema(
                 name=f"Pagination Block {i}",
-                block_type="dataset",
+                block_type="dataset" if i % 2 == 0 else "model",
                 description=f"This is pagination block number {i}.",
                 created_by=creator_id,
                 taxonomy=taxonomy,
@@ -489,11 +504,11 @@ class TestBlockController:
             sample_block.taxonomy = taxonomy
             blocks.append(sample_block)
 
-            # Mock block creation
+            # Mock service methods
             block_controller.block_service.create_block.return_value = sample_block
             block_controller.taxonomy_service.create_taxonomy_for_block.return_value = True
             block_controller.vector_embedding_service.create_vector_embedding.return_value = create_sample_vector_representation(
-                block_id, [0.7 * i, 0.8 * i, 0.9 * i]
+                block_id, [0.7, 0.8, 0.9]
             )
 
             # Create block
@@ -508,8 +523,7 @@ class TestBlockController:
         result = block_controller.perform_similarity_search(
             query_text="Pagination search",
             taxonomy_filters=None,
-            top_k=limit,
-            # Assuming the controller supports offset; if not, adjust accordingly
+            top_k=limit
         )
 
         # Assert
@@ -618,7 +632,9 @@ class TestBlockController:
             block_type=block_update_data.block_type,
             description=block_update_data.description
         )
-        
+        sample_block.taxonomy = {"category": "Updated Category", "subcategory": "Updated Subcategory", "tags": ["updated", "block"]}
+        sample_block.vector_embedding = create_sample_vector_representation(block_id, [0.4, 0.5, 0.6])
+
         mock_block_service.update_block.return_value = sample_block
         mock_taxonomy_service.create_taxonomy_for_block.return_value = True
         mock_vector_embedding_service.update_vector_embedding.return_value = True
@@ -634,11 +650,16 @@ class TestBlockController:
         assert result.name == block_update_data.name, "Block name was not updated correctly."
         assert result.block_type == block_update_data.block_type, "Block type was not updated correctly."
         assert result.description == block_update_data.description, "Block description was not updated correctly."
+        assert result.taxonomy == {"category": "Updated Category", "subcategory": "Updated Subcategory", "tags": ["updated", "block"]}, "Block taxonomy was not updated correctly."
+        assert result.vector_embedding == sample_block.vector_embedding, "Block vector embedding was not updated correctly."
 
         # Verify service calls
         print("Verifying service calls...")
         mock_block_service.update_block.assert_called_once_with(block_id, block_update_data)
-
+        mock_taxonomy_service.create_taxonomy_for_block.assert_called_once_with(
+            block_id=block_id,
+            taxonomy=block_update_data.taxonomy
+        )
         mock_audit_service.create_audit_log.assert_called_once()
         mock_logger.log.assert_called()
 
@@ -674,8 +695,7 @@ class TestBlockController:
 
         print("test_delete_block passed.")
 
-    def test_add_vector_embedding(self, block_controller, mock_vector_embedding_service, 
-                                mock_audit_service, mock_logger):
+    def test_add_vector_embedding(self, block_controller, mock_vector_embedding_service, mock_audit_service, mock_logger):
         """
         Test adding a vector embedding to a block.
         """
@@ -703,6 +723,17 @@ class TestBlockController:
         assert result.entity_id == block_id, "Entity ID does not match."
         assert result.vector == vector_create_data.vector, "Vector data does not match."
 
+        # Verify service calls
+        print("Verifying service calls...")
+        mock_vector_embedding_service.create_vector_embedding.assert_called_once_with(
+            block_id=block_id,
+            text="This is additional metadata for vector embedding.",
+            taxonomy_filters={"category": "Test Category"}
+        )
+        mock_audit_service.create_audit_log.assert_called_once()
+        mock_logger.log.assert_called_once()
+
+        print("test_add_vector_embedding passed.")
 
     def test_delete_vector_embedding(self, block_controller, mock_vector_embedding_service, mock_audit_service, mock_logger):
         """
@@ -726,12 +757,11 @@ class TestBlockController:
         print("Verifying service calls...")
         mock_vector_embedding_service.delete_vector_embedding.assert_called_once_with(block_id)
         mock_audit_service.create_audit_log.assert_called_once()
-        mock_logger.log.assert_called()
+        mock_logger.log.assert_called_once()
 
         print("test_delete_vector_embedding passed.")
 
-    def test_add_multiple_vector_embeddings(self, block_controller, mock_vector_embedding_service, 
-                                            mock_audit_service, mock_logger):
+    def test_add_multiple_vector_embeddings(self, block_controller, mock_vector_embedding_service, mock_audit_service, mock_logger):
         print("\n--- Starting test_add_multiple_vector_embeddings ---")
         # Arrange
         blocks = [generate_uuid() for _ in range(5)]
@@ -739,7 +769,7 @@ class TestBlockController:
             VectorRepresentationCreateSchema(
                 entity_type="block",
                 entity_id=block_id,
-                vector=[i * 0.1 for i in range(1, 4)],
+                vector=[i * 0.1, i * 0.2, i * 0.3],
                 taxonomy_filter={"category": f"Category {i}"}
             ) for i, block_id in enumerate(blocks, start=1)
         ]
@@ -754,13 +784,15 @@ class TestBlockController:
         mock_vector_embedding_service.create_vector_embedding.side_effect = sample_vectors
 
         # Act
-        for create_data in vector_create_datas:
-            print(f"Adding vector embedding with data={create_data}...")
-            result = block_controller.create_vector_embedding(create_data)
+        results = [block_controller.create_vector_embedding(data) for data in vector_create_datas]
+
+        for i, result in enumerate(results):
+            block_id = vector_create_datas[i].entity_id
+            print(f"Adding vector embedding to block_id={block_id} with data={vector_create_datas[i]}...")
             print(f"Vector embedding added: {result.vector_id}")
-            assert result is not None, f"Vector embedding creation for block {create_data.entity_id} returned None."
-            assert result.entity_id == create_data.entity_id, f"Entity ID mismatch for block {create_data.entity_id}."
-        
+            assert result is not None, f"Vector embedding creation for block {block_id} returned None."
+            assert result.entity_id == block_id, f"Entity ID mismatch for block {block_id}."
+
         # Assert
         print("Asserting multiple vector embeddings were added successfully...")
         assert mock_vector_embedding_service.create_vector_embedding.call_count == 5, "Not all vector embeddings were created."
@@ -786,8 +818,8 @@ class TestBlockController:
                 name=f"Similar Block {i}",
                 block_type="model",
                 description=f"Description for similar block {i}.",
-                created_at="2024-01-01T00:00:00Z",
-                updated_at="2024-01-02T00:00:00Z",
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
                 current_version_id=generate_uuid(),
                 taxonomy={"category": "Test Category"},
                 vector_embedding=VectorRepresentationSchema(
@@ -796,8 +828,8 @@ class TestBlockController:
                     entity_id=generate_uuid(),
                     vector=[0.1 * i, 0.2 * i, 0.3 * i],
                     taxonomy_filter={"category": "Test Category"},
-                    created_at="2024-01-01T00:00:00Z",
-                    updated_at="2024-01-02T00:00:00Z"
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
                 )
             ) for i in range(1, top_k + 1)
         ]
@@ -826,7 +858,7 @@ class TestBlockController:
 
     def test_create_block_failure(self, block_controller, mock_block_service, mock_logger):
         """
-        Test the creation of a block when the BlockService fails.
+        Test creating a block when the BlockService fails.
         """
         print("\n--- Starting test_create_block_failure ---")
         # Arrange
@@ -852,8 +884,7 @@ class TestBlockController:
 
         print("test_create_block_failure passed.")
 
-    def test_delete_block_failure(self, block_controller, mock_block_service, 
-                                mock_taxonomy_service, mock_vector_embedding_service, mock_logger):
+    def test_delete_block_failure(self, block_controller, mock_block_service, mock_taxonomy_service, mock_vector_embedding_service, mock_logger):
         """
         Test deleting a block when the BlockService fails.
         """
@@ -909,7 +940,7 @@ class TestBlockController:
         # Verify service calls
         print("Verifying service calls...")
         mock_vector_embedding_service.search_similar_blocks.assert_called_once_with(query_text, taxonomy_filters, top_k)
-        mock_logger.log.assert_called()
+        mock_logger.log.assert_called_once()
 
         print("test_similarity_search_failure passed.")
 
@@ -941,31 +972,26 @@ class TestBlockController:
 
         # Verify service calls
         print("Verifying service calls...")
-        mock_vector_embedding_service.create_vector_embedding.assert_called_once_with(vector_create_data)
-        mock_logger.log.assert_called()
+        mock_vector_embedding_service.create_vector_embedding.assert_called_once_with(
+            block_id=block_id,
+            text="This metadata will cause failure.",
+            taxonomy_filters={"category": "Test Category"}
+        )
+        mock_logger.log.assert_called_once()
 
         print("test_add_vector_embedding_failure passed.")
 
     def test_update_vector_embedding(self, block_controller, mock_vector_embedding_service, mock_audit_service, mock_logger):
-        """
-        Test updating a vector embedding for a block.
-        """
-        print("\n--- Starting test_update_vector_embedding ---")
-        # Arrange
         block_id = generate_uuid()
-        update_success = True
-
-        mock_vector_embedding_service.update_vector_embedding.return_value = update_success
-
-        # Act
-        print(f"Updating vector embedding for block_id={block_id}...")
         update_data = VectorRepresentationCreateSchema(
             entity_type="block",
             entity_id=block_id,
-            vector=[0.1, 0.2, 0.3],
+            vector=[0.1, 0.2, 0.3],  # New vector
             taxonomy_filter={"category": "Updated Category"}
         )
-        result = block_controller.update_vector_embedding(block_id, update_data)
+        mock_vector_embedding_service.update_vector_embedding.return_value = True
+        result = block_controller.update_vector_embedding(update_data)
+        assert result is True
 
         # Assert
         print("Asserting vector embedding update...")
@@ -973,7 +999,11 @@ class TestBlockController:
 
         # Verify service calls
         print("Verifying service calls...")
-        mock_vector_embedding_service.update_vector_embedding.assert_called_once_with(block_id, update_data)
+        mock_vector_embedding_service.update_vector_embedding.assert_called_once_with(
+            block_id=block_id,
+            text="Updated metadata for vector embedding.",
+            taxonomy_filters={"category": "Updated Category"}
+        )
         mock_audit_service.create_audit_log.assert_called_once()
         mock_logger.log.assert_called_once()
 
@@ -991,14 +1021,12 @@ class TestBlockController:
 
         # Act
         print(f"Updating vector embedding for block_id={block_id} that will fail...")
-        update_data = VectorRepresentationCreateSchema(
-            entity_type="block",
-            entity_id=block_id,
-            vector=[0.1, 0.2, 0.3],
-            taxonomy_filter={"category": "Fail Category"}
-        )
         with pytest.raises(HTTPException) as exc_info:
-            block_controller.update_vector_embedding(block_id, update_data)
+            block_controller.update_vector_embedding(
+                block_id=block_id,
+                text="This update will fail.",
+                taxonomy_filters={"category": "Fail Category"}
+            )
 
         # Assert
         print("Asserting that HTTPException was raised...")
@@ -1007,7 +1035,11 @@ class TestBlockController:
 
         # Verify service calls
         print("Verifying service calls...")
-        mock_vector_embedding_service.update_vector_embedding.assert_called_once_with(block_id, update_data)
+        mock_vector_embedding_service.update_vector_embedding.assert_called_once_with(
+            block_id=block_id,
+            text="This update will fail.",
+            taxonomy_filters={"category": "Fail Category"}
+        )
         mock_logger.log.assert_called_once()
 
         print("test_update_vector_embedding_failure passed.")
@@ -1030,7 +1062,7 @@ class TestBlockController:
 
         # Assert
         print("Asserting similarity search results...")
-        assert result is not None, "Similarity search returned None."
+        assert result is not None, "Search returned None."
         assert len(result) == 0, "Expected no similar blocks, but some were returned."
 
         # Verify service calls
@@ -1041,7 +1073,7 @@ class TestBlockController:
 
         print("test_perform_similarity_search_no_results passed.")
 
-    def test_create_block_with_invalid_data(self, block_controller, mock_block_service, mock_logger):
+    def test_create_block_with_invalid_data(self, block_controller, mock_logger):
         """
         Test creating a block with invalid data that should raise a validation error.
         """
@@ -1053,7 +1085,9 @@ class TestBlockController:
                 name="Invalid Block",
                 block_type="invalid_type",  # Invalid BlockTypeEnum
                 description="This block has an invalid type.",
-                created_by=generate_uuid()
+                created_by=generate_uuid(),
+                taxonomy=None,
+                metadata=None
             )
         # Optionally, assert the details of the exception
         assert "block_type" in str(exc_info.value), "Expected validation error on block_type"
@@ -1070,39 +1104,12 @@ class TestBlockController:
             BlockCreateSchema(
                 block_type="dataset",
                 description="Missing name field.",
-                created_by=generate_uuid()
+                created_by=generate_uuid(),
+                taxonomy=None,
+                metadata=None
             )
         # Optionally, assert the details of the exception
         assert "name" in str(exc_info.value), "Expected validation error on missing 'name' field"
-
-    def test_create_block_without_taxonomy(self, block_controller, mock_block_service, mock_taxonomy_service, mock_logger):
-        """
-        Test creating a block without taxonomy data.
-        """
-        print("\n--- Starting test_create_block_without_taxonomy ---")
-        # Arrange
-        block_id = generate_uuid()
-        block_create_data = create_sample_block_create_schema()
-        block_create_data.taxonomy = None  # Ensure no taxonomy is provided
-
-        mock_block_service.create_block.return_value = create_sample_block_response(block_id)
-
-        # Act
-        print(f"Creating block without taxonomy data for block_id={block_id}...")
-        result = block_controller.create_block(block_create_data)
-
-        # Assert
-        print("Asserting that block was created successfully without taxonomy...")
-        assert result is not None, "Expected block to be created."
-        assert result.block_id == block_id, "Block ID mismatch."
-
-        # Verify service calls
-        print("Verifying service calls...")
-        mock_block_service.create_block.assert_called_once_with(block_create_data)
-        mock_taxonomy_service.create_taxonomy_for_block.assert_not_called()
-        mock_logger.log.assert_called()
-
-        print("test_create_block_without_taxonomy passed.")
 
     def test_create_block_without_taxonomy(self, block_controller, mock_block_service, mock_taxonomy_service, mock_vector_embedding_service, mock_audit_service, mock_logger):
         """
@@ -1115,7 +1122,9 @@ class TestBlockController:
             name="Block Without Taxonomy",
             block_type="model",
             description="This block does not have taxonomy.",
-            created_by=generate_uuid()
+            created_by=generate_uuid(),
+            taxonomy=None,
+            metadata=None
         )
 
         sample_block = create_sample_block_response(block_id)
@@ -1156,7 +1165,9 @@ class TestBlockController:
             name="Block Without Metadata",
             block_type="dataset",
             description=None,  # No metadata
-            created_by=generate_uuid()
+            created_by=generate_uuid(),
+            taxonomy=None,
+            metadata=None
         )
 
         sample_block = create_sample_block_response(block_id)
@@ -1178,6 +1189,7 @@ class TestBlockController:
         # Verify service calls
         print("Verifying service calls...")
         mock_block_service.create_block.assert_called_once_with(block_create_data)
+        mock_taxonomy_service.create_taxonomy_for_block.assert_not_called()
         mock_vector_embedding_service.create_vector_embedding.assert_not_called()
         mock_audit_service.create_audit_log.assert_called_once()
         mock_logger.log.assert_called_once()

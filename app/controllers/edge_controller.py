@@ -32,6 +32,8 @@ from app.schemas import (
     EdgeCreateSchema,
     EdgeUpdateSchema,
     EdgeResponseSchema,
+    EdgeVerificationRequestSchema,
+    EdgeVerificationResponseSchema
 )
 from app.logger import ConstellationLogger
 
@@ -471,4 +473,63 @@ class EdgeController:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Internal Server Error during edge search."
+            )
+
+
+
+    # -------------------
+    # Edge Verification Endpoint
+    # -------------------
+    
+    def verify_edge(self, verification_request: EdgeVerificationRequestSchema) -> EdgeVerificationResponseSchema:
+        """
+        Verifies if an edge can be created between two blocks.
+    
+        Args:
+            verification_request (EdgeVerificationRequestSchema): The source and target block IDs.
+    
+        Returns:
+            EdgeVerificationResponseSchema: The result of the verification.
+        """
+        try:
+            # Use EdgeService to perform the verification
+            verification_result = self.edge_service.can_connect_blocks(
+                source_block_id=verification_request.source_block_id,
+                target_block_id=verification_request.target_block_id
+            )
+    
+            # Log the verification in Audit Logs
+            audit_log = {
+                "user_id": None,  # Replace with actual user ID if available
+                "action_type": "READ",
+                "entity_type": "edge",
+                "entity_id": "verification",
+                "details": f"Edge verification between {verification_request.source_block_id} and {verification_request.target_block_id}."
+            }
+            self.audit_service.create_audit_log(audit_log)
+    
+            # Log the verification event
+            self.logger.log(
+                "EdgeController",
+                "info",
+                "Edge verification performed.",
+                extra={
+                    "source_block_id": str(verification_request.source_block_id),
+                    "target_block_id": str(verification_request.target_block_id),
+                    "can_connect": verification_result.can_connect
+                }
+            )
+            return verification_result
+    
+        except Exception as e:
+            # Log unexpected exceptions with critical level
+            self.logger.log(
+                "EdgeController",
+                "critical",
+                f"Exception during edge verification: {str(e)}",
+                extra={"traceback": traceback.format_exc()}
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Internal Server Error during edge verification."
             )
