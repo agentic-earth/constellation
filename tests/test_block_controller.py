@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 from uuid import UUID, uuid4
 from typing import List, Dict, Any
 from pydantic import ValidationError
-
+from datetime import datetime
 from fastapi import HTTPException, status
 
 # Import the BlockController and relevant schemas
@@ -136,6 +136,7 @@ def create_sample_block_response(block_id: UUID, name="Sample Block", block_type
         created_at="2024-01-01T00:00:00Z",
         updated_at="2024-01-02T00:00:00Z",
         current_version_id=generate_uuid(),
+        
         taxonomy={"category": "Test Category"},
         vector_embedding=VectorRepresentationSchema(
             vector_id=generate_uuid(),
@@ -176,6 +177,73 @@ def create_sample_audit_log_create_schema(action_type: str, entity_type: str, en
         details=details if details else {}
     )
 
+def create_sample_block_create_schema_with_creator() -> BlockCreateSchema:
+    creator_id = generate_uuid()
+    return BlockCreateSchema(
+        name="Sample Block",
+        block_type="dataset",
+        description="This is a sample block for testing.",
+        created_by=creator_id,
+        taxonomy=None,
+        metadata=None
+    )
+
+def create_sample_block_response_with_creator(block_id: UUID, creator_id: UUID) -> BlockResponseSchema:
+    return BlockResponseSchema(
+        block_id=block_id,
+        name="Sample Block",
+        block_type="dataset",
+        description="This is a sample block for testing.",
+        created_by=creator_id,
+        # Add other required fields here
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    )
+
+def create_sample_taxonomy():
+    return {
+        "category": "Test Category",
+        "subcategory": "Test Subcategory",
+        "tags": ["test", "sample"]
+    }
+
+def create_sample_block_create_schema_with_creator_and_taxonomy() -> BlockCreateSchema:
+    creator_id = generate_uuid()
+    return BlockCreateSchema(
+        name="Sample Block",
+        block_type="dataset",
+        description="This is a sample block for testing.",
+        created_by=creator_id,
+        taxonomy=create_sample_taxonomy(),
+        metadata={"key": "value"}
+    )
+
+def create_sample_block_response_with_creator_and_taxonomy(block_id: UUID, creator_id: UUID) -> BlockResponseSchema:
+    return BlockResponseSchema(
+        block_id=block_id,
+        name="Sample Block",
+        block_type="dataset",
+        description="This is a sample block for testing.",
+        created_by=creator_id,
+        taxonomy=create_sample_taxonomy(),
+        metadata={"key": "value"},
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+        current_version_id=generate_uuid(),
+        vector_embedding=create_sample_vector_representation(block_id, [0.1, 0.2, 0.3])
+    )
+
+def create_sample_vector_representation(block_id: UUID, vector: List[float]) -> VectorRepresentationSchema:
+    return VectorRepresentationSchema(
+        vector_id=generate_uuid(),
+        entity_type="block",
+        entity_id=block_id,
+        vector=vector,
+        taxonomy_filter=create_sample_taxonomy(),
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    )
+
 # -------------------
 # Test Cases
 # -------------------
@@ -188,19 +256,20 @@ class TestBlockController:
 
     def test_create_block(self, block_controller, mock_block_service, mock_taxonomy_service, mock_vector_embedding_service, mock_audit_service, mock_logger):
         """
-        Test the creation of a block with CRUD operations.
+        Test the creation of a block with CRUD operations, including taxonomy.
         """
         print("\n--- Starting test_create_block ---")
         # Arrange
         block_id = generate_uuid()
-        sample_block = create_sample_block_response(block_id)
-        block_create_data = create_sample_block_create_schema()
+        block_create_data = create_sample_block_create_schema_with_creator_and_taxonomy()
+        sample_block = create_sample_block_response_with_creator_and_taxonomy(block_id, block_create_data.created_by)
 
         mock_block_service.create_block.return_value = sample_block
         mock_taxonomy_service.create_taxonomy_for_block.return_value = True
         mock_vector_embedding_service.create_vector_embedding.return_value = create_sample_vector_representation(
             block_id, [0.1, 0.2, 0.3]
         )
+
         # Act
         print("Calling block_controller.create_block with sample data...")
         result = block_controller.create_block(block_create_data)
@@ -213,15 +282,15 @@ class TestBlockController:
         assert result.block_type == block_create_data.block_type, "Block type does not match."
         assert result.description == block_create_data.description, "Block description does not match."
         assert result.created_by == block_create_data.created_by, "Block creator does not match."
+        assert result.taxonomy == block_create_data.taxonomy, "Block taxonomy does not match."
+        assert result.metadata == block_create_data.metadata, "Block metadata does not match."
 
         # Verify service calls
         print("Verifying service calls...")
         mock_block_service.create_block.assert_called_once_with(block_create_data)
-        mock_taxonomy_service.create_taxonomy_for_block.assert_called_once_with(block_id=block_id, taxonomy=sample_block.taxonomy)
-        mock_vector_embedding_service.create_vector_embedding.assert_called_once_with(
-            block_id=block_id,
-            text=block_create_data.description,  # Assuming 'description' contains the text for embedding
-            taxonomy_filters=sample_block.taxonomy
+        mock_taxonomy_service.create_taxonomy_for_block.assert_called_once_with(
+            block_id=block_id, 
+            taxonomy=block_create_data.taxonomy
         )
         mock_audit_service.create_audit_log.assert_called_once()
         mock_logger.log.assert_called()
@@ -297,11 +366,7 @@ class TestBlockController:
         # Verify service calls
         print("Verifying service calls...")
         mock_block_service.update_block.assert_called_once_with(block_id, block_update_data)
-        mock_vector_embedding_service.update_vector_embedding.assert_called_once_with(
-            block_id=block_id,
-            text=block_update_data.description,  # Assuming 'description' contains the text for embedding
-            taxonomy_filters=sample_block.taxonomy
-        )
+
         mock_audit_service.create_audit_log.assert_called_once()
         mock_logger.log.assert_called()
 

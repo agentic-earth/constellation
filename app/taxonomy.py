@@ -438,7 +438,7 @@ class ModelTaxonomyBase(GeneralTaxonomy):
     spatial_resolution: SpatialResolution = Field(..., description="Spatial resolution of the model.")
     temporal_resolution: TemporalResolution = Field(..., description="Temporal resolution of the model.")
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
 class EarthObservationModelTaxonomy(ModelTaxonomyBase):
     satellite_data_sources: List[SatelliteSource] = Field(..., description="Satellite data sources used.")
@@ -551,11 +551,11 @@ class SearchQuery(BaseModel):
                 raise ValueError(f"Unable to parse date string: {value}")
         raise ValueError(f"Unsupported date type: {type(value)}")
 
-    model_config = {
-        "json_encoders": {
+    model_config = ConfigDict(
+        json_serializers={
             datetime: lambda v: v.isoformat()
         }
-    }
+    )
 
 class SearchResult(BaseModel):
     papers: List[FullPaper] = Field(..., description="List of full papers matching the search criteria")
@@ -564,9 +564,7 @@ class SearchResult(BaseModel):
     total_pages: int = Field(..., description="Total number of pages available")
     query: SearchQuery = Field(..., description="The original search query")
 
-    model_config = {
-        "arbitrary_types_allowed": True
-    }
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 class EOWorkflowRequest(BaseModel):
     prompt: str
