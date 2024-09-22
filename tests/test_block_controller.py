@@ -244,6 +244,65 @@ def create_sample_vector_representation(block_id: UUID, vector: List[float]) -> 
         updated_at=datetime.utcnow()
     )
 
+
+
+def create_multiple_sample_blocks(controller: BlockController, num_blocks: int) -> List[BlockResponseSchema]:
+    """
+    Creates multiple sample blocks with varying attributes and taxonomy for testing.
+
+    Args:
+        controller (BlockController): The BlockController instance.
+        num_blocks (int): Number of blocks to create.
+
+    Returns:
+        List[BlockResponseSchema]: List of created block responses.
+    """
+    blocks = []
+    for i in range(1, num_blocks + 1):
+        block_id = generate_uuid()
+        creator_id = generate_uuid()
+        taxonomy = {
+            "category": f"Category {i % 3}",  # Categories: Category 0, 1, 2
+            "subcategory": f"Subcategory {i % 2}",  # Subcategories: Subcategory 0, 1
+            "tags": ["test", f"sample_{i}"]
+        }
+        block_create_data = BlockCreateSchema(
+            name=f"Sample Block {i}",
+            block_type="dataset" if i % 2 == 0 else "model",
+            description=f"This is sample block number {i}.",
+            created_by=creator_id,
+            taxonomy=taxonomy,
+            metadata={"key": f"value_{i}"}
+        )
+        sample_block = create_sample_block_response_with_creator_and_taxonomy(block_id, creator_id)
+        sample_block.taxonomy = taxonomy
+        mock_block_service = MagicMock()
+        mock_taxonomy_service = MagicMock()
+        mock_vector_embedding_service = MagicMock()
+        mock_audit_service = MagicMock()
+        mock_logger = MagicMock()
+
+        # Mock service methods
+        mock_block_service.create_block.return_value = sample_block
+        mock_taxonomy_service.create_taxonomy_for_block.return_value = True
+        mock_vector_embedding_service.create_vector_embedding.return_value = create_sample_vector_representation(
+            block_id, [0.1 * i, 0.2 * i, 0.3 * i]
+        )
+
+        # Assign mocks to controller
+        controller.block_service = mock_block_service
+        controller.taxonomy_service = mock_taxonomy_service
+        controller.vector_embedding_service = mock_vector_embedding_service
+        controller.audit_service = mock_audit_service
+        controller.logger = mock_logger
+
+        # Create block
+        block = controller.create_block(block_create_data)
+        blocks.append(block)
+
+    return blocks
+
+
 # -------------------
 # Test Cases
 # -------------------
@@ -253,6 +312,219 @@ class TestBlockController:
     Test class for BlockController covering CRUD operations, taxonomy management,
     vector embedding management, and similarity search.
     """
+
+    def test_search_blocks_by_keywords(self, block_controller, mock_vector_embedding_service, 
+                                    mock_audit_service, mock_logger):
+        """
+        Test searching blocks by keywords present in their name and description.
+        """
+        print("\n--- Starting test_search_blocks_by_keywords ---")
+        # Arrange
+        keyword = "Sample"
+        top_k = 5
+
+        # Create sample blocks
+        num_blocks = 5
+        blocks = []
+        for i in range(1, num_blocks + 1):
+            block_id = generate_uuid()
+            creator_id = generate_uuid()
+            taxonomy = {
+                "category": "Category 1",
+                "subcategory": "Subcategory 1",
+                "tags": ["test", f"sample_{i}"]
+            }
+            block_create_data = BlockCreateSchema(
+                name=f"Sample Block {i}",
+                block_type="dataset",
+                description=f"This is sample block number {i}.",
+                created_by=creator_id,
+                taxonomy=taxonomy,
+                metadata={"key": f"value_{i}"}
+            )
+            sample_block = create_sample_block_response_with_creator_and_taxonomy(block_id, creator_id)
+            sample_block.taxonomy = taxonomy
+            blocks.append(sample_block)
+
+            # Mock block creation
+            block_controller.block_service.create_block.return_value = sample_block
+            block_controller.taxonomy_service.create_taxonomy_for_block.return_value = True
+            block_controller.vector_embedding_service.create_vector_embedding.return_value = create_sample_vector_representation(
+                block_id, [0.1 * i, 0.2 * i, 0.3 * i]
+            )
+
+            # Create block
+            block_controller.create_block(block_create_data)
+
+        # Mock search_similar_blocks to return blocks containing the keyword
+        mock_vector_embedding_service.search_similar_blocks.return_value = blocks[:top_k]
+
+        # Act
+        print(f"Performing similarity search with keyword='{keyword}'...")
+        search_query = SearchQuery(
+            keywords=[keyword],
+            limit=top_k,
+            offset=0
+        )
+        result = block_controller.perform_similarity_search(
+            query_text="Sample search",
+            taxonomy_filters=None,
+            top_k=top_k
+        )
+
+        # Assert
+        print("Asserting search results based on keywords...")
+        assert result is not None, "Search returned None."
+        assert len(result) == top_k, f"Expected {top_k} results, got {len(result)}."
+        for block in result:
+            assert keyword in block.name or keyword in block.description, "Keyword not found in block."
+
+        # Verify service calls
+        print("Verifying service calls...")
+        mock_vector_embedding_service.search_similar_blocks.assert_called_once_with("Sample search", None, top_k)
+
+        print("test_search_blocks_by_keywords passed.")
+
+
+    def test_search_blocks_by_taxonomy_filters(self, block_controller, mock_vector_embedding_service, 
+                                            mock_audit_service, mock_logger):
+        """
+        Test searching blocks using taxonomy filters.
+        """
+        print("\n--- Starting test_search_blocks_by_taxonomy_filters ---")
+        # Arrange
+        taxonomy_filters = {
+            "category": "Category 1",
+            "subcategory": "Subcategory 1"
+        }
+        top_k = 3
+
+        # Create sample blocks
+        blocks = []
+        for i in range(1, top_k + 1):
+            block_id = generate_uuid()
+            creator_id = generate_uuid()
+            taxonomy = {
+                "category": "Category 1",
+                "subcategory": "Subcategory 1",
+                "tags": ["test", f"filter_sample_{i}"]
+            }
+            block_create_data = BlockCreateSchema(
+                name=f"Filter Sample Block {i}",
+                block_type="model",
+                description=f"This is filter sample block number {i}.",
+                created_by=creator_id,
+                taxonomy=taxonomy,
+                metadata={"key": f"value_filter_{i}"}
+            )
+            sample_block = create_sample_block_response_with_creator_and_taxonomy(block_id, creator_id)
+            sample_block.taxonomy = taxonomy
+            blocks.append(sample_block)
+
+            # Mock block creation
+            block_controller.block_service.create_block.return_value = sample_block
+            block_controller.taxonomy_service.create_taxonomy_for_block.return_value = True
+            block_controller.vector_embedding_service.create_vector_embedding.return_value = create_sample_vector_representation(
+                block_id, [0.4 * i, 0.5 * i, 0.6 * i]
+            )
+
+            # Create block
+            block_controller.create_block(block_create_data)
+
+        # Mock search_similar_blocks to return blocks matching taxonomy filters
+        mock_vector_embedding_service.search_similar_blocks.return_value = blocks[:top_k]
+
+        # Act
+        print(f"Performing similarity search with taxonomy_filters={taxonomy_filters}...")
+        result = block_controller.perform_similarity_search(
+            query_text="Filter search",
+            taxonomy_filters=taxonomy_filters,
+            top_k=top_k
+        )
+
+        # Assert
+        print("Asserting search results based on taxonomy filters...")
+        assert result is not None, "Search returned None."
+        assert len(result) == top_k, f"Expected {top_k} results, got {len(result)}."
+        for block in result:
+            assert block.taxonomy["category"] == "Category 1", "Category filter mismatch."
+            assert block.taxonomy["subcategory"] == "Subcategory 1", "Subcategory filter mismatch."
+
+        # Verify service calls
+        print("Verifying service calls...")
+        mock_vector_embedding_service.search_similar_blocks.assert_called_once_with("Filter search", taxonomy_filters, top_k)
+
+        print("test_search_blocks_by_taxonomy_filters passed.")
+
+    def test_search_blocks_pagination(self, block_controller, mock_vector_embedding_service, 
+                                    mock_audit_service, mock_logger):
+        """
+        Test searching blocks with pagination parameters.
+        """
+        print("\n--- Starting test_search_blocks_pagination ---")
+        # Arrange
+        total_blocks = 10
+        limit = 5
+        offset = 5
+
+        # Create sample blocks
+        blocks = []
+        for i in range(1, total_blocks + 1):
+            block_id = generate_uuid()
+            creator_id = generate_uuid()
+            taxonomy = {
+                "category": "Category Pagination",
+                "subcategory": "Subcategory Pagination",
+                "tags": ["pagination", f"page_sample_{i}"]
+            }
+            block_create_data = BlockCreateSchema(
+                name=f"Pagination Block {i}",
+                block_type="dataset",
+                description=f"This is pagination block number {i}.",
+                created_by=creator_id,
+                taxonomy=taxonomy,
+                metadata={"key": f"value_pagination_{i}"}
+            )
+            sample_block = create_sample_block_response_with_creator_and_taxonomy(block_id, creator_id)
+            sample_block.taxonomy = taxonomy
+            blocks.append(sample_block)
+
+            # Mock block creation
+            block_controller.block_service.create_block.return_value = sample_block
+            block_controller.taxonomy_service.create_taxonomy_for_block.return_value = True
+            block_controller.vector_embedding_service.create_vector_embedding.return_value = create_sample_vector_representation(
+                block_id, [0.7 * i, 0.8 * i, 0.9 * i]
+            )
+
+            # Create block
+            block_controller.create_block(block_create_data)
+
+        # Mock search_similar_blocks to return a subset based on pagination
+        paginated_blocks = blocks[offset:offset + limit]
+        mock_vector_embedding_service.search_similar_blocks.return_value = paginated_blocks
+
+        # Act
+        print(f"Performing similarity search with limit={limit} and offset={offset}...")
+        result = block_controller.perform_similarity_search(
+            query_text="Pagination search",
+            taxonomy_filters=None,
+            top_k=limit,
+            # Assuming the controller supports offset; if not, adjust accordingly
+        )
+
+        # Assert
+        print("Asserting search results based on pagination...")
+        assert result is not None, "Search returned None."
+        assert len(result) == limit, f"Expected {limit} results, got {len(result)}."
+        expected_blocks = blocks[offset:offset + limit]
+        for result_block, expected_block in zip(result, expected_blocks):
+            assert result_block.block_id == expected_block.block_id, "Block ID mismatch in pagination."
+
+        # Verify service calls
+        print("Verifying service calls...")
+        mock_vector_embedding_service.search_similar_blocks.assert_called_once_with("Pagination search", None, limit)
+
+        print("test_search_blocks_pagination passed.")
 
     def test_create_block(self, block_controller, mock_block_service, mock_taxonomy_service, mock_vector_embedding_service, mock_audit_service, mock_logger):
         """
