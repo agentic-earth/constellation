@@ -31,7 +31,9 @@ from app.schemas import (
     PipelineBlockCreateSchema,
     PipelineBlockResponseSchema,
     PipelineEdgeCreateSchema,
-    PipelineEdgeResponseSchema
+    PipelineEdgeResponseSchema,
+    PipelineVerificationRequestSchema,
+    PipelineVerificationResponseSchema
 )
 from app.logger import ConstellationLogger
 from app.database import get_supabase_client
@@ -855,3 +857,87 @@ class PipelineService:
                 extra={"traceback": traceback.format_exc(), "pipeline_id": str(pipeline_id)}
             )
             return False
+
+
+    def validate_pipeline(self, block_ids: List[UUID], edge_ids: Optional[List[UUID]] = None) -> PipelineVerificationResponseSchema:
+        """
+        Validates if a group of blocks can form a valid pipeline without fatal connections.
+
+        Args:
+            block_ids (List[UUID]): List of block UUIDs to include in the pipeline.
+            edge_ids (Optional[List[UUID]]): Optional list of edge UUIDs to include.
+
+        Returns:
+            PipelineVerificationResponseSchema: The result of the pipeline validation.
+        """
+        response = PipelineVerificationResponseSchema(can_build_pipeline=True)
+        reasons = []
+        conflicting_edges = []
+
+        # Example Validation Rules:
+        # 1. Ensure no cycles are formed.
+        # 2. Check for required edge types between certain blocks.
+        # 3. Prevent duplicate connections.
+
+        # Rule 1: Check for cycles in the proposed pipeline
+        # Build adjacency list
+        adjacency = {block_id: [] for block_id in block_ids}
+
+        # Retrieve all edges between the blocks
+        edges = self.supabase_client.table("edges")\
+            .select("*").in_("source_block_id", [str(bid) for bid in block_ids])\
+            .in_("target_block_id", [str(bid) for bid in block_ids]).execute()
+
+        for edge in edges.data:
+            source = UUID(edge["source_block_id"])
+            target = UUID(edge["target_block_id"])
+            adjacency[source].append(target)
+
+            # Rule 2: Enforce specific edge types
+            # Example: Only 'primary' can connect to 'secondary'
+            source_block = self.supabase_client.table("blocks")\
+                .select("block_type").eq("block_id", str(source)).single().execute()
+
+            target_block = self.supabase_client.table("blocks")\
+                .select("block_type").eq("block_id", str(target)).single().execute()
+
+            if source_block.data and target_block.data:
+                if source_block.data["block_type"] == "primary" and target_block.data["block_type"] != "secondary":
+                    response.can_build_pipeline = False
+                    reasons.append(f"Primary block {source} can only connect to secondary blocks.")
+                    conflicting_edges.append(EdgeResponseSchema(**edge))
+        
+        # Detect cycles using DFS
+        def has_cycle(adjacency: Dict[UUID, List[UUID]]) -> bool:
+            visited = set()
+            rec_stack = set()
+        
+            def dfs(v: UUID) -> bool:
+                visited.add(v)
+                rec_stack.add(v)
+        
+                for neighbour in adjacency[v]:
+                    if neighbour not in visited:
+                        if dfs(neighbour):
+                            return True
+                    elif neighbour in rec_stack:
+                        return True
+                rec_stack.remove(v)
+                return False
+        
+            for node in adjacency:
+                if node not in visited:
+                    if dfs(node):
+                        return True
+            return False
+        
+        if has_cycle(adjacency):
+            response.can_build_pipeline = False
+            reasons.append("Pipeline contains cycles.")
+        
+        # Rule 3: Prevent duplicate connections
+        # Already handled in edge retrieval
+        
+        response.reasons = reasons
+        response.conflicting_edges = conflicting_edges
+        return response

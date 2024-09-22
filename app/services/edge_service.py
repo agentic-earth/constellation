@@ -22,6 +22,8 @@ from app.schemas import (
     EdgeResponseSchema,
     EdgeCreateSchema,
     EdgeUpdateSchema,
+    EdgeVerificationResponseSchema,
+    EdgeVerificationRequestSchema
 )
 from app.models import EdgeTypeEnum
 from app.logger import ConstellationLogger
@@ -465,6 +467,99 @@ class EdgeService:
             return None
 
 
+#
+    def can_connect_blocks(self, source_block_id: UUID, target_block_id: UUID) -> EdgeVerificationResponseSchema:
+        """
+        Determines if two blocks can be connected via an edge based on business rules.
+
+        Args:
+            source_block_id (UUID): The UUID of the source block.
+            target_block_id (UUID): The UUID of the target block.
+
+        Returns:
+            EdgeVerificationResponseSchema: The result of the verification.
+        """
+        response = EdgeVerificationResponseSchema(can_connect=True)
+        reasons = []
+        existing_edges = []
+
+        # Example Business Rules:
+        # 1. Prevent duplicate edges.
+        # 2. Enforce specific edge types between certain block types.
+        # 3. Prevent cycles in the graph.
+
+        # Rule 1: Check for existing edges
+        existing = self.supabase_client.table("edges")\
+            .select("*").eq("source_block_id", str(source_block_id))\
+            .eq("target_block_id", str(target_block_id)).execute()
+
+        if existing.data:
+            response.can_connect = False
+            reasons.append("An edge already exists between these blocks.")
+            existing_edges = [EdgeResponseSchema(**edge) for edge in existing.data]
+        
+        # Rule 2: Enforce specific edge types (example)
+        # Fetch source and target block types
+        source_block = self.supabase_client.table("blocks")\
+            .select("block_type").eq("block_id", str(source_block_id)).single().execute()
+
+        target_block = self.supabase_client.table("blocks")\
+            .select("block_type").eq("block_id", str(target_block_id)).single().execute()
+        
+        if source_block.data and target_block.data:
+            # Example: Only 'primary' blocks can connect to 'secondary' blocks
+            if source_block.data["block_type"] == "primary" and target_block.data["block_type"] != "secondary":
+                response.can_connect = False
+                reasons.append("Primary blocks can only connect to secondary blocks.")
+        
+        # Rule 3: Prevent cycles (Advanced)
+        # Implement DAG cycle detection logic
+        # This can be resource-intensive; hence, consider optimizing or limiting depth
+        if self.creates_cycle(source_block_id, target_block_id):
+            response.can_connect = False
+            reasons.append("Connecting these blocks would create a cycle in the graph.")
+        
+        response.reasons = reasons
+        response.existing_edges = existing_edges
+        return response
+
+    def creates_cycle(self, source_block_id: UUID, target_block_id: UUID) -> bool:
+        """
+        Determines if adding an edge would create a cycle in the graph.
+
+        Args:
+            source_block_id (UUID): The UUID of the source block.
+            target_block_id (UUID): The UUID of the target block.
+
+        Returns:
+            bool: True if a cycle would be created, False otherwise.
+        """
+        try:
+            # Perform a Depth-First Search (DFS) from the target block to see if we can reach the source block
+            stack = [target_block_id]
+            visited = set()
+
+            while stack:
+                current = stack.pop()
+                if current == source_block_id:
+                    return True
+                if current not in visited:
+                    visited.add(current)
+                    # Get all outgoing edges from current block
+                    edges = self.supabase_client.table("edges")\
+                        .select("target_block_id").eq("source_block_id", str(current)).execute()
+                    for edge in edges.data:
+                        stack.append(UUID(edge["target_block_id"]))
+            return False
+        except Exception as e:
+            self.logger.log(
+                "EdgeService",
+                "critical",
+                f"Exception during cycle detection: {str(e)}",
+                extra={"traceback": traceback.format_exc(), "source_block_id": str(source_block_id), "target_block_id": str(target_block_id)}
+            )
+            # Default to cycle creation prevention on error
+            return True
 if __name__ == "__main__":
     import traceback
 

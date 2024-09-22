@@ -6,12 +6,75 @@ Test Suite for EdgeController
 This module contains comprehensive tests for the EdgeController class, focusing on
 CRUD operations, partial data handling, and various edge cases. It utilizes pytest
 and unittest.mock for structuring and mocking dependencies respectively.
+
+Functionalities Tested:
+1. Edge Creation:
+   - Creating an edge with full data
+   - Creating an edge with minimal required data
+   - Handling edge creation failures
+
+2. Edge Retrieval:
+   - Getting an edge by ID
+   - Handling retrieval of non-existent edges
+
+3. Edge Update:
+   - Updating an edge with full data
+   - Updating an edge with partial data
+   - Handling update of non-existent edges
+
+4. Edge Deletion:
+   - Deleting an existing edge
+   - Handling deletion of non-existent edges
+
+5. Edge Listing:
+   - Retrieving a list of all edges
+   - Handling empty edge lists
+
+6. Edge Verification:
+   - Verifying that an edge can connect two blocks
+   - Verifying that an edge cannot connect due to existing edges
+   - Verifying that an edge cannot connect due to incompatible block types
+   - Verifying that an edge cannot connect due to potential cycle creation
+
+7. Error Handling:
+   - Proper HTTP exceptions for various error scenarios
+   - Validation of error messages and status codes
+
+8. Audit Logging:
+   - Verification of audit log creation for all CRUD operations
+
+9. Input Validation:
+   - Handling of invalid input data for create and update operations
+
+10. Service Integration:
+    - Correct interaction between EdgeController and EdgeService
+    - Proper use of mocked EdgeService methods
+
+11. Response Formatting:
+    - Correct schema usage for request and response data
+
+12. Edge-specific Business Logic:
+    - Validation of edge type constraints
+    - Handling of edge metadata
+
+This test suite ensures the robustness and reliability of the EdgeController,
+covering both happy paths and edge cases to maintain the integrity of edge-related
+operations within the application.
 """
 
 import pytest
 from unittest.mock import MagicMock, patch
 from uuid import uuid4, UUID
 from typing import Optional, Dict, Any, List
+from datetime import datetime
+
+# ... (rest of the imports and test code)
+
+import pytest
+from unittest.mock import MagicMock, patch
+from uuid import uuid4, UUID
+from typing import Optional, Dict, Any, List
+from datetime import datetime
 
 from fastapi import HTTPException, status
 
@@ -21,7 +84,10 @@ from app.schemas import (
     EdgeCreateSchema,
     EdgeUpdateSchema,
     EdgeResponseSchema,
+    EdgeVerificationRequestSchema,
+    EdgeVerificationResponseSchema
 )
+
 from app.models import EdgeTypeEnum
 
 # -------------------
@@ -73,7 +139,23 @@ def sample_edge_create_full():
         name="FullEdge123",
         edge_type=EdgeTypeEnum.primary,
         description="A fully detailed edge.",
-        created_by=generate_uuid()
+        created_by=uuid4()
+    )
+
+@pytest.fixture
+def sample_edge_response(sample_edge_create_full):
+    """
+    Sample EdgeResponseSchema with all fields populated.
+    Ensures that 'created_by' matches the one in 'sample_edge_create_full'.
+    """
+    return EdgeResponseSchema(
+        edge_id=uuid4(),
+        name=sample_edge_create_full.name,
+        edge_type=sample_edge_create_full.edge_type,
+        description=sample_edge_create_full.description,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+        created_by=sample_edge_create_full.created_by
     )
 
 @pytest.fixture
@@ -110,22 +192,6 @@ def sample_edge_update_partial():
         # name and edge_type are omitted
     )
 
-@pytest.fixture
-def sample_edge_response():
-    """
-    Updated EdgeResponseSchema to match the name provided in EdgeCreateSchema.
-    """
-    return EdgeResponseSchema(
-        edge_id=uuid4(),
-        name="FullEdge123",  # Must match sample_edge_create_full.name
-        edge_type=EdgeTypeEnum.primary,
-        description="A fully detailed edge.",
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
-        created_by=uuid4(),
-        updated_by=uuid4()  # Ensure it's included if necessary
-    )
-
 # -------------------
 # Test Cases
 # -------------------
@@ -158,7 +224,7 @@ class TestEdgeController:
 
         # Ensure that audit_log was created
         edge_controller_instance.audit_service.create_audit_log.assert_called_once()
-    
+
     def test_create_edge_with_partial_data(self, edge_controller_instance, sample_edge_create_partial, sample_edge_response):
         """
         Test creating an edge with partial data (missing optional fields).
@@ -188,7 +254,7 @@ class TestEdgeController:
 
         # Ensure that audit_log was created
         edge_controller_instance.audit_service.create_audit_log.assert_called_once()
-    
+
     def test_create_edge_with_invalid_edge_type(self, edge_controller_instance, sample_edge_create_full):
         """
         Test creating an edge with an invalid edge_type, expecting failure.
@@ -199,7 +265,7 @@ class TestEdgeController:
         # Invoke the controller's create_edge method and expect an HTTPException
         with pytest.raises(HTTPException) as exc_info:
             edge_controller_instance.create_edge(sample_edge_create_full)
-        
+
         # Assertions
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert exc_info.value.detail == "Edge creation failed due to invalid data."
@@ -228,7 +294,7 @@ class TestEdgeController:
 
         # Ensure that audit_log was created
         edge_controller_instance.audit_service.create_audit_log.assert_called_once()
-    
+
     def test_get_edge_by_id_non_existing(self, edge_controller_instance):
         """
         Test retrieving a non-existing edge by its ID, expecting a 404 error.
@@ -241,12 +307,12 @@ class TestEdgeController:
         # Invoke the controller's get_edge_by_id method and expect an HTTPException
         with pytest.raises(HTTPException) as exc_info:
             edge_controller_instance.get_edge_by_id(non_existing_id)
-        
+
         # Assertions
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
         assert exc_info.value.detail == "Edge not found."
 
-        # Ensure that audit_log was created
+        # Ensure that audit_log was created with correct details
         edge_controller_instance.audit_service.create_audit_log.assert_called_once_with({
             "user_id": None,
             "action_type": "READ",
@@ -286,7 +352,7 @@ class TestEdgeController:
 
         # Ensure that audit_log was created
         edge_controller_instance.audit_service.create_audit_log.assert_called_once()
-    
+
     def test_update_edge_with_partial_data(self, edge_controller_instance, sample_edge_update_partial, sample_edge_response):
         """
         Test updating an edge with partial data.
@@ -314,7 +380,7 @@ class TestEdgeController:
 
         # Ensure that audit_log was created
         edge_controller_instance.audit_service.create_audit_log.assert_called_once()
-    
+
     def test_update_edge_with_invalid_edge_type(self, edge_controller_instance, sample_edge_update_full):
         """
         Test updating an edge with an invalid edge_type, expecting failure.
@@ -325,7 +391,7 @@ class TestEdgeController:
         # Invoke the controller's update_edge method and expect an HTTPException
         with pytest.raises(HTTPException) as exc_info:
             edge_controller_instance.update_edge(generate_uuid(), sample_edge_update_full)
-        
+
         # Assertions
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert exc_info.value.detail == "Edge update failed due to invalid data."
@@ -352,7 +418,7 @@ class TestEdgeController:
 
         # Ensure that audit_log was created
         edge_controller_instance.audit_service.create_audit_log.assert_called_once()
-    
+
     def test_delete_edge_non_existing(self, edge_controller_instance):
         """
         Test deleting a non-existing edge, expecting failure.
@@ -365,7 +431,7 @@ class TestEdgeController:
         # Invoke the controller's delete_edge method and expect an HTTPException
         with pytest.raises(HTTPException) as exc_info:
             edge_controller_instance.delete_edge(non_existing_id)
-        
+
         # Assertions
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert exc_info.value.detail == "Edge deletion failed."
@@ -394,7 +460,7 @@ class TestEdgeController:
 
         # Ensure that audit_log was created
         edge_controller_instance.audit_service.create_audit_log.assert_called_once()
-    
+
     def test_list_edges_with_filters(self, edge_controller_instance, sample_edge_response):
         """
         Test listing edges with specific filters.
@@ -414,7 +480,7 @@ class TestEdgeController:
 
         # Ensure that audit_log was created
         edge_controller_instance.audit_service.create_audit_log.assert_called_once()
-    
+
     def test_list_edges_with_pagination(self, edge_controller_instance, sample_edge_response):
         """
         Test listing edges with pagination parameters.
@@ -460,7 +526,7 @@ class TestEdgeController:
 
         # Ensure that audit_log was created
         edge_controller_instance.audit_service.create_audit_log.assert_called_once()
-    
+
     def test_search_edges_with_invalid_parameters(self, edge_controller_instance):
         """
         Test searching edges with invalid query parameters, expecting failure.
@@ -495,14 +561,14 @@ class TestEdgeController:
         # Invoke the controller's create_edge method and expect an HTTPException
         with pytest.raises(HTTPException) as exc_info:
             edge_controller_instance.create_edge(sample_edge_create_full)
-        
+
         # Assertions
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert exc_info.value.detail == "Edge creation failed due to invalid data."
 
         # Ensure that audit_log was not created
         edge_controller_instance.audit_service.create_audit_log.assert_not_called()
-    
+
     def test_update_edge_with_no_data(self, edge_controller_instance, sample_edge_response):
         """
         Test updating an edge without providing any update data, expecting failure.
@@ -516,14 +582,14 @@ class TestEdgeController:
         # Invoke the controller's update_edge method and expect an HTTPException
         with pytest.raises(HTTPException) as exc_info:
             edge_controller_instance.update_edge(sample_edge_response.edge_id, empty_update)
-        
+
         # Assertions
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert exc_info.value.detail == "Edge update failed due to invalid data."
 
         # Ensure that audit_log was not created
         edge_controller_instance.audit_service.create_audit_log.assert_not_called()
-    
+
     def test_delete_edge_twice(self, edge_controller_instance, sample_edge_response):
         """
         Test deleting an edge twice, expecting the second deletion to fail.
@@ -545,7 +611,7 @@ class TestEdgeController:
         # Invoke the controller's delete_edge method again and expect an HTTPException
         with pytest.raises(HTTPException) as exc_info:
             edge_controller_instance.delete_edge(sample_edge_response.edge_id)
-        
+
         # Assertions
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert exc_info.value.detail == "Edge deletion failed."
@@ -553,8 +619,198 @@ class TestEdgeController:
         # Ensure that audit_log was not created for the failed deletion
         edge_controller_instance.audit_service.create_audit_log.assert_not_called()
 
-# -------------------
-# Utility Imports
-# -------------------
+    def test_verify_edge_can_connect(self, edge_controller_instance):
+        """
+        Test verifying that an edge can connect two blocks.
+        """
+        # Arrange
+        source_block_id = uuid4()
+        target_block_id = uuid4()
+        verification_request = EdgeVerificationRequestSchema(
+            source_block_id=source_block_id,
+            target_block_id=target_block_id
+        )
+        verification_response = EdgeVerificationResponseSchema(
+            can_connect=True,
+            reasons=[],
+            existing_edges=[],
+            verification_id=uuid4(),
+            edge_version_id=uuid4(),
+            verification_status="passed",
+            verification_logs=None,
+            verified_at=None,
+            verified_by=None,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        edge_controller_instance.edge_service.can_connect_blocks.return_value = verification_response
 
-from datetime import datetime
+        # Act
+        result = edge_controller_instance.verify_edge(verification_request)
+
+        # Assert
+        assert isinstance(result, EdgeVerificationResponseSchema)
+        assert result.can_connect is True
+        assert len(result.reasons) == 0
+        assert len(result.existing_edges) == 0
+        assert result.verification_status == "passed"
+        edge_controller_instance.audit_service.create_audit_log.assert_called_once()
+        edge_controller_instance.logger.log.assert_called()
+
+    def test_verify_edge_cannot_connect_due_to_existing_edge(self, edge_controller_instance):
+        """
+        Test verifying that an edge cannot connect two blocks due to an existing edge.
+        """
+        source_block_id = uuid4()
+        target_block_id = uuid4()
+        verification_request = EdgeVerificationRequestSchema(
+            source_block_id=source_block_id,
+            target_block_id=target_block_id
+        )
+        existing_edge = EdgeResponseSchema(
+            edge_id=uuid4(),
+            name="ExistingEdge",
+            edge_type=EdgeTypeEnum.primary,
+            description="Existing edge between blocks",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+            created_by=uuid4()
+        )
+        verification_response = EdgeVerificationResponseSchema(
+            can_connect=False,
+            reasons=["An edge already exists between these blocks."],
+            existing_edges=[existing_edge],
+            verification_id=uuid4(),
+            edge_version_id=uuid4(),
+            verification_status="failed",
+            verification_logs=None,
+            verified_at=None,
+            verified_by=None,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        edge_controller_instance.edge_service.can_connect_blocks.return_value = verification_response
+
+        # Act
+        result = edge_controller_instance.verify_edge(verification_request)
+
+        # Assert
+        assert isinstance(result, EdgeVerificationResponseSchema)
+        assert result.can_connect is False
+        assert "An edge already exists between these blocks." in result.reasons
+        assert len(result.existing_edges) == 1
+        assert result.existing_edges[0].edge_id == existing_edge.edge_id
+        assert result.verification_status == "failed"
+        edge_controller_instance.audit_service.create_audit_log.assert_called_once()
+        edge_controller_instance.logger.log.assert_called()
+
+    def test_verify_edge_can_connect_no_existing_edges(self, edge_controller_instance):
+        """
+        Test verifying that an edge can connect two blocks when there are no existing edges.
+        """
+        source_block_id = uuid4()
+        target_block_id = uuid4()
+        verification_request = EdgeVerificationRequestSchema(
+            source_block_id=source_block_id,
+            target_block_id=target_block_id
+        )
+        verification_response = EdgeVerificationResponseSchema(
+            can_connect=True,
+            reasons=[],
+            existing_edges=[],
+            verification_id=uuid4(),
+            edge_version_id=uuid4(),
+            verification_status="passed",
+            verification_logs=None,
+            verified_at=None,
+            verified_by=None,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        edge_controller_instance.edge_service.can_connect_blocks.return_value = verification_response
+
+        # Act
+        result = edge_controller_instance.verify_edge(verification_request)
+
+        # Assert
+        assert isinstance(result, EdgeVerificationResponseSchema)
+        assert result.can_connect is True
+        assert len(result.reasons) == 0
+        assert len(result.existing_edges) == 0
+        assert result.verification_status == "passed"
+        edge_controller_instance.audit_service.create_audit_log.assert_called_once()
+        edge_controller_instance.logger.log.assert_called()
+
+    def test_verify_edge_cannot_connect_due_to_incompatible_block_types(self, edge_controller_instance):
+        """
+        Test verifying that an edge cannot connect two blocks due to incompatible block types.
+        """
+        source_block_id = uuid4()
+        target_block_id = uuid4()
+        verification_request = EdgeVerificationRequestSchema(
+            source_block_id=source_block_id,
+            target_block_id=target_block_id
+        )
+        verification_response = EdgeVerificationResponseSchema(
+            can_connect=False,
+            reasons=["Incompatible block types: Cannot connect a 'data' block to a 'visualization' block."],
+            existing_edges=[],
+            verification_id=uuid4(),
+            edge_version_id=uuid4(),
+            verification_status="failed",
+            verification_logs=None,
+            verified_at=None,
+            verified_by=None,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        edge_controller_instance.edge_service.can_connect_blocks.return_value = verification_response
+
+        # Act
+        result = edge_controller_instance.verify_edge(verification_request)
+
+        # Assert
+        assert isinstance(result, EdgeVerificationResponseSchema)
+        assert result.can_connect is False
+        assert "Incompatible block types" in result.reasons[0]
+        assert len(result.existing_edges) == 0
+        assert result.verification_status == "failed"
+        edge_controller_instance.audit_service.create_audit_log.assert_called_once()
+        edge_controller_instance.logger.log.assert_called()
+
+    def test_verify_edge_cannot_connect_due_to_cycle_creation(self, edge_controller_instance):
+        """
+        Test verifying that an edge cannot connect two blocks because it would create a cycle in the pipeline.
+        """
+        source_block_id = uuid4()
+        target_block_id = uuid4()
+        verification_request = EdgeVerificationRequestSchema(
+            source_block_id=source_block_id,
+            target_block_id=target_block_id
+        )
+        verification_response = EdgeVerificationResponseSchema(
+            can_connect=False,
+            reasons=["Connecting these blocks would create a cycle in the pipeline."],
+            existing_edges=[],
+            verification_id=uuid4(),
+            edge_version_id=uuid4(),
+            verification_status="failed",
+            verification_logs=None,
+            verified_at=None,
+            verified_by=None,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        edge_controller_instance.edge_service.can_connect_blocks.return_value = verification_response
+
+        # Act
+        result = edge_controller_instance.verify_edge(verification_request)
+
+        # Assert
+        assert isinstance(result, EdgeVerificationResponseSchema)
+        assert result.can_connect is False
+        assert "create a cycle" in result.reasons[0]
+        assert len(result.existing_edges) == 0
+        assert result.verification_status == "failed"
+        edge_controller_instance.audit_service.create_audit_log.assert_called_once()
+        edge_controller_instance.logger.log.assert_called()

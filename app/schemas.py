@@ -424,10 +424,16 @@ class EdgeVerificationCreateSchema(BaseSchema):
     verified_by: Optional[UUID] = Field(None, description="UUID of the user who performed the verification.")
 
 
+class EdgeVerificationRequestSchema(BaseSchema):
+    source_block_id: UUID
+    target_block_id: UUID
+    # Additional fields as necessary, e.g., desired edge_type
+
 class EdgeVerificationResponseSchema(BaseSchema):
-    """
-    Schema for returning edge verification details.
-    """
+    can_connect: bool
+    reasons: Optional[List[str]] = []
+    existing_edges: Optional[List["EdgeResponseSchema"]] = []
+    # Information about possible edges
     verification_id: UUID = Field(..., description="Unique identifier for the edge verification.")
     edge_version_id: UUID = Field(..., description="UUID of the edge version being verified.")
     verification_status: VerificationStatusEnum = Field(..., description="Status of the verification.")
@@ -441,6 +447,20 @@ class EdgeVerificationResponseSchema(BaseSchema):
 # -------------------
 # Pipeline Schemas
 # -------------------
+
+class PipelineVerificationRequestSchema(BaseModel):
+    """
+    Schema for requesting pipeline verification.
+    """
+    block_ids: List[UUID] = Field(..., description="List of block UUIDs in the pipeline")
+    edge_ids: Optional[List[UUID]] = Field(None, description="Optional list of edge UUIDs in the pipeline")
+
+
+class PipelineVerificationResponseSchema(BaseSchema):
+    can_build_pipeline: bool
+    reasons: Optional[List[str]] = []
+    conflicting_edges: Optional[List["EdgeResponseSchema"]] = []
+    # Information about the pipeline's validity
 
 class PipelineCreateSchema(BaseSchema):
     """
