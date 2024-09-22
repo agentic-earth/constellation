@@ -422,11 +422,7 @@ class TestBlockController:
 
         # Act
         print(f"Calling block_controller.create_vector_embedding with block_id={block_id} and vector_create_data={vector_create_data}...")
-        result = block_controller.create_vector_embedding(
-            block_id=block_id,
-            text="This is additional metadata for vector embedding.",
-            taxonomy_filters=vector_create_data.taxonomy_filter
-        )
+        result = block_controller.create_vector_embedding(vector_create_data)
 
         # Assert
         print("Asserting vector embedding creation...")
@@ -486,16 +482,12 @@ class TestBlockController:
         mock_vector_embedding_service.create_vector_embedding.side_effect = sample_vectors
 
         # Act
-        for block_id, create_data in zip(blocks, vector_create_datas):
-            print(f"Adding vector embedding to block_id={block_id} with data={create_data}...")
-            result = block_controller.create_vector_embedding(
-                block_id=block_id,
-                text=f"Metadata for block {block_id}",
-                taxonomy_filters=create_data.taxonomy_filter
-            )
+        for create_data in vector_create_datas:
+            print(f"Adding vector embedding with data={create_data}...")
+            result = block_controller.create_vector_embedding(create_data)
             print(f"Vector embedding added: {result.vector_id}")
-            assert result is not None, f"Vector embedding creation for block {block_id} returned None."
-            assert result.entity_id == block_id, f"Entity ID mismatch for block {block_id}."
+            assert result is not None, f"Vector embedding creation for block {create_data.entity_id} returned None."
+            assert result.entity_id == create_data.entity_id, f"Entity ID mismatch for block {create_data.entity_id}."
         
         # Assert
         print("Asserting multiple vector embeddings were added successfully...")
@@ -668,11 +660,7 @@ class TestBlockController:
         # Act
         print(f"Adding vector embedding to block_id={block_id} that will fail...")
         with pytest.raises(HTTPException) as exc_info:
-            block_controller.create_vector_embedding(
-                block_id=block_id,
-                text="This metadata will cause failure.",
-                taxonomy_filters=vector_create_data.taxonomy_filter
-            )
+            block_controller.create_vector_embedding(vector_create_data)
 
         # Assert
         print("Asserting that HTTPException was raised...")
@@ -681,11 +669,7 @@ class TestBlockController:
 
         # Verify service calls
         print("Verifying service calls...")
-        mock_vector_embedding_service.create_vector_embedding.assert_called_once_with(
-            block_id=block_id,
-            text="This metadata will cause failure.",
-            taxonomy_filters={"category": "Test Category"}
-        )
+        mock_vector_embedding_service.create_vector_embedding.assert_called_once_with(vector_create_data)
         mock_logger.log.assert_called()
 
         print("test_add_vector_embedding_failure passed.")
@@ -703,11 +687,13 @@ class TestBlockController:
 
         # Act
         print(f"Updating vector embedding for block_id={block_id}...")
-        result = block_controller.update_vector_embedding(
-            block_id=block_id,
-            text="Updated metadata for vector embedding.",
-            taxonomy_filters={"category": "Updated Category"}
+        update_data = VectorRepresentationCreateSchema(
+            entity_type="block",
+            entity_id=block_id,
+            vector=[0.1, 0.2, 0.3],
+            taxonomy_filter={"category": "Updated Category"}
         )
+        result = block_controller.update_vector_embedding(block_id, update_data)
 
         # Assert
         print("Asserting vector embedding update...")
@@ -715,11 +701,7 @@ class TestBlockController:
 
         # Verify service calls
         print("Verifying service calls...")
-        mock_vector_embedding_service.update_vector_embedding.assert_called_once_with(
-            block_id=block_id,
-            text="Updated metadata for vector embedding.",
-            taxonomy_filters={"category": "Updated Category"}
-        )
+        mock_vector_embedding_service.update_vector_embedding.assert_called_once_with(block_id, update_data)
         mock_audit_service.create_audit_log.assert_called_once()
         mock_logger.log.assert_called_once()
 
@@ -737,12 +719,14 @@ class TestBlockController:
 
         # Act
         print(f"Updating vector embedding for block_id={block_id} that will fail...")
+        update_data = VectorRepresentationCreateSchema(
+            entity_type="block",
+            entity_id=block_id,
+            vector=[0.1, 0.2, 0.3],
+            taxonomy_filter={"category": "Fail Category"}
+        )
         with pytest.raises(HTTPException) as exc_info:
-            block_controller.update_vector_embedding(
-                block_id=block_id,
-                text="This update will fail.",
-                taxonomy_filters={"category": "Fail Category"}
-            )
+            block_controller.update_vector_embedding(block_id, update_data)
 
         # Assert
         print("Asserting that HTTPException was raised...")
@@ -751,11 +735,7 @@ class TestBlockController:
 
         # Verify service calls
         print("Verifying service calls...")
-        mock_vector_embedding_service.update_vector_embedding.assert_called_once_with(
-            block_id=block_id,
-            text="This update will fail.",
-            taxonomy_filters={"category": "Fail Category"}
-        )
+        mock_vector_embedding_service.update_vector_embedding.assert_called_once_with(block_id, update_data)
         mock_logger.log.assert_called_once()
 
         print("test_update_vector_embedding_failure passed.")
