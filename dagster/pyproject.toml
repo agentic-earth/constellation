@@ -12,6 +12,9 @@ uvicorn = "^0.30.6"
 dagster = "^1.8.8"
 
 
+[tool.poetry.group.dev.dependencies]
+dagster-docker = "^0.24.8"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
