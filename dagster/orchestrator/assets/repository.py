@@ -13,16 +13,16 @@ from dagster import (
 
 
 @op(config_schema={"credentials": dict})
-def import_s3(context: OpExecutionContext) -> str:
+def import_s3(context: OpExecutionContext) -> int:
     credentials = context.op_config["credentials"]
     context.log.info(f"Importing data with credentials: {credentials}")
-    data = "file data"
+    data = 1
     context.log.info(f"Data imported: {data}")
     return data
 
 
 @op(config_schema={"credentials": dict})
-def export_s3(context: OpExecutionContext, data: str):
+def export_s3(context: OpExecutionContext, data: int):
     credentials = context.op_config["credentials"]
     context.log.info(f"Exporting data with credentials: {credentials}")
     context.log.info(f"Data to export: {data}")
