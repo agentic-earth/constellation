@@ -16,7 +16,6 @@ WORKDIR /opt/dagster/app
 COPY ./orchestrator/assets/ /opt/dagster/app
 
 # Run dagster gRPC server on port 4000
-
 EXPOSE 4000
 
 # CMD allows this to be overridden from run launchers or executors that want
