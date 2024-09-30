@@ -31,7 +31,7 @@ services:
       DAGSTER_POSTGRES_DB: "postgres_db"
       DAGSTER_CURRENT_IMAGE: "dagster_assets"
     volumes:
-      - ./dagster/orchestrator/assets/:/opt/dagster/app
+      - ./dagster/:/opt/dagster/app
     networks:
       - dagster_network
 
