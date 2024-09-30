@@ -10,6 +10,7 @@ python = ">=3.9,<3.13"
 fastapi = "^0.115.0"
 uvicorn = "^0.30.6"
 dagster = "^1.8.8"
+pandas = "^2.2.3"
 
 
 [tool.poetry.group.dev.dependencies]
