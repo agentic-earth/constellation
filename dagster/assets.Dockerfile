@@ -7,8 +7,8 @@ FROM python:${PYTHON_VERSION}
 RUN pip install \
     dagster \
     dagster-postgres \
-    dagster-docker
-
+    dagster-docker \
+    pandas
 # Add repository code
 
 WORKDIR /opt/dagster/app

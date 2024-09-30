@@ -1,10 +1,14 @@
+import operator
 from pathlib import Path
 import random
-from typing import List
+from typing import Callable, List
 from dagster import (
+    Config,
+    Field,
+    Shape,
     asset,
     Definitions,
-    FilesystemIOManager,
+    InMemoryIOManager,
     graph,
     job,
     op,
@@ -13,142 +17,178 @@ from dagster import (
     OpExecutionContext,
     define_asset_job,
 )
+import pandas as pd
+from dataclasses import dataclass
+
+
+@dataclass
+class CallableOperation:
+    operation: str
+    parameters: dict[str, any]
+
 
 @asset
-def process_csv_data(context: OpExecutionContext) -> List[List[int]]:
-    context.log.info(f"Current working directory: {Path.cwd()}") #Needed to figure out why code wasnt seeing file
-    file_path = Path("orchestrator/assets/Test.csv")
-    data = []
-    context.log.info(f"Reading data from {file_path}")
-    try:
-        with file_path.open('r') as file:
-            lines = file.readlines()
-            for line in lines[1:]:  # Skip header
-                data.append([int(value) for value in line.strip().split(',')])
-        context.log.info(f"Data read: {data}")
-    except FileNotFoundError:
-        context.log.error(f"File not found: {file_path}")
-    except Exception as e:
-        context.log.error(f"Error reading file: {e}")
-    return data
+def mock_csv_data(ctx: OpExecutionContext) -> pd.DataFrame:
+    data = [["column1", "column2", "column3"], [1, 2, 3], [4, 5, 6], [7, 8, 9]]
+    ctx.log.info(f"Mock data: {data}")
+
+    df = pd.DataFrame(data[1:], columns=data[0])
+    ctx.log.info(f"DataFrame created from mock data:\n{df}")
+
+    return df
+
 
 @asset
-def write_result_to_csv(context: OpExecutionContext, result: List[List[int]]) -> List[List[int]]:
-    context.log.info(f"Current working directory: {Path.cwd()}")
-    output_file_path = Path("orchestrator/assets/Result.csv")
-    context.log.info(f"Writing result to {output_file_path}")
-    try:
-        with output_file_path.open('w') as file:
-            for sublist in result:
-                file.write(','.join(map(str, sublist)) + '\n')
-        context.log.info(f"Result written to {output_file_path}")
-    except Exception as e:
-        context.log.error(f"Error writing file: {e}")
+def write_csv(ctx: OpExecutionContext, result: pd.DataFrame) -> str:
+    ctx.log.info(f"Received data to write to CSV:\n{result}")
+
+    result.to_csv("output.csv", index=False)
+
+    ctx.log.info(f"Data written to output.csv")
+    return "output.csv"
+
+
+@op
+def math_block(
+    ctx: OpExecutionContext,
+    operand: str,
+    constant: float,
+    data: pd.DataFrame,
+) -> pd.DataFrame:
+    operand = getattr(operator, operand)
+    ctx.log.info(f"Applying math operation: {operand.__name__}")
+    result = data.apply(lambda x: operand(x, constant), axis=1)
+    ctx.log.info(f"Data after {operand.__name__} operation:\n{result}")
     return result
 
-@op
-def choose_operations(context) -> List[str]:
-    operations_sequence = ["multiply", "add", "subtract", "divide"]
-    chosen_ops = random.sample(operations_sequence, 2)  # Dynamically picking 2 random ops
-    context.log.info(f"Chosen operations: {chosen_ops}")
-    return chosen_ops
+
+@op(
+    config_schema=Shape(
+        {
+            "instructions": Field(
+                Shape(
+                    {
+                        "operation": Field(
+                            str,
+                            description="Operation to be performed",
+                            default_value="write_csv",
+                        ),
+                        "parameters": Field(
+                            dict,
+                            description="Parameters required for the operation",
+                            default_value={
+                                "result": {
+                                    "operation": "math_block",
+                                    "parameters": {
+                                        "operand": "add",
+                                        "constant": 10.0,
+                                        "data": {"operation": "mock_csv_data"},
+                                    },
+                                }
+                            },
+                        ),
+                    }
+                ),
+                description="Instructions to build the job",
+                is_required=True,
+            )
+        }
+    )
+)
+def job_assembler(context: OpExecutionContext) -> CallableOperation:
+    context.log.info("Parsing instructions to create job")
+
+    def parse_parameters(params):
+        parsed_params = {}
+        for key, value in params.items():
+            if isinstance(value, dict) and "operation" in value:
+                _ = globals()[value["operation"]]
+                nested_params = value.get("parameters", {})
+
+                context.log.info(f"Nested job: {value['operation']}")
+                parsed_params[key] = CallableOperation(
+                    value["operation"], parse_parameters(nested_params)
+                )
+            else:
+                parsed_params[key] = value
+        return parsed_params
+
+    instruction = context.op_config["instructions"]
+    if "operation" not in instruction:
+        raise ValueError("Operation not found in instruction")
+    _ = globals()[instruction["operation"]]
+
+    parameters = {}
+    if "parameters" in instruction:
+        parameters = parse_parameters(instruction["parameters"])
+
+    context.log.info(f"Instruction parsed: {instruction['operation']}")
+
+    return CallableOperation(instruction["operation"], parameters)
+
 
 @op
-def multiply(nums: List[int]) -> List[int]:
-    return [x * 2 for x in nums]
+def job_executer(context: OpExecutionContext, operations: CallableOperation) -> None:
+    context.log.info("Executing job operations")
 
-@op
-def divide(nums: List[int]) -> List[int]:
-    return [x // 2 if x != 0 else 0 for x in nums]  # Avoid division by zero
+    def execute_helper(operations):
+        context.log.info(f"Executing operation: {operations.operation}")
 
-@op
-def add(nums: List[int]) -> List[int]:
-    return [x + 2 for x in nums]
+        if operations.operation not in globals():
+            raise ValueError(f"Operation {operations.operation} not found")
 
-@op
-def subtract(nums: List[int]) -> List[int]:
-    return [x - 2 for x in nums]
+        computed_params = {}
+        if operations.parameters:
+            for key, value in operations.parameters.items():
+                if isinstance(value, CallableOperation):
+                    result = execute_helper(value)
+                    computed_params[key] = result
+                else:
+                    computed_params[key] = value
 
-@op
-def apply_operations(context, operations: List[str], data: List[List[int]]) -> List[List[int]]:
-    """
-    Applies a sequence of operations to each row in the CSV data.
-    """
-    context.log.info(f"Applying operations: {operations}")
-    processed_data = data
-    for operation in operations:
-        context.log.info(f"Applying operation: {operation}")
-        if operation == "multiply":
-            processed_data = [multiply(row) for row in processed_data]
-        elif operation == "divide":
-            processed_data = [divide(row) for row in processed_data]
-        elif operation == "add":
-            processed_data = [add(row) for row in processed_data]
-        elif operation == "subtract":
-            processed_data = [subtract(row) for row in processed_data]
-        else:
-            raise ValueError(f"Unknown operation: {operation}")
-        context.log.info(f"Data after {operation}: {processed_data}")
-    return processed_data
+        context.log.info(f"Executing operation: {operations.operation}")
+        fn = globals()[operations.operation]
+        return fn(ctx=context, **computed_params)
 
-@op(config_schema={"credentials": dict})
-def import_s3(context: OpExecutionContext) -> int:
-    credentials = context.op_config["credentials"]
-    context.log.info(f"Importing data with credentials: {credentials}")
-    data = 1  # Placeholder for actual S3 import logic
-    context.log.info(f"Data imported: {data}")
-    return data
+    execute_helper(operations)
 
-@op(config_schema={"credentials": dict})
-def export_s3(context: OpExecutionContext, data: int):
-    credentials = context.op_config["credentials"]
-    context.log.info(f"Exporting data with credentials: {credentials}")
-    context.log.info(f"Data to export: {data}")
-    # Placeholder for actual S3 export logic
-    context.log.info(f"Data exported: {data}")
-    return data
+    context.log.info("Job operations executed")
 
-@graph
-def my_pipeline():
-    data = import_s3()
-    result = export_s3(data)
-    return result
 
-# Example usage
-my_pipeline_job = my_pipeline.to_job(
-    # executor_def=docker_executor,
+@graph()
+def dynamic_math():
+    instructions = job_assembler()
+    job_executer(operations=instructions)
+
+
+dynamic_math_job = dynamic_math.to_job(
     config={
         "ops": {
-            "import_s3": {
+            "job_assembler": {
                 "config": {
-                    "credentials": {
-                        "access_key": "your_access_key",
-                        "secret_key": "your_secret_key",
+                    "instructions": {
+                        "operation": "write_csv",
+                        "parameters": {
+                            "result": {
+                                "operation": "math_block",
+                                "parameters": {
+                                    "operand": "add",
+                                    "constant": 10.0,
+                                    "data": {"operation": "mock_csv_data"},
+                                },
+                            },
+                        },
                     }
                 }
-            },
-            "export_s3": {
-                "config": {
-                    "credentials": {
-                        "access_key": "your_access_key",
-                        "secret_key": "your_secret_key",
-                    }
-                }
-            },
+            }
         }
-    },
+    }
 )
 
-@graph
-def dynamic_math_operations():
-    data = process_csv_data()
-    operations = choose_operations()
-    processed_data = apply_operations(operations, data)
-    write_result_to_csv(processed_data)
 
-dynamic_math_operations_job = dynamic_math_operations.to_job()
+dynamic_math_job = dynamic_math.to_job()
+
 
 @repository
 def deploy_docker_repository():
-    return [my_pipeline_job, dynamic_math_operations_job]
-
+    return [dynamic_math_job]
