@@ -1,1 +1,2 @@
-*constellation_backend
+# Ignore the virtual environment directory
+/constellation_backend
