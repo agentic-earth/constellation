@@ -1,0 +1,2 @@
+Log file initialized on 2024-09-30 02:37:06.512214
+2024-09-30 02:37:06,512 - AuditService - CRITICAL - Exception during audit log creation: 'dict' object has no attribute 'dict'

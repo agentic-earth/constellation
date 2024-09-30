@@ -34,6 +34,9 @@ class SupabaseClientManager:
             self.client = self.connect()
         return self.client
 
+    def disconnect(self):
+        pass
+
 # Initialize the Supabase client manager
 supabase_manager = SupabaseClientManager()
 

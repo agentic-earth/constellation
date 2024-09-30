@@ -1,0 +1,3 @@
+Log file initialized on 2024-09-30 02:36:30.110982
+2024-09-30 02:36:30,111 - main - INFO - Application startup successful. Supabase client is connected.
+2024-09-30 02:41:06,937 - main - INFO - Application shutdown. Supabase client disconnected.

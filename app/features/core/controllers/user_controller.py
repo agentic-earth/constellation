@@ -27,7 +27,8 @@ Usage Example:
 
 from typing import List, Optional, Dict, Any
 from uuid import UUID
-from app.services import UserService, AuditService
+# from app.services import UserService, AuditService
+from app.features.core.services import UserService, AuditService
 from app.schemas import (
     UserCreateSchema,
     UserUpdateSchema,

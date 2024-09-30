@@ -14,7 +14,7 @@ client = TestClient(app)
 def test_block_data():
     return {
         "name": "Test Block",
-        "block_type": BlockTypeEnum.DATA_SOURCE.value,
+        "block_type": BlockTypeEnum.model,
         "created_by": str(uuid4())
     }
 
@@ -33,7 +33,7 @@ def test_block(test_block_data):
 def test_create_block():
     block_data = {
         "name": "Create Block Test",
-        "block_type": BlockTypeEnum.PROCESSING.value,
+        "block_type": BlockTypeEnum.dataset,
         "created_by": str(uuid4())
     }
     response = client.post("/blocks/", json=block_data)

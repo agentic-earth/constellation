@@ -14,16 +14,21 @@ Design Philosophy:
 """
 
 import traceback
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from uuid import UUID, uuid4
 from datetime import datetime
 
 from app.logger import ConstellationLogger
 from app.database import get_supabase_client
 from app.utils.serialization_utils import serialize_dict
+from app.features.core.services.audit_service import AuditService
+from app.schemas import (
+    AuditLogResponseSchema,
+    AuditLogUpdateSchema
+)
 
 
-class AuditService:
+class AuditController:
     """
     AuditService handles all audit-related operations, including creating audit logs for various actions.
     """
@@ -34,6 +39,7 @@ class AuditService:
         """
         self.client = get_supabase_client()
         self.logger = ConstellationLogger()
+        self.audit_service = AuditService()
 
     def create_audit_log(self, audit_data: Dict[str, Any]) -> bool:
         """

@@ -142,10 +142,11 @@ class BlockCreateSchema(BaseSchema):
     """
     Schema for creating a new block.
     """
+    block_id: Optional[UUID] = Field(None, description="UUID of the block")
     name: str = Field(..., description="Unique name for the block.")
     block_type: BlockTypeEnum = Field(..., description="Type of the block (e.g., 'dataset', 'model').")
     description: Optional[str] = Field(None, description="Description of the block.")
-    created_by: Optional[UUID] = Field(None, description="UUID of the user creating the block.")
+    # created_by: Optional[UUID] = Field(None, description="UUID of the user creating the block.")
     taxonomy: Optional[Dict[str, Any]] = Field(None, description="Taxonomy data associated with the block.")
     metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata for the block.")
 
@@ -607,3 +608,17 @@ class AuditLogResponseSchema(BaseSchema):
     entity_id: UUID = Field(..., description="UUID of the affected entity.")
     timestamp: datetime = Field(..., description="Timestamp when the action was performed.")
     details: Optional[Dict[str, Any]] = Field(None, description="Additional details about the action.")
+
+class AuditLogUpdateSchema(BaseSchema):
+    log_id: UUID = Field(..., description="Unique identifier for the audit log entry.")
+    user_id: UUID = Field(..., description="UUID of the user who performed the action.")
+    action_type: ActionTypeEnum = Field(..., description="Type of action performed.")
+    entity_type: AuditEntityTypeEnum = Field(..., description="Type of the entity involved.")
+    entity_id: UUID = Field(..., description="UUID of the affected entity.")
+    timestamp: datetime = Field(..., description="Timestamp when the action was performed.")
+    details: Optional[Dict[str, Any]] = Field(None, description="Additional details about the action.")
+
+
+class TokenSchema(BaseSchema):
+    access_token: str = Field(..., description="access token returned when a user logged in")
+    token_type: str = Field("bearer", description="type of the access token")

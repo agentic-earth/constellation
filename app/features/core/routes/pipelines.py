@@ -22,7 +22,8 @@ Design Philosophy:
 from fastapi import APIRouter, HTTPException
 from typing import List, Optional
 from uuid import UUID
-from app.controllers.pipeline_controller import PipelineController
+# from app.controllers.pipeline_controller import PipelineController
+from app.features.core.controllers.pipeline_controller import PipelineController
 from app.schemas import (
     PipelineCreateSchema,
     PipelineUpdateSchema,

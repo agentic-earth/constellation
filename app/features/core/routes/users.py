@@ -24,7 +24,8 @@ Design Philosophy:
 from fastapi import APIRouter, HTTPException, Depends, status
 from typing import List, Optional
 from uuid import UUID
-from app.controllers.user_controller import UserController
+# from app.controllers.user_controller import UserController
+from app.features.core.controllers.user_controller import UserController
 from app.schemas import (
     UserCreateSchema,
     UserUpdateSchema,

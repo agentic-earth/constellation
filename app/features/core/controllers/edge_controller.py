@@ -26,8 +26,10 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 
-from app.services.edge_service import EdgeService
-from app.services.audit_service import AuditService
+# from app.services.edge_service import EdgeService
+# from app.services.audit_service import AuditService
+from app.features.core.services.edge_service import EdgeService
+from app.features.core.services.audit_service import AuditService
 from app.schemas import (
     EdgeCreateSchema,
     EdgeUpdateSchema,

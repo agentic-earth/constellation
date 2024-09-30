@@ -18,10 +18,11 @@ Design Philosophy:
 - Ensure clear separation between HTTP handling and business logic.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 from uuid import UUID
-from app.controllers.edge_controller import EdgeController
+# from app.controllers.edge_controller import EdgeController
+from app.features.core.controllers.edge_controller import EdgeController
 from app.schemas import (
     EdgeCreateSchema,
     EdgeUpdateSchema,

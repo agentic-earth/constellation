@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from app.models import User
-from app.services.user_service import UserService
+from app.features.core.services.user_service import UserService
 
 # Secret key to encode and decode JWT tokens
 SECRET_KEY = "your-secret-key"  # Replace with a secure key in production

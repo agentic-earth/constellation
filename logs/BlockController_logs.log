@@ -1,0 +1,3 @@
+Log file initialized on 2024-09-30 02:37:06.177486
+2024-09-30 02:37:06,177 - BlockController - INFO - block_service.create_block
+2024-09-30 02:37:06,512 - BlockController - INFO - Block created successfully with taxonomy and vector embedding. - extra={'block_id': '875374c9-33ab-40a9-bece-65eacf61b3b1'}

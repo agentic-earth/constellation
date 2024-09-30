@@ -15,6 +15,8 @@ class Settings(BaseSettings):
         LOG_LEVEL (str): The logging level (e.g., INFO, DEBUG).
         LOG_FORMAT (str): The format string for log messages.
         SECRET_KEY (str): The secret key for JWT token generation.
+        POSTGRES_RUL (str): The URL of the Postgres database
+        DATABASE_PWD (str): The password to the Postgres database
     """
     
     SUPABASE_URL: AnyHttpUrl = Field(..., validation_alias="SUPABASE_URL")
@@ -27,6 +29,8 @@ class Settings(BaseSettings):
     )
     SECRET_KEY: str = Field(default="default-secret-key", validation_alias="SECRET_KEY")
     # Add more configuration variables as needed
+    POSTGRES_URL: str = Field(..., validation_alias="POSTGRES_URL")
+    DATABASE_PWD: str = Field(..., validation_alias="DATABASE_PWD")
     
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -38,4 +42,4 @@ class Settings(BaseSettings):
 # Initialize the settings object
 settings = Settings()
 
-#print("Loaded settings:", settings.dict())
+# print("Loaded settings:", settings.dict())

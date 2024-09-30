@@ -26,10 +26,14 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 
-from app.services.pipeline_service import PipelineService
-from app.services.block_service import BlockService
-from app.services.edge_service import EdgeService
-from app.services.audit_service import AuditService
+# from app.services.pipeline_service import PipelineService
+# from app.services.block_service import BlockService
+# from app.services.edge_service import EdgeService
+# from app.services.audit_service import AuditService
+from app.features.core.services.pipeline_service import PipelineService
+from app.features.core.services.block_service import BlockService
+from app.features.core.services.edge_service import EdgeService
+from app.features.core.services.audit_service import AuditService
 from app.schemas import (
     PipelineCreateSchema,
     PipelineUpdateSchema,

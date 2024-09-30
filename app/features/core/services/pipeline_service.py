@@ -38,9 +38,12 @@ from app.schemas import (
 from app.logger import ConstellationLogger
 from app.database import get_supabase_client
 from app.utils.serialization_utils import serialize_dict
-from app.services.block_service import BlockService
-from app.services.edge_service import EdgeService
-from app.services.vector_embedding_service import VectorEmbeddingService
+# from app.services.block_service import BlockService
+# from app.services.edge_service import EdgeService
+# from app.services.vector_embedding_service import VectorEmbeddingService
+from app.features.core.services.block_service import BlockService
+from app.features.core.services.edge_service import EdgeService
+from app.features.core.services.vector_embedding_service import VectorEmbeddingService
 
 
 class PipelineService:

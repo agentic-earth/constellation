@@ -18,14 +18,16 @@ Design Philosophy:
 - Ensure clear separation between HTTP handling and business logic.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 from uuid import UUID
-from app.controllers.block_controller import BlockController
+# from app.controllers.block_controller import BlockController
+from app.features.core.controllers.block_controller import BlockController
 from app.schemas import (
     BlockCreateSchema,
     BlockUpdateSchema,
-    BlockResponseSchema
+    BlockResponseSchema,
+    BlockTypeEnum
 )
 
 router = APIRouter(

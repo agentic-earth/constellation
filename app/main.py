@@ -75,7 +75,7 @@ The Constellation API is a FastAPI-based application designed to manage pipeline
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
-from app.routes import blocks, edges, pipelines, audit_logs, users
+from app.features.core.routes import blocks, edges, pipelines, audit_logs, users
 from app.utils.helpers import SupabaseClientManager
 from app.logger import ConstellationLogger
 from app.database import get_supabase_client
@@ -135,7 +135,7 @@ async def startup_event():
     
     Ensures that the Supabase client is connected and logs the event.
     """
-    if supabase_manager.is_connected():
+    if supabase_manager.client:
         logger.log("main", "info", "Application startup successful. Supabase client is connected.")
     else:
         logger.log("main", "critical", "Application startup failed. Supabase client is not connected.")

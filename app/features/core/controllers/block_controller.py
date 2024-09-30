@@ -27,10 +27,14 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 
-from app.services.block_service import BlockService
-from app.services.taxonomy_service import TaxonomyService
-from app.services.vector_embedding_service import VectorEmbeddingService
-from app.services.audit_service import AuditService  # Assuming AuditService exists
+# from app.services.block_service import BlockService
+# from app.services.taxonomy_service import TaxonomyService
+# from app.services.vector_embedding_service import VectorEmbeddingService
+# from app.services.audit_service import AuditService  # Assuming AuditService exists
+from app.features.core.services.block_service import BlockService
+from app.features.core.services.taxonomy_service import TaxonomyService
+from app.features.core.services.vector_embedding_service import VectorEmbeddingService
+from app.features.core.services.audit_service import AuditService
 from app.schemas import (
     BlockCreateSchema,
     BlockUpdateSchema,
@@ -78,6 +82,11 @@ class BlockController:
         """
         try:
             # Step 1: Create Block
+            self.logger.log(
+                "BlockController",
+                "info",
+                "block_service.create_block"
+            )
             block = self.block_service.create_block(block_data)
             if not block:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Block creation failed.")
@@ -94,7 +103,7 @@ class BlockController:
 
             # Step 4: Log the creation in Audit Logs
             audit_log = {
-                "user_id": block_data.created_by,  # Assuming `created_by` exists in BlockCreateSchema
+                # "user_id": block_data.created_by,  # Assuming `created_by` exists in BlockCreateSchema
                 "action_type": "CREATE",
                 "entity_type": "block",
                 "entity_id": str(block.block_id),

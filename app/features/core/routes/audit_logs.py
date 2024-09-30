@@ -21,7 +21,8 @@ Design Philosophy:
 from fastapi import APIRouter, HTTPException
 from typing import List, Optional
 from uuid import UUID
-from app.controllers.audit_controller import AuditController
+# from app.controllers.audit_controller import AuditController
+from app.features.core.controllers.audit_controller import AuditController
 from app.schemas import (
     AuditLogCreateSchema,
     AuditLogUpdateSchema,

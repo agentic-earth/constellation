@@ -15,6 +15,7 @@ Design Philosophy:
 - Implement robust error handling and comprehensive logging for production readiness.
 """
 
+import traceback
 from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime
@@ -66,6 +67,7 @@ class BlockService:
                 block_id = uuid4()
             else:
                 block_id = block_data.block_id
+            print("new block id:", block_id)
 
             # Prepare block data with timestamps
             current_time = datetime.utcnow()
@@ -79,15 +81,16 @@ class BlockService:
 
             # Insert the new block into Supabase
             response = self.supabase_client.table("blocks").insert(serialize_dict(block_dict)).execute()
+            print("insert new block success")
 
-            if response.error:
-                self.logger.log(
-                    "BlockService",
-                    "error",
-                    "Failed to create block in Supabase.",
-                    extra={"error": response.error.message, "block_data": block_dict}
-                )
-                return None
+            # if response.error:
+            #     self.logger.log(
+            #         "BlockService",
+            #         "error",
+            #         "Failed to create block in Supabase.",
+            #         extra={"error": response.error.message, "block_data": block_dict}
+            #     )
+            #     return None
 
             # Construct the BlockResponseSchema
             created_block = BlockResponseSchema(
