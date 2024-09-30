@@ -35,6 +35,7 @@ class AuditController:
         """
         self.client = get_supabase_client()
         self.logger = ConstellationLogger()
+        self.audit_service = AuditService()
 
     def create_audit_log(self, audit_data: Dict[str, Any]) -> bool:
         """

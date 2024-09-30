@@ -84,6 +84,11 @@ class BlockController:
         """
         try:
             # Step 1: Create Block
+            self.logger.log(
+                "BlockController",
+                "info",
+                "block_service.create_block"
+            )
             block = self.block_service.create_block(block_data)
             if not block:
                 raise HTTPException(
@@ -107,7 +112,7 @@ class BlockController:
 
             # Step 4: Log the creation in Audit Logs
             audit_log = {
-                "user_id": block_data.created_by,  # Assuming `created_by` exists in BlockCreateSchema
+                # "user_id": block_data.created_by,  # Assuming `created_by` exists in BlockCreateSchema
                 "action_type": "CREATE",
                 "entity_type": "block",
                 "entity_id": str(block.block_id),
