@@ -1,14 +1,364 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client-js"
+  provider             = "prisma-client-py"
+  previewFeatures      = ["postgresqlExtensions"]
+  recursive_type_depth = "5"
+  interface            = "asyncio"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [uuid_ossp(map: "uuid-ossp", schema: "extensions"), vector(schema: "extensions")]
+}
+
+model alembic_version {
+  version_num String @id(map: "alembic_version_pkc") @db.VarChar(32)
+}
+
+model api_keys {
+  api_key_id        String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id           String    @db.Uuid
+  encrypted_api_key String
+  created_at        DateTime? @default(now()) @db.Timestamptz(6)
+  expires_at        DateTime  @db.Timestamptz(6)
+  is_active         Boolean?  @default(true)
+  users             users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model audit_logs {
+  log_id      String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id     String                 @db.Uuid
+  action_type action_type_enum
+  entity_type audit_entity_type_enum
+  entity_id   String                 @db.Uuid
+  timestamp   DateTime?              @default(now()) @db.Timestamptz(6)
+  details     Json?
+  users       users                  @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model block_categories {
+  block_category_id String      @id @db.Uuid
+  block_id          String?     @db.Uuid
+  category_id       String?     @db.Uuid
+  created_at        DateTime?   @default(dbgenerated("(now() AT TIME ZONE 'UTC'::text)")) @db.Timestamp(6)
+  blocks            blocks?     @relation(fields: [block_id], references: [block_id], onDelete: Cascade, onUpdate: NoAction)
+  categories        categories? @relation(fields: [category_id], references: [category_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([block_id], map: "idx_block_categories_block_id")
+  @@index([category_id], map: "idx_block_categories_category_id")
+}
+
+model block_taxonomies {
+  block_taxonomy_id   String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  block_id            String              @db.Uuid
+  category_id         String              @db.Uuid
+  created_at          DateTime?           @default(now()) @db.Timestamptz(6)
+  blocks              blocks              @relation(fields: [block_id], references: [block_id], onDelete: Cascade, onUpdate: NoAction)
+  taxonomy_categories taxonomy_categories @relation(fields: [category_id], references: [category_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([block_id, category_id])
+}
+
+model block_vector_representations {
+  vector_id       String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  block_id        String                 @db.Uuid
+  taxonomy_filter Json?
+  created_at      DateTime?              @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime?              @default(now()) @db.Timestamptz(6)
+  vector          Unsupported("vector")?
+  blocks          blocks                 @relation(fields: [block_id], references: [block_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([vector], map: "idx_block_vectors_vector")
+}
+
+model block_versions {
+  version_id                                       String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  block_id                                         String    @db.Uuid
+  version_number                                   Int
+  metadata                                         Json?
+  created_at                                       DateTime? @default(now()) @db.Timestamptz(6)
+  created_by                                       String    @db.Uuid
+  is_active                                        Boolean?  @default(true)
+  blocks_block_versions_block_idToblocks           blocks    @relation("block_versions_block_idToblocks", fields: [block_id], references: [block_id], onDelete: Cascade, onUpdate: NoAction)
+  users                                            users     @relation(fields: [created_by], references: [user_id], onDelete: SetNull, onUpdate: NoAction)
+  blocks_blocks_current_version_idToblock_versions blocks[]  @relation("blocks_current_version_idToblock_versions")
+
+  @@unique([block_id, version_number])
+}
+
+model blocks {
+  block_id                                                 String                         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                                                     String                         @unique @db.VarChar(255)
+  block_type                                               block_type_enum
+  description                                              String?
+  created_at                                               DateTime?                      @default(now()) @db.Timestamptz(6)
+  updated_at                                               DateTime?                      @default(now()) @db.Timestamptz(6)
+  current_version_id                                       String?                        @db.Uuid
+  block_categories                                         block_categories[]
+  block_taxonomies                                         block_taxonomies[]
+  block_vector_representations                             block_vector_representations[]
+  block_versions_block_versions_block_idToblocks           block_versions[]               @relation("block_versions_block_idToblocks")
+  block_versions_blocks_current_version_idToblock_versions block_versions?                @relation("blocks_current_version_idToblock_versions", fields: [current_version_id], references: [version_id], onUpdate: NoAction, map: "fk_blocks_current_version")
+  pipeline_blocks                                          pipeline_blocks[]
+  pipeline_edges_pipeline_edges_source_block_idToblocks    pipeline_edges[]               @relation("pipeline_edges_source_block_idToblocks")
+  pipeline_edges_pipeline_edges_target_block_idToblocks    pipeline_edges[]               @relation("pipeline_edges_target_block_idToblocks")
+  vector_representations                                   vector_representations[]
+}
+
+model categories {
+  category_id      String             @id @db.Uuid
+  name             String             @db.VarChar(255)
+  parent_id        String?            @db.Uuid
+  created_at       DateTime?          @default(dbgenerated("(now() AT TIME ZONE 'UTC'::text)")) @db.Timestamp(6)
+  updated_at       DateTime?          @default(dbgenerated("(now() AT TIME ZONE 'UTC'::text)")) @db.Timestamp(6)
+  block_categories block_categories[]
+  categories       categories?        @relation("categoriesTocategories", fields: [parent_id], references: [category_id], onDelete: Cascade, onUpdate: NoAction)
+  other_categories categories[]       @relation("categoriesTocategories")
+
+  @@index([name], map: "idx_categories_name")
+}
+
+model code_repos {
+  repo_id      String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  entity_type  entity_type_enum
+  entity_id    String           @db.Uuid
+  repo_url     String           @db.VarChar(255)
+  branch       String?          @default("main") @db.VarChar(100)
+  last_updated DateTime?        @default(now()) @db.Timestamptz(6)
+}
+
+model dependencies {
+  dependency_id     String               @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  entity_type       entity_type_enum
+  entity_id         String               @db.Uuid
+  dependency_type   dependency_type_enum
+  dependency_detail String
+}
+
+model docker_images {
+  image_id     String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  entity_type  entity_type_enum
+  entity_id    String             @db.Uuid
+  image_tag    String             @db.VarChar(100)
+  registry_url String             @db.VarChar(255)
+  build_status build_status_enum? @default(pending)
+  build_logs   String?
+  created_at   DateTime?          @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime?          @default(now()) @db.Timestamptz(6)
+
+  @@unique([entity_id, image_tag])
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model documents_v1 {
+  id             String                 @id @db.VarChar(128)
+  embedding      Unsupported("vector")?
+  content        String?
+  dataframe      Json?
+  blob_data      Bytes?
+  blob_meta      Json?
+  blob_mime_type String?                @db.VarChar(255)
+  meta           Json?
+
+  @@index([embedding], map: "haystack_hnsw_index")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model documents_v2 {
+  internal_id BigInt   @id @default(autoincrement())
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  paper_id    String?
+  data        Json?
+}
+
+model edge_vector_representations {
+  vector_id       String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  edge_id         String    @db.Uuid
+  vector_db       String    @db.VarChar(100)
+  vector_key      String    @db.VarChar(255)
+  taxonomy_filter Json?
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime? @default(now()) @db.Timestamptz(6)
+  edges           edges     @relation(fields: [edge_id], references: [edge_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model edge_verifications {
+  verification_id     String                    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  edge_version_id     String                    @db.Uuid
+  verification_status verification_status_enum? @default(pending)
+  verification_logs   String?
+  verified_at         DateTime?                 @db.Timestamptz(6)
+  verified_by         String?                   @db.Uuid
+  created_at          DateTime?                 @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime?                 @default(now()) @db.Timestamptz(6)
+  edge_versions       edge_versions             @relation(fields: [edge_version_id], references: [version_id], onDelete: Cascade, onUpdate: NoAction)
+  users               users?                    @relation(fields: [verified_by], references: [user_id], onUpdate: NoAction)
+}
+
+model edge_versions {
+  version_id                                    String               @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  edge_id                                       String               @db.Uuid
+  version_number                                Int
+  metadata                                      Json?
+  created_at                                    DateTime?            @default(now()) @db.Timestamptz(6)
+  created_by                                    String               @db.Uuid
+  is_active                                     Boolean?             @default(true)
+  edge_verifications                            edge_verifications[]
+  users                                         users                @relation(fields: [created_by], references: [user_id], onDelete: SetNull, onUpdate: NoAction)
+  edges_edge_versions_edge_idToedges            edges                @relation("edge_versions_edge_idToedges", fields: [edge_id], references: [edge_id], onDelete: Cascade, onUpdate: NoAction)
+  edges_edges_current_version_idToedge_versions edges[]              @relation("edges_current_version_idToedge_versions")
+
+  @@unique([edge_id, version_number])
+}
+
+model edges {
+  edge_id                                               String                        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                                                  String                        @unique @db.VarChar(255)
+  description                                           String?
+  current_version_id                                    String?                       @db.Uuid
+  created_at                                            DateTime?                     @default(now()) @db.Timestamptz(6)
+  updated_at                                            DateTime?                     @default(now()) @db.Timestamptz(6)
+  edge_type                                             String                        @default("primary") @db.VarChar(50)
+  source_block_id                                       BigInt?
+  target_block_id                                       BigInt?
+  edge_vector_representations                           edge_vector_representations[]
+  edge_versions_edge_versions_edge_idToedges            edge_versions[]               @relation("edge_versions_edge_idToedges")
+  edge_versions_edges_current_version_idToedge_versions edge_versions?                @relation("edges_current_version_idToedge_versions", fields: [current_version_id], references: [version_id], onUpdate: NoAction, map: "fk_edges_current_version")
+  pipeline_edges                                        pipeline_edges[]
+
+  @@index([edge_id], map: "idx_edges_edge_id")
+  @@index([source_block_id], map: "idx_edges_source")
+  @@index([target_block_id], map: "idx_edges_target")
+}
+
+model pipeline_blocks {
+  pipeline_block_id String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  pipeline_id       String    @db.Uuid
+  block_id          String    @db.Uuid
+  created_at        DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime? @default(now()) @db.Timestamptz(6)
+  blocks            blocks    @relation(fields: [block_id], references: [block_id], onDelete: Cascade, onUpdate: NoAction)
+  pipelines         pipelines @relation(fields: [pipeline_id], references: [pipeline_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([pipeline_id, block_id])
+}
+
+model pipeline_edges {
+  pipeline_edge_id                              String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  pipeline_id                                   String    @db.Uuid
+  edge_id                                       String    @db.Uuid
+  source_block_id                               String    @db.Uuid
+  target_block_id                               String    @db.Uuid
+  created_at                                    DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at                                    DateTime? @default(now()) @db.Timestamptz(6)
+  edges                                         edges     @relation(fields: [edge_id], references: [edge_id], onDelete: Cascade, onUpdate: NoAction)
+  pipelines                                     pipelines @relation(fields: [pipeline_id], references: [pipeline_id], onDelete: Cascade, onUpdate: NoAction)
+  blocks_pipeline_edges_source_block_idToblocks blocks    @relation("pipeline_edges_source_block_idToblocks", fields: [source_block_id], references: [block_id], onDelete: Cascade, onUpdate: NoAction)
+  blocks_pipeline_edges_target_block_idToblocks blocks    @relation("pipeline_edges_target_block_idToblocks", fields: [target_block_id], references: [block_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([pipeline_id, edge_id])
+}
+
+model pipelines {
+  pipeline_id             String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                    String            @unique @db.VarChar(255)
+  description             String?
+  created_at              DateTime?         @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime?         @default(now()) @db.Timestamptz(6)
+  dagster_pipeline_config Json?
+  created_by              String            @db.Uuid
+  times_run               Int?              @default(0)
+  average_runtime         Float?            @default(0.0)
+  pipeline_blocks         pipeline_blocks[]
+  pipeline_edges          pipeline_edges[]
+  users                   users             @relation(fields: [created_by], references: [user_id], onDelete: SetNull, onUpdate: NoAction)
+}
+
+model taxonomy_categories {
+  category_id               String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                      String                @db.VarChar(255)
+  parent_id                 String?               @db.Uuid
+  created_at                DateTime?             @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime?             @default(now()) @db.Timestamptz(6)
+  block_taxonomies          block_taxonomies[]
+  taxonomy_categories       taxonomy_categories?  @relation("taxonomy_categoriesTotaxonomy_categories", fields: [parent_id], references: [category_id], onUpdate: NoAction)
+  other_taxonomy_categories taxonomy_categories[] @relation("taxonomy_categoriesTotaxonomy_categories")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model users {
+  user_id            String               @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  username           String               @unique @db.VarChar(150)
+  email              String               @unique @db.VarChar(255)
+  password_hash      String               @db.VarChar(255)
+  role               String               @db.VarChar(50)
+  created_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  api_keys           api_keys[]
+  audit_logs         audit_logs[]
+  block_versions     block_versions[]
+  edge_verifications edge_verifications[]
+  edge_versions      edge_versions[]
+  pipelines          pipelines[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model vector_representations {
+  vector_id       String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entity_type     String
+  entity_id       String                @db.Uuid
+  vector          Unsupported("vector")
+  taxonomy_filter Json?
+  created_at      DateTime?             @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime?             @default(now()) @db.Timestamptz(6)
+  blocks          blocks                @relation(fields: [entity_id], references: [block_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_entity")
+
+  @@index([vector], map: "idx_vector_representations_vector")
+}
+
+enum action_type_enum {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+}
+
+enum audit_entity_type_enum {
+  block
+  edge
+  pipeline
+  taxonomy
+  metadata
+  user
+  api_key
+  code_repo
+  docker_image
+  verification
+}
+
+enum block_type_enum {
+  dataset
+  model
+}
+
+enum build_status_enum {
+  pending
+  success
+  failed
+}
+
+enum dependency_type_enum {
+  internal
+  external
+}
+
+enum entity_type_enum {
+  block
+  edge
+}
+
+enum verification_status_enum {
+  pending
+  passed
+  failed
 }
