@@ -3,10 +3,12 @@ import sys
 import os
 from pydantic import ValidationError
 # from logger import ConstellationLogger
-from haystack.document_stores import InMemoryDocumentStore
-from haystack.nodes import DenseRetriever, PromptNode, EmbeddingRetriever
-from haystack.pipelines import ExtractiveQAPipeline
-from haystack.pipelines import Pipeline
+from haystack import Pipeline, Document
+from haystack.components.builders import PromptBuilder
+from haystack.document_stores.in_memory import InMemoryDocumentStore
+from haystack.components.embedders import OpenAITextEmbedder, OpenAIDocumentEmbedder
+from haystack.components.retrievers import InMemoryEmbeddingRetriever
+from haystack.components.generators import OpenAIGenerator
 
 class LLMService:
 
@@ -21,36 +23,59 @@ class LLMService:
 
     def make_llm_request(self, prompt: str) -> str:
         # Step 1: Initialize a document store (in-memory for this example)
-        document_store = InMemoryDocumentStore()
+        document_store = InMemoryDocumentStore(embedding_similarity_function="cosine")
 
         # Step 2: Add some documents to the document store
         documents = [
-            {"content": "The Eiffel Tower is located in Paris."},
-            {"content": "The Great Wall of China is one of the greatest wonders of the world."},
-            {"content": "The Statue of Liberty was a gift from France to the United States."}
+            Document(content='The Eiffel Tower is located in Paris.'),
+            Document(content='The Great Wall of China is one of the greatest wonders of the world.'),
+            Document(content='The Statue of Liberty was a gift from France to the United States.')
         ]
-
+        # Ensure documents is a list of Document objects
+        if not isinstance(documents, list) or not all(isinstance(doc, Document) for doc in documents):
+            raise ValueError("Please provide a list of Documents.")
         document_store.write_documents(documents)
 
-        print("Initializing retriever")
-        retriever = EmbeddingRetriever(
-            embedding_model="sentence-transformers/multi-qa-mpnet-base-dot-v1", document_store=document_store, api_key=self.openai_api_key
-        )
+        # Step 3: Initialize a retriever and connect it to the document store
+        retriever = InMemoryEmbeddingRetriever(document_store=document_store)
+
+        # Step 4: Initialize text and document embedders, prompt builder, and generator
+        text_embedder = OpenAITextEmbedder()
+        document_embedder = OpenAIDocumentEmbedder()
         print("Initializing prompt node")
-        prompt_node = PromptNode(
-            model_name_or_path="gpt-3.5-turbo", 
-            api_key=self.openai_api_key, 
-            default_prompt_template="deepset/question-answering"
-        )
-        print("Running pipeline")
+        prompt_template = """
+            Given the following context, answer the question:
+            Context: 
+            {% for doc in documents %}
+                {{ doc.content }}
+            {% endfor %}
+            Question: {{query}}
+            Answer:
+        """
+        prompt_builder = PromptBuilder(template=prompt_template)
+        generator = OpenAIGenerator(model="gpt-3.5-turbo")
+        pipeline = Pipeline()
 
-        query_pipeline = Pipeline()
-        query_pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])
-        query_pipeline.add_node(component=prompt_node, name="PromptNode", inputs=["Retriever"])
-        query_pipeline.run(prompt)
+        # Add components to the pipeline
+        pipeline.add_component("text_embedder", text_embedder)
+        pipeline.add_component("retriever", retriever)
+        pipeline.add_component("prompt_builder", prompt_builder)
+        pipeline.add_component("generator", generator)
 
-        # Step 7: Return the answer
-        # return results['answers'][0].answer
+        # Connect components
+        pipeline.connect("text_embedder.embedding", "retriever.query_embedding")
+        pipeline.connect("retriever.documents", "prompt_builder.documents")
+        pipeline.connect("prompt_builder.prompt", "generator.prompt")
+
+        # Step 5: Run the pipeline
+        query = "What is the Eiffel Tower located?"
+        result = pipeline.run(
+                        {
+                "text_embedder": {"text": query},
+                "retriever": {"top_k": 3},
+                "prompt_builder": {"query": query}
+            })
+        return result.get("generator").get("replies")[0]
 
     # async def process_llm_output(self, llm_json_str: str) -> PipelineAPIRequest:
     #     try:
@@ -64,14 +89,7 @@ class LLMService:
     #         # Implement error handling strategy (e.g., retry, fallback, or user notification)
 
 if __name__ == "__main__":
-    # Example usage
-    # llm_output = '{"data": {"image_url": "https://example.com/image.jpg"}, "metadata": {"source": "llm"}}'
-    # sys.path.insert(0, '/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/app')
     LLMService = LLMService()
-    pipeline_request = LLMService.make_llm_request(
-                                        LLMService.construct_prompt("Where is the Eiffel Tower located?", 
-                                                {
-                                                    "context": "A user is trying to ask you a question regarding, please answer with profession and accuracy"
-                                                }))
+    pipeline_request = LLMService.make_llm_request("What is the Eiffel Tower located?")
     print(pipeline_request)
     
