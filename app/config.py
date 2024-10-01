@@ -15,6 +15,7 @@ class Settings(BaseSettings):
         LOG_LEVEL (str): The logging level (e.g., INFO, DEBUG).
         LOG_FORMAT (str): The format string for log messages.
         SECRET_KEY (str): The secret key for JWT token generation.
+        OPENAI_API_KEY (str): The OpenAI API key.
     """
     
     SUPABASE_URL: AnyHttpUrl = Field(..., validation_alias="SUPABASE_URL")
@@ -26,6 +27,7 @@ class Settings(BaseSettings):
         validation_alias="LOG_FORMAT"
     )
     SECRET_KEY: str = Field(default="default-secret-key", validation_alias="SECRET_KEY")
+    OPENAI_API_KEY: str = Field(default=os.getenv("OPENAI_API_KEY"), validation_alias="OPENAI_API_KEY")
     # Add more configuration variables as needed
     
     model_config = SettingsConfigDict(
@@ -39,3 +41,11 @@ class Settings(BaseSettings):
 settings = Settings()
 
 #print("Loaded settings:", settings.dict())
+
+# Add this to your existing config
+HAYSTACK_CONFIG = {
+    "document_store": "InMemoryDocumentStore",
+    "retriever": "EmbeddingRetriever",
+    "embedding_model": "sentence-transformers/multi-qa-mpnet-base-dot-v1",
+    "generator_model": "gpt-3.5-turbo"
+}
