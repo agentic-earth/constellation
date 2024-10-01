@@ -9,6 +9,12 @@ from haystack.document_stores.in_memory import InMemoryDocumentStore
 from haystack.components.embedders import OpenAITextEmbedder, OpenAIDocumentEmbedder
 from haystack.components.retrievers import InMemoryEmbeddingRetriever
 from haystack.components.generators import OpenAIGenerator
+from haystack import Pipeline, Document
+from haystack.components.builders import PromptBuilder
+from haystack.document_stores.in_memory import InMemoryDocumentStore
+from haystack.components.embedders import OpenAITextEmbedder, OpenAIDocumentEmbedder
+from haystack.components.retrievers import InMemoryEmbeddingRetriever
+from haystack.components.generators import OpenAIGenerator
 
 class LLMService:
 
@@ -25,8 +31,11 @@ class LLMService:
         # Step 1: Initialize a document store (in-memory for this example)
         document_store = InMemoryDocumentStore(embedding_similarity_function="cosine")
 
-        # Step 2: Add some documents to the document store
+        # Step 3: Add some documents to the document store
         documents = [
+            Document(content='The Eiffel Tower is located in Paris.'),
+            Document(content='The Great Wall of China is one of the greatest wonders of the world.'),
+            Document(content='The Statue of Liberty was a gift from France to the United States.')
             Document(content='The Eiffel Tower is located in Paris.'),
             Document(content='The Great Wall of China is one of the greatest wonders of the world.'),
             Document(content='The Statue of Liberty was a gift from France to the United States.')
