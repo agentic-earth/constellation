@@ -17,11 +17,11 @@ class BlockService:
     async def create_block(self, block_data: BlockCreateSchema) -> Optional[BlockResponseSchema]:
         block = await self.prisma.blocks.create(
             data={
-                "block_id": uuid4(),
+                "block_id": str(uuid4()),  # Convert UUID to string
                 "name": block_data.name,
                 "block_type": block_data.block_type.value,
                 "description": block_data.description,
-                "created_by": block_data.created_by,
+                "created_by": str(block_data.created_by),  # Convert UUID to string
                 "metadata": block_data.metadata,
                 "taxonomy": block_data.taxonomy,
                 "created_at": datetime.utcnow(),
