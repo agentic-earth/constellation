@@ -1,50 +1,117 @@
 # app/schemas.py
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+"""
+Schemas Module
+
+This module defines Pydantic models that correspond to the Prisma schemas defined in `schema.prisma`.
+These schemas are used for request validation and response formatting in the FastAPI application,
+ensuring type safety and consistency between the API layer and the database.
+
+**Alignment with `schema.prisma`:**
+- Each Prisma model has a corresponding Pydantic model with fields that match the database schema.
+- Enums defined in Prisma are replicated as Pydantic Enums to maintain consistency.
+- Nested relationships are represented using nested Pydantic models.
+- Any changes to the Prisma schema (e.g., adding/removing fields, changing data types) should
+  be reflected in the corresponding Pydantic models to maintain synchronization.
+- Shared enums and types are centralized to reduce duplication and ensure consistency.
+
+**Best Practices:**
+- Utilize Pydantic validators to enforce additional constraints beyond database-level validations.
+- Keep Pydantic models focused on API boundaries; avoid exposing database-specific fields directly.
+- Enable `orm_mode` to allow seamless integration with ORM objects returned by Prisma.
+- Document each Pydantic model thoroughly to aid maintainability and developer understanding.
+"""
+
+from pydantic import BaseModel, EmailStr, Field, validator
 from typing import Optional, List, Dict, Any
 from uuid import UUID
 from datetime import datetime
-from pydantic import ConfigDict
-
-from backend.app.models import (
-    BlockTypeEnum,
-    EntityTypeEnum,
-    BuildStatusEnum,
-    DependencyTypeEnum,
-    VerificationStatusEnum,
-    ActionTypeEnum,
-    AuditEntityTypeEnum,
-    EdgeTypeEnum,
-)
-
-# Base configuration for all schemas
+from enum import Enum
 
 
-# Base configuration for all schemas
+# -------------------
+# Enum Definitions
+# -------------------
+
+class ActionTypeEnum(str, Enum):
+    CREATE = "CREATE"
+    READ = "READ"
+    UPDATE = "UPDATE"
+    DELETE = "DELETE"
+
+
+class AuditEntityTypeEnum(str, Enum):
+    BLOCK = "BLOCK"
+    EDGE = "EDGE"
+    PIPELINE = "PIPELINE"
+    TAXONOMY = "TAXONOMY"
+    METADATA = "METADATA"
+    USER = "USER"
+    API_KEY = "API_KEY"
+    CODE_REPO = "CODE_REPO"
+    DOCKER_IMAGE = "DOCKER_IMAGE"
+    VERIFICATION = "VERIFICATION"
+
+
+class BlockTypeEnum(str, Enum):
+    DATASET = "DATASET"
+    MODEL = "MODEL"
+
+
+class EntityTypeEnum(str, Enum):
+    BLOCK = "BLOCK"
+    EDGE = "EDGE"
+
+
+class BuildStatusEnum(str, Enum):
+    PENDING = "PENDING"
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+
+
+class DependencyTypeEnum(str, Enum):
+    INTERNAL = "INTERNAL"
+    EXTERNAL = "EXTERNAL"
+
+
+class EdgeTypeEnum(str, Enum):
+    PRIMARY = "PRIMARY"
+    SECONDARY = "SECONDARY"
+    TERTIARY = "TERTIARY"
+
+
+class VerificationStatusEnum(str, Enum):
+    PENDING = "PENDING"
+    PASSED = "PASSED"
+    FAILED = "FAILED"
+
+
+# -------------------
+# Base Schema
+# -------------------
+
 class BaseSchema(BaseModel):
     """
     BaseSchema serves as the foundational schema for all other Pydantic models.
-    It enables ORM mode for seamless integration with database models.
+    It enables ORM mode for seamless integration with Prisma-generated ORM objects.
     """
-
-    model_config = ConfigDict(from_attributes=True)  # Updated for Pydantic v2
+    class Config:
+        orm_mode = True
 
 
 # -------------------
 # User Schemas
 # -------------------
 
-
 class UserCreateSchema(BaseSchema):
     """
     Schema for creating a new user.
     """
-
     username: str = Field(..., description="Unique username for the user.")
     email: EmailStr = Field(..., description="Valid email address for the user.")
     password: str = Field(..., description="Password for the user account.")
 
-    @field_validator("password")
+    @validator("password")
     def password_strength(cls, v):
         """
         Validates the strength of the password.
@@ -54,7 +121,7 @@ class UserCreateSchema(BaseSchema):
         # Add more checks (e.g., uppercase, numbers, special characters) if needed
         return v
 
-    @field_validator("username")
+    @validator("username")
     def username_no_spaces(cls, v):
         """
         Ensures the username does not contain spaces.
@@ -68,44 +135,46 @@ class UserUpdateSchema(BaseSchema):
     """
     Schema for updating an existing user.
     """
-
     username: Optional[str] = Field(None, description="New username for the user.")
-    email: Optional[EmailStr] = Field(
-        None, description="New email address for the user."
-    )
-    password_hash: Optional[str] = Field(
-        None, description="New hashed password for the user."
-    )
-    role: Optional[str] = Field(
-        None, description="Role of the user (e.g., admin, developer)."
-    )
+    email: Optional[EmailStr] = Field(None, description="New email address for the user.")
+    password: Optional[str] = Field(None, description="New password for the user account.")
+    role: Optional[str] = Field(None, description="Role of the user (e.g., admin, developer).")
+
+    @validator("username")
+    def validate_username(cls, v):
+        """
+        Ensures the username does not contain spaces if provided.
+        """
+        if v and " " in v:
+            raise ValueError("Username must not contain spaces")
+        return v
+
+    @validator("password")
+    def validate_password(cls, v):
+        """
+        Validates the strength of the new password if provided.
+        """
+        if v and len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        return v
 
 
 class UserResponseSchema(BaseSchema):
     """
     Schema for returning user details.
     """
-
     user_id: UUID = Field(..., description="Unique identifier for the user.")
     username: str = Field(..., description="Username of the user.")
     email: EmailStr = Field(..., description="Email address of the user.")
     role: str = Field(..., description="Role of the user.")
-    created_at: datetime = Field(
-        ..., description="Timestamp when the user was created."
-    )
-    updated_at: datetime = Field(
-        ..., description="Timestamp when the user was last updated."
-    )
-
-    class Config:
-        exclude = ["password_hash"]
+    created_at: datetime = Field(..., description="Timestamp when the user was created.")
+    updated_at: datetime = Field(..., description="Timestamp when the user was last updated.")
 
 
 class TokenSchema(BaseSchema):
     """
     Schema for returning a JWT token.
     """
-
     access_token: str = Field(..., description="JWT access token.")
     token_type: str = Field(..., description="Type of token (e.g., bearer).")
 
@@ -114,179 +183,125 @@ class TokenSchema(BaseSchema):
 # API Key Schemas
 # -------------------
 
-
 class APIKeyCreateSchema(BaseSchema):
     """
     Schema for creating a new API key.
     """
-
-    user_id: UUID = Field(
-        ..., description="UUID of the user associated with the API key."
-    )
+    user_id: UUID = Field(..., description="UUID of the user associated with the API key.")
     encrypted_api_key: str = Field(..., description="Encrypted API key string.")
-    expires_at: datetime = Field(
-        ..., description="Expiration timestamp for the API key."
-    )
+    expires_at: datetime = Field(..., description="Expiration timestamp for the API key.")
 
 
 class APIKeyResponseSchema(BaseSchema):
     """
     Schema for returning API key details.
     """
-
     api_key_id: UUID = Field(..., description="Unique identifier for the API key.")
-    user_id: UUID = Field(
-        ..., description="UUID of the user associated with the API key."
-    )
+    user_id: UUID = Field(..., description="UUID of the user associated with the API key.")
     encrypted_api_key: str = Field(..., description="Encrypted API key string.")
-    created_at: datetime = Field(
-        ..., description="Timestamp when the API key was created."
-    )
-    expires_at: datetime = Field(
-        ..., description="Expiration timestamp for the API key."
-    )
-    is_active: bool = Field(
-        ..., description="Status indicating if the API key is active."
-    )
+    created_at: datetime = Field(..., description="Timestamp when the API key was created.")
+    expires_at: datetime = Field(..., description="Expiration timestamp for the API key.")
+    is_active: bool = Field(..., description="Status indicating if the API key is active.")
 
 
 # -------------------
 # Taxonomy Category Schemas
 # -------------------
 
-
 class TaxonomyCategoryCreateSchema(BaseSchema):
     """
     Schema for creating a new taxonomy category.
     """
-
     name: str = Field(..., description="Name of the taxonomy category.")
-    parent_id: Optional[UUID] = Field(
-        None, description="UUID of the parent category, if any."
-    )
+    parent_id: Optional[UUID] = Field(None, description="UUID of the parent category, if any.")
 
 
 class TaxonomyCategoryResponseSchema(BaseSchema):
     """
     Schema for returning taxonomy category details.
     """
-
-    category_id: UUID = Field(
-        ..., description="Unique identifier for the taxonomy category."
-    )
+    category_id: UUID = Field(..., description="Unique identifier for the taxonomy category.")
     name: str = Field(..., description="Name of the taxonomy category.")
-    parent_id: Optional[UUID] = Field(
-        None, description="UUID of the parent category, if any."
-    )
-    created_at: datetime = Field(
-        ..., description="Timestamp when the category was created."
-    )
-    updated_at: datetime = Field(
-        ..., description="Timestamp when the category was last updated."
-    )
+    parent_id: Optional[UUID] = Field(None, description="UUID of the parent category, if any.")
+    created_at: datetime = Field(..., description="Timestamp when the category was created.")
+    updated_at: datetime = Field(..., description="Timestamp when the category was last updated.")
 
 
 # -------------------
 # Block Schemas
 # -------------------
 
-
 class BlockCreateSchema(BaseSchema):
     """
     Schema for creating a new block.
     """
-
     name: str = Field(..., description="Unique name for the block.")
-    block_type: BlockTypeEnum = Field(
-        ..., description="Type of the block (e.g., 'dataset', 'model')."
-    )
+    block_type: BlockTypeEnum = Field(..., description="Type of the block (e.g., 'DATASET', 'MODEL').")
     description: Optional[str] = Field(None, description="Description of the block.")
-    created_by: Optional[UUID] = Field(
-        None, description="UUID of the user creating the block."
-    )
-    taxonomy: Optional[Dict[str, Any]] = Field(
-        None, description="Taxonomy data associated with the block."
-    )
-    metadata: Optional[Dict[str, Any]] = Field(
-        None, description="Additional metadata for the block."
-    )
+    created_by: Optional[UUID] = Field(None, description="UUID of the user creating the block.")
+    taxonomy: Optional[Dict[str, Any]] = Field(None, description="Taxonomy data associated with the block.")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata for the block.")
+
+    @validator("name")
+    def validate_name(cls, v):
+        """
+        Ensures the block name does not contain spaces.
+        """
+        if " " in v:
+            raise ValueError("Block name must not contain spaces")
+        return v
 
 
 class BlockUpdateSchema(BaseSchema):
     """
     Schema for updating an existing block.
     """
-
     name: Optional[str] = Field(None, description="New name for the block.")
-    block_type: Optional[BlockTypeEnum] = Field(
-        None, description="New type for the block."
-    )
-    description: Optional[str] = Field(
-        None, description="New description for the block."
-    )
-    updated_by: Optional[UUID] = Field(
-        None, description="UUID of the user updating the block."
-    )
-    taxonomy: Optional[Dict[str, Any]] = Field(
-        None, description="Updated taxonomy data for the block."
-    )
-    metadata: Optional[Dict[str, Any]] = Field(
-        None, description="Updated metadata for the block."
-    )
+    block_type: Optional[BlockTypeEnum] = Field(None, description="New type for the block.")
+    description: Optional[str] = Field(None, description="New description for the block.")
+    updated_by: Optional[UUID] = Field(None, description="UUID of the user updating the block.")
+    taxonomy: Optional[Dict[str, Any]] = Field(None, description="Updated taxonomy data for the block.")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Updated metadata for the block.")
+
+    @validator("name")
+    def validate_name(cls, v):
+        """
+        Ensures the new block name does not contain spaces.
+        """
+        if v and " " in v:
+            raise ValueError("Block name must not contain spaces")
+        return v
 
 
 class BlockResponseSchema(BaseSchema):
     """
     Schema for returning block details, including taxonomy and vector embedding.
     """
-
     block_id: UUID = Field(..., description="Unique identifier for the block.")
     name: str = Field(..., description="Name of the block.")
-    block_type: str = Field(..., description="Type of the block.")
-    description: str = Field(..., description="Description of the block.")
-    created_at: datetime = Field(
-        ..., description="Timestamp when the block was created."
-    )
-    updated_at: datetime = Field(
-        ..., description="Timestamp when the block was last updated."
-    )
-    current_version_id: Optional[UUID] = Field(
-        None, description="UUID of the current version of the block."
-    )
-    created_by: Optional[UUID] = Field(
-        None, description="UUID of the user who created the block."
-    )
-    updated_by: Optional[UUID] = Field(
-        None, description="UUID of the user who last updated the block."
-    )
-    taxonomy: Optional[Dict[str, Any]] = Field(
-        None, description="Taxonomy data associated with the block."
-    )
-    metadata: Optional[Dict[str, Any]] = Field(
-        None, description="Additional metadata for the block."
-    )
-    vector_embedding: Optional["VectorRepresentationSchema"] = Field(
-        None, description="Vector embedding associated with the block."
-    )
+    block_type: BlockTypeEnum = Field(..., description="Type of the block.")
+    description: Optional[str] = Field(None, description="Description of the block.")
+    created_at: datetime = Field(..., description="Timestamp when the block was created.")
+    updated_at: datetime = Field(..., description="Timestamp when the block was last updated.")
+    current_version_id: Optional[UUID] = Field(None, description="UUID of the current version of the block.")
+    created_by: Optional[UUID] = Field(None, description="UUID of the user who created the block.")
+    updated_by: Optional[UUID] = Field(None, description="UUID of the user who last updated the block.")
+    taxonomy: Optional[Dict[str, Any]] = Field(None, description="Taxonomy data associated with the block.")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata for the block.")
+    vector_embedding: Optional["VectorRepresentationSchema"] = Field(None, description="Vector embedding associated with the block.")
 
 
 # -------------------
 # Block Version Schemas
 # -------------------
 
-
 class BlockVersionCreateSchema(BaseSchema):
     """
     Schema for creating a new block version.
     """
-
-    block_id: UUID = Field(
-        ..., description="UUID of the block to which this version belongs."
-    )
+    block_id: UUID = Field(..., description="UUID of the block to which this version belongs.")
     version_number: int = Field(..., description="Sequential version number.")
-    metadata: Optional[Dict[str, Any]] = Field(
-        None, description="Metadata specific to this block version."
-    )
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Metadata specific to this block version.")
     created_by: UUID = Field(..., description="UUID of the user creating this version.")
 
 
@@ -294,21 +309,12 @@ class BlockVersionResponseSchema(BaseSchema):
     """
     Schema for returning block version details.
     """
-
-    version_id: UUID = Field(
-        ..., description="Unique identifier for the block version."
-    )
+    version_id: UUID = Field(..., description="Unique identifier for the block version.")
     block_id: UUID = Field(..., description="UUID of the associated block.")
     version_number: int = Field(..., description="Sequential version number.")
-    metadata: Optional[Dict[str, Any]] = Field(
-        None, description="Metadata specific to this block version."
-    )
-    created_at: datetime = Field(
-        ..., description="Timestamp when the version was created."
-    )
-    created_by: UUID = Field(
-        ..., description="UUID of the user who created this version."
-    )
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Metadata specific to this block version.")
+    created_at: datetime = Field(..., description="Timestamp when the version was created.")
+    created_by: UUID = Field(..., description="UUID of the user who created this version.")
     is_active: bool = Field(..., description="Indicator if this is the active version.")
 
 
@@ -316,12 +322,10 @@ class BlockVersionResponseSchema(BaseSchema):
 # Block Taxonomy Schemas
 # -------------------
 
-
 class BlockTaxonomyCreateSchema(BaseSchema):
     """
     Schema for associating a taxonomy category with a block.
     """
-
     block_id: UUID = Field(..., description="UUID of the block.")
     category_id: UUID = Field(..., description="UUID of the taxonomy category.")
 
@@ -330,71 +334,48 @@ class BlockTaxonomyResponseSchema(BaseSchema):
     """
     Schema for returning block taxonomy association details.
     """
-
-    block_taxonomy_id: UUID = Field(
-        ..., description="Unique identifier for the block-taxonomy association."
-    )
+    block_taxonomy_id: UUID = Field(..., description="Unique identifier for the block-taxonomy association.")
     block_id: UUID = Field(..., description="UUID of the associated block.")
-    category_id: UUID = Field(
-        ..., description="UUID of the associated taxonomy category."
-    )
-    created_at: datetime = Field(
-        ..., description="Timestamp when the association was created."
-    )
+    category_id: UUID = Field(..., description="UUID of the associated taxonomy category.")
+    created_at: datetime = Field(..., description="Timestamp when the association was created.")
+    updated_at: datetime = Field(..., description="Timestamp when the association was last updated.")
 
 
 # -------------------
 # Code Repo Schemas
 # -------------------
 
-
 class CodeRepoCreateSchema(BaseSchema):
     """
     Schema for creating a new code repository association.
     """
-
-    entity_type: EntityTypeEnum = Field(
-        ..., description="Type of the entity ('block' or 'edge')."
-    )
+    entity_type: EntityTypeEnum = Field(..., description="Type of the entity ('BLOCK' or 'EDGE').")
     entity_id: UUID = Field(..., description="UUID of the associated entity.")
     repo_url: str = Field(..., description="URL of the GitHub repository.")
-    branch: Optional[str] = Field(
-        "main", description="Default branch of the repository."
-    )
+    branch: Optional[str] = Field("main", description="Default branch of the repository.")
 
 
 class CodeRepoResponseSchema(BaseSchema):
     """
     Schema for returning code repository association details.
     """
-
-    repo_id: UUID = Field(
-        ..., description="Unique identifier for the code repository association."
-    )
-    entity_type: EntityTypeEnum = Field(
-        ..., description="Type of the associated entity."
-    )
+    repo_id: UUID = Field(..., description="Unique identifier for the code repository association.")
+    entity_type: EntityTypeEnum = Field(..., description="Type of the associated entity.")
     entity_id: UUID = Field(..., description="UUID of the associated entity.")
     repo_url: str = Field(..., description="URL of the GitHub repository.")
     branch: str = Field(..., description="Default branch of the repository.")
-    last_updated: datetime = Field(
-        ..., description="Timestamp of the last repository update."
-    )
+    last_updated: datetime = Field(..., description="Timestamp of the last repository update.")
 
 
 # -------------------
 # Docker Image Schemas
 # -------------------
 
-
 class DockerImageCreateSchema(BaseSchema):
     """
     Schema for creating a new Docker image association.
     """
-
-    entity_type: EntityTypeEnum = Field(
-        ..., description="Type of the entity ('block' or 'edge')."
-    )
+    entity_type: EntityTypeEnum = Field(..., description="Type of the entity ('BLOCK' or 'EDGE').")
     entity_id: UUID = Field(..., description="UUID of the associated entity.")
     image_tag: str = Field(..., description="Tag of the Docker image (e.g., 'v1.0.0').")
     registry_url: str = Field(..., description="URL of the Docker registry.")
@@ -404,90 +385,56 @@ class DockerImageResponseSchema(BaseSchema):
     """
     Schema for returning Docker image association details.
     """
-
-    image_id: UUID = Field(
-        ..., description="Unique identifier for the Docker image association."
-    )
-    entity_type: EntityTypeEnum = Field(
-        ..., description="Type of the associated entity."
-    )
+    image_id: UUID = Field(..., description="Unique identifier for the Docker image association.")
+    entity_type: EntityTypeEnum = Field(..., description="Type of the associated entity.")
     entity_id: UUID = Field(..., description="UUID of the associated entity.")
     image_tag: str = Field(..., description="Tag of the Docker image.")
     registry_url: str = Field(..., description="URL of the Docker registry.")
-    build_status: BuildStatusEnum = Field(
-        ..., description="Status of the Docker image build."
-    )
-    build_logs: Optional[str] = Field(
-        None, description="Logs from the Docker image build process."
-    )
-    created_at: datetime = Field(
-        ..., description="Timestamp when the Docker image was created."
-    )
-    updated_at: datetime = Field(
-        ..., description="Timestamp when the Docker image was last updated."
-    )
+    build_status: BuildStatusEnum = Field(..., description="Status of the Docker image build.")
+    build_logs: Optional[str] = Field(None, description="Logs from the Docker image build process.")
+    created_at: datetime = Field(..., description="Timestamp when the Docker image was created.")
+    updated_at: datetime = Field(..., description="Timestamp when the Docker image was last updated.")
 
 
 # -------------------
 # Dependency Schemas
 # -------------------
 
-
 class DependencyCreateSchema(BaseSchema):
     """
     Schema for creating a new dependency association.
     """
-
-    entity_type: EntityTypeEnum = Field(
-        ..., description="Type of the entity ('block' or 'edge')."
-    )
+    entity_type: EntityTypeEnum = Field(..., description="Type of the entity ('BLOCK' or 'EDGE').")
     entity_id: UUID = Field(..., description="UUID of the associated entity.")
-    dependency_type: DependencyTypeEnum = Field(
-        ..., description="Type of the dependency ('internal' or 'external')."
-    )
-    dependency_detail: str = Field(
-        ..., description="Detailed information about the dependency."
-    )
+    dependency_type: DependencyTypeEnum = Field(..., description="Type of the dependency ('INTERNAL' or 'EXTERNAL').")
+    dependency_detail: str = Field(..., description="Detailed information about the dependency.")
 
 
 class DependencyResponseSchema(BaseSchema):
     """
     Schema for returning dependency association details.
     """
-
-    dependency_id: UUID = Field(
-        ..., description="Unique identifier for the dependency association."
-    )
-    entity_type: EntityTypeEnum = Field(
-        ..., description="Type of the associated entity."
-    )
+    dependency_id: UUID = Field(..., description="Unique identifier for the dependency association.")
+    entity_type: EntityTypeEnum = Field(..., description="Type of the associated entity.")
     entity_id: UUID = Field(..., description="UUID of the associated entity.")
-    dependency_type: DependencyTypeEnum = Field(
-        ..., description="Type of the dependency."
-    )
-    dependency_detail: str = Field(
-        ..., description="Detailed information about the dependency."
-    )
+    dependency_type: DependencyTypeEnum = Field(..., description="Type of the dependency.")
+    dependency_detail: str = Field(..., description="Detailed information about the dependency.")
 
 
 # -------------------
 # Edge Schemas
 # -------------------
 
-
 class EdgeCreateSchema(BaseSchema):
     """
     Schema for creating a new edge.
     """
-
     name: str = Field(..., description="Unique name for the edge.")
     edge_type: EdgeTypeEnum = Field(..., description="Type of the edge.")
     description: Optional[str] = Field(None, description="Description of the edge.")
-    created_by: Optional[UUID] = Field(
-        None, description="UUID of the user creating the edge."
-    )
+    created_by: Optional[UUID] = Field(None, description="UUID of the user creating the edge.")
 
-    @field_validator("name")
+    @validator("name")
     def name_no_spaces(cls, v):
         """
         Ensures the edge name does not contain spaces.
@@ -496,7 +443,7 @@ class EdgeCreateSchema(BaseSchema):
             raise ValueError("Edge name must not contain spaces")
         return v
 
-    @field_validator("edge_type")
+    @validator("edge_type")
     def validate_edge_type(cls, v):
         """
         Validates the edge type against the EdgeTypeEnum.
@@ -510,17 +457,12 @@ class EdgeUpdateSchema(BaseSchema):
     """
     Schema for updating an existing edge.
     """
-
     name: Optional[str] = Field(None, description="New name for the edge.")
-    edge_type: Optional[EdgeTypeEnum] = Field(
-        None, description="New type for the edge."
-    )
-    description: Optional[str] = Field(
-        None, description="New description for the edge."
-    )
-    updated_by: Optional[UUID] = None  # Added updated_by field
+    edge_type: Optional[EdgeTypeEnum] = Field(None, description="New type for the edge.")
+    description: Optional[str] = Field(None, description="New description for the edge.")
+    updated_by: Optional[UUID] = Field(None, description="UUID of the user updating the edge.")
 
-    @field_validator("name")
+    @validator("name")
     def name_no_spaces(cls, v):
         """
         Ensures the new edge name does not contain spaces.
@@ -529,7 +471,7 @@ class EdgeUpdateSchema(BaseSchema):
             raise ValueError("Edge name must not contain spaces")
         return v
 
-    @field_validator("edge_type")
+    @validator("edge_type")
     def validate_edge_type(cls, v):
         """
         Validates the new edge type against the EdgeTypeEnum.
@@ -543,42 +485,27 @@ class EdgeResponseSchema(BaseSchema):
     """
     Schema for returning edge details.
     """
-
     edge_id: UUID = Field(..., description="Unique identifier for the edge.")
     name: str = Field(..., description="Name of the edge.")
     edge_type: EdgeTypeEnum = Field(..., description="Type of the edge.")
     description: Optional[str] = Field(None, description="Description of the edge.")
-    current_version_id: Optional[UUID] = Field(
-        None, description="UUID of the current version of the edge."
-    )
-    created_at: datetime = Field(
-        ..., description="Timestamp when the edge was created."
-    )
-    updated_at: datetime = Field(
-        ..., description="Timestamp when the edge was last updated."
-    )
-    created_by: Optional[UUID] = Field(
-        None, description="UUID of the user who created the edge."
-    )
+    current_version_id: Optional[UUID] = Field(None, description="UUID of the current version of the edge.")
+    created_at: datetime = Field(..., description="Timestamp when the edge was created.")
+    updated_at: datetime = Field(..., description="Timestamp when the edge was last updated.")
+    created_by: Optional[UUID] = Field(None, description="UUID of the user who created the edge.")
 
 
 # -------------------
 # Edge Version Schemas
 # -------------------
 
-
 class EdgeVersionCreateSchema(BaseSchema):
     """
     Schema for creating a new edge version.
     """
-
-    edge_id: UUID = Field(
-        ..., description="UUID of the edge to which this version belongs."
-    )
+    edge_id: UUID = Field(..., description="UUID of the edge to which this version belongs.")
     version_number: int = Field(..., description="Sequential version number.")
-    metadata: Optional[Dict[str, Any]] = Field(
-        None, description="Metadata specific to this edge version."
-    )
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Metadata specific to this edge version.")
     created_by: UUID = Field(..., description="UUID of the user creating this version.")
 
 
@@ -586,19 +513,12 @@ class EdgeVersionResponseSchema(BaseSchema):
     """
     Schema for returning edge version details.
     """
-
     version_id: UUID = Field(..., description="Unique identifier for the edge version.")
     edge_id: UUID = Field(..., description="UUID of the associated edge.")
     version_number: int = Field(..., description="Sequential version number.")
-    metadata: Optional[Dict[str, Any]] = Field(
-        None, description="Metadata specific to this edge version."
-    )
-    created_at: datetime = Field(
-        ..., description="Timestamp when the version was created."
-    )
-    created_by: UUID = Field(
-        ..., description="UUID of the user who created this version."
-    )
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Metadata specific to this edge version.")
+    created_at: datetime = Field(..., description="Timestamp when the version was created.")
+    created_by: UUID = Field(..., description="UUID of the user who created this version.")
     is_active: bool = Field(..., description="Indicator if this is the active version.")
 
 
@@ -606,98 +526,70 @@ class EdgeVersionResponseSchema(BaseSchema):
 # Edge Verification Schemas
 # -------------------
 
-
 class EdgeVerificationCreateSchema(BaseSchema):
     """
     Schema for creating a new edge verification.
     """
-
-    edge_version_id: UUID = Field(
-        ..., description="UUID of the edge version being verified."
-    )
-    verification_status: VerificationStatusEnum = Field(
-        ..., description="Status of the verification ('pending', 'passed', 'failed')."
-    )
-    verification_logs: Optional[str] = Field(
-        None, description="Logs from the verification process."
-    )
-    verified_by: Optional[UUID] = Field(
-        None, description="UUID of the user who performed the verification."
-    )
+    edge_version_id: UUID = Field(..., description="UUID of the edge version being verified.")
+    verification_status: VerificationStatusEnum = Field(..., description="Status of the verification ('PENDING', 'PASSED', 'FAILED').")
+    verification_logs: Optional[str] = Field(None, description="Logs from the verification process.")
+    verified_by: Optional[UUID] = Field(None, description="UUID of the user who performed the verification.")
 
 
 class EdgeVerificationRequestSchema(BaseSchema):
-    source_block_id: UUID
-    target_block_id: UUID
+    """
+    Schema for requesting edge verification.
+    """
+    source_block_id: UUID = Field(..., description="UUID of the source block in the edge.")
+    target_block_id: UUID = Field(..., description="UUID of the target block in the edge.")
     # Additional fields as necessary, e.g., desired edge_type
 
 
 class EdgeVerificationResponseSchema(BaseSchema):
-    can_connect: bool
-    reasons: Optional[List[str]] = []
-    existing_edges: Optional[List["EdgeResponseSchema"]] = []
-    # Information about possible edges
-    verification_id: UUID = Field(
-        ..., description="Unique identifier for the edge verification."
-    )
-    edge_version_id: UUID = Field(
-        ..., description="UUID of the edge version being verified."
-    )
-    verification_status: VerificationStatusEnum = Field(
-        ..., description="Status of the verification."
-    )
-    verification_logs: Optional[str] = Field(
-        None, description="Logs from the verification process."
-    )
-    verified_at: Optional[datetime] = Field(
-        None, description="Timestamp when the verification was completed."
-    )
-    verified_by: Optional[UUID] = Field(
-        None, description="UUID of the user who performed the verification."
-    )
-    created_at: datetime = Field(
-        ..., description="Timestamp when the verification was created."
-    )
-    updated_at: datetime = Field(
-        ..., description="Timestamp when the verification was last updated."
-    )
+    """
+    Schema for returning edge verification results.
+    """
+    can_connect: bool = Field(..., description="Indicates if the connection between blocks is valid.")
+    reasons: Optional[List[str]] = Field(default_factory=list, description="Reasons for the verification outcome.")
+    existing_edges: Optional[List[EdgeResponseSchema]] = Field(default_factory=list, description="Information about existing edges.")
+    verification_id: UUID = Field(..., description="Unique identifier for the edge verification.")
+    edge_version_id: UUID = Field(..., description="UUID of the edge version being verified.")
+    verification_status: VerificationStatusEnum = Field(..., description="Status of the verification.")
+    verification_logs: Optional[str] = Field(None, description="Logs from the verification process.")
+    verified_at: Optional[datetime] = Field(None, description="Timestamp when the verification was completed.")
+    verified_by: Optional[UUID] = Field(None, description="UUID of the user who performed the verification.")
+    created_at: datetime = Field(..., description="Timestamp when the verification was created.")
+    updated_at: datetime = Field(..., description="Timestamp when the verification was last updated.")
 
 
 # -------------------
 # Pipeline Schemas
 # -------------------
 
-
 class PipelineVerificationRequestSchema(BaseModel):
     """
     Schema for requesting pipeline verification.
     """
-
-    block_ids: List[UUID] = Field(
-        ..., description="List of block UUIDs in the pipeline"
-    )
-    edge_ids: Optional[List[UUID]] = Field(
-        None, description="Optional list of edge UUIDs in the pipeline"
-    )
+    block_ids: List[UUID] = Field(..., description="List of block UUIDs in the pipeline.")
+    edge_ids: Optional[List[UUID]] = Field(None, description="Optional list of edge UUIDs in the pipeline.")
 
 
 class PipelineVerificationResponseSchema(BaseSchema):
-    can_build_pipeline: bool
-    reasons: Optional[List[str]] = []
-    conflicting_edges: Optional[List["EdgeResponseSchema"]] = []
-    # Information about the pipeline's validity
+    """
+    Schema for returning pipeline verification results.
+    """
+    can_build_pipeline: bool = Field(..., description="Indicates if the pipeline can be built.")
+    reasons: Optional[List[str]] = Field(default_factory=list, description="Reasons for the verification outcome.")
+    conflicting_edges: Optional[List[EdgeResponseSchema]] = Field(default_factory=list, description="Information about conflicting edges.")
 
 
 class PipelineCreateSchema(BaseSchema):
     """
     Schema for creating a new pipeline.
     """
-
     name: str = Field(..., description="Unique name for the pipeline.")
     description: Optional[str] = Field(None, description="Description of the pipeline.")
-    dagster_pipeline_config: Optional[Dict[str, Any]] = Field(
-        None, description="Dagster-specific configuration for the pipeline."
-    )
+    dagster_pipeline_config: Optional[Dict[str, Any]] = Field(None, description="Dagster-specific configuration for the pipeline.")
     created_by: UUID = Field(..., description="UUID of the user creating the pipeline.")
 
 
@@ -705,164 +597,99 @@ class PipelineUpdateSchema(BaseSchema):
     """
     Schema for updating an existing pipeline.
     """
-
     name: Optional[str] = Field(None, description="New name for the pipeline.")
-    description: Optional[str] = Field(
-        None, description="New description for the pipeline."
-    )
-    dagster_pipeline_config: Optional[Dict[str, Any]] = Field(
-        None, description="New Dagster-specific configuration for the pipeline."
-    )
-    times_run: Optional[int] = Field(
-        None, description="Total number of times the pipeline has run."
-    )
-    average_runtime: Optional[float] = Field(
-        None, description="Average runtime of pipeline executions."
-    )
+    description: Optional[str] = Field(None, description="New description for the pipeline.")
+    dagster_pipeline_config: Optional[Dict[str, Any]] = Field(None, description="New Dagster-specific configuration for the pipeline.")
+    times_run: Optional[int] = Field(None, description="Total number of times the pipeline has run.")
+    average_runtime: Optional[float] = Field(None, description="Average runtime of pipeline executions.")
 
 
 class PipelineResponseSchema(BaseSchema):
     """
     Schema for returning pipeline details.
     """
-
     pipeline_id: UUID = Field(..., description="Unique identifier for the pipeline.")
     name: str = Field(..., description="Name of the pipeline.")
     description: Optional[str] = Field(None, description="Description of the pipeline.")
-    created_at: datetime = Field(
-        ..., description="Timestamp when the pipeline was created."
-    )
-    updated_at: datetime = Field(
-        ..., description="Timestamp when the pipeline was last updated."
-    )
-    dagster_pipeline_config: Optional[Dict[str, Any]] = Field(
-        None, description="Dagster-specific configuration for the pipeline."
-    )
-    created_by: UUID = Field(
-        ..., description="UUID of the user who created the pipeline."
-    )
-    times_run: int = Field(
-        ..., description="Total number of times the pipeline has run."
-    )
-    average_runtime: float = Field(
-        ..., description="Average runtime of pipeline executions."
-    )
+    created_at: datetime = Field(..., description="Timestamp when the pipeline was created.")
+    updated_at: datetime = Field(..., description="Timestamp when the pipeline was last updated.")
+    dagster_pipeline_config: Optional[Dict[str, Any]] = Field(None, description="Dagster-specific configuration for the pipeline.")
+    created_by: UUID = Field(..., description="UUID of the user who created the pipeline.")
+    times_run: int = Field(..., description="Total number of times the pipeline has run.")
+    average_runtime: float = Field(..., description="Average runtime of pipeline executions.")
 
 
 # -------------------
 # Pipeline Block Schemas
 # -------------------
 
-
 class PipelineBlockCreateSchema(BaseSchema):
     """
     Schema for associating a block with a pipeline.
     """
-
     pipeline_id: UUID = Field(..., description="UUID of the pipeline.")
-    block_id: UUID = Field(
-        ..., description="UUID of the block to include in the pipeline."
-    )
+    block_id: UUID = Field(..., description="UUID of the block to include in the pipeline.")
 
 
 class PipelineBlockResponseSchema(BaseSchema):
     """
     Schema for returning pipeline-block association details.
     """
-
-    pipeline_block_id: UUID = Field(
-        ..., description="Unique identifier for the pipeline-block association."
-    )
+    pipeline_block_id: UUID = Field(..., description="Unique identifier for the pipeline-block association.")
     pipeline_id: UUID = Field(..., description="UUID of the associated pipeline.")
     block_id: UUID = Field(..., description="UUID of the associated block.")
-    created_at: datetime = Field(
-        ..., description="Timestamp when the association was created."
-    )
-    updated_at: datetime = Field(
-        ..., description="Timestamp when the association was last updated."
-    )
+    created_at: datetime = Field(..., description="Timestamp when the association was created.")
+    updated_at: datetime = Field(..., description="Timestamp when the association was last updated.")
 
 
 # -------------------
 # Pipeline Edge Schemas
 # -------------------
 
-
 class PipelineEdgeCreateSchema(BaseSchema):
     """
     Schema for associating an edge with a pipeline.
     """
-
     pipeline_id: UUID = Field(..., description="UUID of the pipeline.")
-    edge_id: UUID = Field(
-        ..., description="UUID of the edge to include in the pipeline."
-    )
-    source_block_id: UUID = Field(
-        ..., description="UUID of the source block in the edge."
-    )
-    target_block_id: UUID = Field(
-        ..., description="UUID of the target block in the edge."
-    )
+    edge_id: UUID = Field(..., description="UUID of the edge to include in the pipeline.")
+    source_block_id: UUID = Field(..., description="UUID of the source block in the edge.")
+    target_block_id: UUID = Field(..., description="UUID of the target block in the edge.")
 
 
 class PipelineEdgeResponseSchema(BaseSchema):
     """
     Schema for returning pipeline-edge association details.
     """
-
-    pipeline_edge_id: UUID = Field(
-        ..., description="Unique identifier for the pipeline-edge association."
-    )
+    pipeline_edge_id: UUID = Field(..., description="Unique identifier for the pipeline-edge association.")
     pipeline_id: UUID = Field(..., description="UUID of the associated pipeline.")
     edge_id: UUID = Field(..., description="UUID of the associated edge.")
-    source_block_id: UUID = Field(
-        ..., description="UUID of the source block in the edge."
-    )
-    target_block_id: UUID = Field(
-        ..., description="UUID of the target block in the edge."
-    )
-    created_at: datetime = Field(
-        ..., description="Timestamp when the association was created."
-    )
-    updated_at: datetime = Field(
-        ..., description="Timestamp when the association was last updated."
-    )
+    source_block_id: UUID = Field(..., description="UUID of the source block in the edge.")
+    target_block_id: UUID = Field(..., description="UUID of the target block in the edge.")
+    created_at: datetime = Field(..., description="Timestamp when the association was created.")
+    updated_at: datetime = Field(..., description="Timestamp when the association was last updated.")
 
 
 # -------------------
 # Vector Representation Schemas
 # -------------------
 
-
 class VectorRepresentationSchema(BaseSchema):
     """
     Schema representing a vector embedding associated with an entity (block or edge).
     """
-
-    vector_id: UUID = Field(
-        ..., description="Unique identifier for the vector embedding."
-    )
-    entity_type: str = Field(..., description="Type of the entity ('block' or 'edge').")
+    vector_id: UUID = Field(..., description="Unique identifier for the vector embedding.")
+    entity_type: EntityTypeEnum = Field(..., description="Type of the entity ('BLOCK' or 'EDGE').")
     entity_id: UUID = Field(..., description="UUID of the associated entity.")
-    vector: List[float] = Field(
-        ..., description="Vector embedding (e.g., 512-dimensional)."
-    )
-    taxonomy_filter: Optional[Dict[str, Any]] = Field(
-        None, description="Taxonomy constraints for RAG search."
-    )
-    created_at: datetime = Field(
-        ..., description="Timestamp when the vector was created."
-    )
-    updated_at: datetime = Field(
-        ..., description="Timestamp when the vector was last updated."
-    )
+    vector: List[float] = Field(..., description="Vector embedding (e.g., 512-dimensional).")
+    taxonomy_filter: Optional[Dict[str, Any]] = Field(None, description="Taxonomy constraints for RAG search.")
+    created_at: datetime = Field(..., description="Timestamp when the vector was created.")
+    updated_at: datetime = Field(..., description="Timestamp when the vector was last updated.")
 
 
 class VectorRepresentationResponseSchema(VectorRepresentationSchema):
     """
     Schema for returning vector embedding details.
     """
-
     pass
 
 
@@ -870,75 +697,52 @@ class VectorRepresentationCreateSchema(BaseSchema):
     """
     Schema for creating a new vector embedding.
     """
-
-    entity_type: str = Field(..., description="Type of the entity ('block' or 'edge').")
+    entity_type: EntityTypeEnum = Field(..., description="Type of the entity ('BLOCK' or 'EDGE').")
     entity_id: UUID = Field(..., description="UUID of the associated entity.")
-    vector: List[float] = Field(
-        ..., description="Vector embedding (e.g., 512-dimensional)."
-    )
-    taxonomy_filter: Optional[Dict[str, Any]] = Field(
-        None, description="Taxonomy constraints for RAG search."
-    )
+    vector: List[float] = Field(..., description="Vector embedding (e.g., 512-dimensional).")
+    taxonomy_filter: Optional[Dict[str, Any]] = Field(None, description="Taxonomy constraints for RAG search.")
 
 
 # -------------------
 # Audit Log Schemas
 # -------------------
 
-
 class AuditLogCreateSchema(BaseSchema):
     """
     Schema for creating a new audit log entry.
     """
-
     user_id: UUID = Field(..., description="UUID of the user performing the action.")
-    action_type: ActionTypeEnum = Field(
-        ..., description="Type of action performed (e.g., 'CREATE', 'READ')."
-    )
-    entity_type: AuditEntityTypeEnum = Field(
-        ..., description="Type of the entity involved (e.g., 'block', 'edge')."
-    )
+    action_type: ActionTypeEnum = Field(..., description="Type of action performed (e.g., 'CREATE', 'READ').")
+    entity_type: AuditEntityTypeEnum = Field(..., description="Type of the entity involved (e.g., 'BLOCK', 'EDGE').")
     entity_id: UUID = Field(..., description="UUID of the affected entity.")
-    details: Optional[Dict[str, Any]] = Field(
-        None, description="Additional details about the action."
-    )
+    details: Optional[Dict[str, Any]] = Field(None, description="Additional details about the action.")
 
 
 class AuditLogResponseSchema(BaseSchema):
     """
     Schema for returning audit log entry details.
     """
-
     log_id: UUID = Field(..., description="Unique identifier for the audit log entry.")
     user_id: UUID = Field(..., description="UUID of the user who performed the action.")
     action_type: ActionTypeEnum = Field(..., description="Type of action performed.")
-    entity_type: AuditEntityTypeEnum = Field(
-        ..., description="Type of the entity involved."
-    )
+    entity_type: AuditEntityTypeEnum = Field(..., description="Type of the entity involved.")
     entity_id: UUID = Field(..., description="UUID of the affected entity.")
-    timestamp: datetime = Field(
-        ..., description="Timestamp when the action was performed."
-    )
-    details: Optional[Dict[str, Any]] = Field(
-        None, description="Additional details about the action."
-    )
+    timestamp: datetime = Field(..., description="Timestamp when the action was performed.")
+    details: Optional[Dict[str, Any]] = Field(None, description="Additional details about the action.")
 
 
 class AuditLogUpdateSchema(BaseSchema):
     """
-    FIXME @mason: I added this because it was missing from the original code snippet.
     Schema for updating an existing audit log entry.
     """
+    action_type: Optional[ActionTypeEnum] = Field(None, description="New action type for the log entry.")
+    details: Optional[Dict[str, Any]] = Field(None, description="New details for the log entry.")
+    updated_by: Optional[UUID] = Field(None, description="UUID of the user updating the log entry.")
+    updated_at: Optional[datetime] = Field(None, description="Timestamp when the log entry was last updated.")
 
-    action_type: Optional[ActionTypeEnum] = Field(
-        None, description="New action type for the log entry."
-    )
-    details: Optional[Dict[str, Any]] = Field(
-        None, description="New details for the log entry."
-    )
-    updated_by: Optional[UUID] = Field(
-        None, description="UUID of the user updating the log entry."
-    )
-    updated_at: Optional[datetime] = Field(
-        None, description="Timestamp when the log entry was last updated."
-    )
+
+# -------------------
+# Additional Schemas (Placeholder)
+# -------------------
+
+# Define other schemas like EdgeSchema, PipelineSchema, etc., following the same pattern.
