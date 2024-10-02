@@ -47,7 +47,7 @@ class LLMService:
             Given the following context, answer the question:
             Context: 
             {% for doc in documents %}
-                {{ doc.content }}
+                {{ doc.content }}`
             {% endfor %}
             Question: {{query}}
             Answer:
