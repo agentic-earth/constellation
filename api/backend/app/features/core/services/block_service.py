@@ -17,7 +17,7 @@ class BlockService:
     async def create_block(self, block_data: BlockCreateSchema) -> Optional[BlockResponseSchema]:
         block = await self.prisma.blocks.create(
             data={
-                "block_id": block_data.block_id or uuid4(),
+                "block_id": uuid4(),
                 "name": block_data.name,
                 "block_type": block_data.block_type.value,
                 "description": block_data.description,

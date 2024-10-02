@@ -1,15 +1,6 @@
-```python:api/backend/app/database.py
 # app/database.py
 
-"""
-Database Module
-
-This module initializes and provides a singleton instance of the Prisma Client.
-It ensures that a single connection to the database is maintained throughout the application's lifecycle,
-optimizing resource usage and maintaining consistency across services.
-"""
 import traceback
-import asyncio
 from prisma import Prisma
 from backend.app.logger import ConstellationLogger
 
@@ -67,11 +58,3 @@ class Database:
 
 # Initialize the Database Singleton
 database = Database()
-
-# Connect to the database when the module is imported
-async def init_db():
-    await database.connect()
-
-# Ensure the database is connected upon starting the application
-import asyncio
-asyncio.create_task(init_db())
