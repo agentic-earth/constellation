@@ -76,7 +76,7 @@ class BlockController:
         Returns:
             Optional[BlockResponseSchema]: The created block data if successful, None otherwise.
         """
-        async with self.prisma.transaction():
+        async with self.prisma.tx() as transaction:
             # Step 1: Create Block
             block = await self.block_service.create_block(block_data)
             if not block:

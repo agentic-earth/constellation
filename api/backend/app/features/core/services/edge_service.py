@@ -27,7 +27,6 @@ from backend.app.schemas import (
 )
 from backend.app.models import EdgeTypeEnum
 from backend.app.logger import ConstellationLogger
-from backend.app.database import get_supabase_client
 from backend.app.utils.serialization_utils import serialize_dict
 
 

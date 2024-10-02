@@ -35,8 +35,8 @@ from backend.app.schemas import (
     PipelineVerificationRequestSchema,
     PipelineVerificationResponseSchema
 )
+
 from backend.app.logger import ConstellationLogger
-from backend.app.database import get_supabase_client
 from backend.app.utils.serialization_utils import serialize_dict
 from backend.app.features.core.services.block_service import BlockService
 from backend.app.features.core.services.edge_service import EdgeService
@@ -55,7 +55,6 @@ class PipelineService:
         Initializes the PipelineService with the Supabase client and ConstellationLogger for logging purposes.
         Also initializes instances of BlockService and EdgeService to manage associations.
         """
-        self.supabase_client: Client = get_supabase_client()
         self.logger = ConstellationLogger()
         self.block_service = BlockService()
         self.edge_service = EdgeService()

@@ -96,7 +96,7 @@ class BaseSchema(BaseModel):
     It enables ORM mode for seamless integration with Prisma-generated ORM objects.
     """
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # -------------------

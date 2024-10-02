@@ -21,7 +21,6 @@ from datetime import datetime
 
 from backend.app.taxonomy import Taxonomy, GeneralTaxonomy, EarthObservationModelTaxonomy, WeatherClimateModelTaxonomy, DatasetTaxonomy
 from backend.app.logger import ConstellationLogger
-from backend.app.database import get_supabase_client
 from backend.app.utils.serialization_utils import serialize_dict
 from prisma import Prisma
 from backend.app.schemas import TaxonomyCategoryCreateSchema, TaxonomyCategoryResponseSchema
