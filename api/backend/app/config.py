@@ -1,9 +1,13 @@
 # app/config.py
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field, AnyHttpUrl
+from pydantic import Field, AnyHttpUrl, PostgresDsn
 from typing import Optional
 import os
+from pathlib import Path
+
+# Get the path to the root of the project
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
 
 class Settings(BaseSettings):
     """
@@ -27,9 +31,10 @@ class Settings(BaseSettings):
     )
     SECRET_KEY: str = Field(default="default-secret-key", validation_alias="SECRET_KEY")
     # Add more configuration variables as needed
-    
+    DATABASE_URL: PostgresDsn = Field(..., validation_alias="DATABASE_URL")
+
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=ROOT_DIR / ".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra='ignore'  # This will ignore any extra fields in the environment
@@ -39,3 +44,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 #print("Loaded settings:", settings.dict())
+# Uncomment these lines for debugging
+print("Loaded settings:", settings.dict())
+print("ENV file path:", ROOT_DIR / ".env")
+print("DATABASE_URL:", settings.DATABASE_URL)

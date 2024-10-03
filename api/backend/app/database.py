@@ -3,6 +3,7 @@
 import traceback
 from prisma import Prisma
 from backend.app.logger import ConstellationLogger
+from backend.app.config import settings
 
 class Database:
     """
@@ -13,7 +14,9 @@ class Database:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(Database, cls).__new__(cls)
-            cls._instance.prisma = Prisma()
+            # Convert MultiHostUrl to string
+            database_url = str(settings.DATABASE_URL)
+            cls._instance.prisma = Prisma(datasource={"url": database_url})
             cls._instance.logger = ConstellationLogger()
         return cls._instance
 
@@ -22,6 +25,11 @@ class Database:
         Asynchronously connects the Prisma Client to the database.
         """
         try:
+            self.logger.log(
+                "Database",
+                "info",
+                f"Attempting to connect to database with URL: {str(settings.DATABASE_URL)}"
+            )
             await self.prisma.connect()
             self.logger.log(
                 "Database",

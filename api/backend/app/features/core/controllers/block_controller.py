@@ -31,8 +31,20 @@ from backend.app.schemas import (
     BlockResponseSchema,
     AuditLogCreateSchema,
     VectorRepresentationCreateSchema,
-    VectorRepresentationResponseSchema
+    VectorRepresentationResponseSchema,
+    BlockTypeEnum
 )
+
+from backend.app.taxonomy import (
+    PaperType, ApplicationArea, SpatialScale, TemporalScale, ApplicationReadiness,
+    ModelType, Architecture, ModelCharacteristics, InputDataType, OutputDataType,
+    SpatialResolution, TemporalResolution, SatelliteSource, ProcessingLevel,
+    EarthObservationModelTaxonomy, WeatherClimateModelTaxonomy,
+    DatasetTaxonomy, Taxonomy, GeneralTaxonomy
+)
+
+
+from backend.app.database import database
 from backend.app.features.core.services.block_service import BlockService
 from backend.app.features.core.services.taxonomy_service import TaxonomyService
 from backend.app.features.core.services.vector_embedding_service import VectorEmbeddingService
@@ -274,36 +286,58 @@ class BlockController:
 
 async def main():
     """
-    Main function to test the BlockController functionality. It performs the following steps:
-    1. Creates a new block.
-    2. Retrieves the created block.
-    3. Updates the block's name and taxonomy.
-    4. Performs a similarity search.
-    5. Deletes the block.
-
-    Ensure that the Prisma client is correctly connected to the database before running this function.
+    Main function to test the BlockController functionality with correct schemas and taxonomies.
     """
-    from backend.app.database import database
-    from backend.app.features.core.controllers.block_controller import BlockController
-    from backend.app.schemas import BlockCreateSchema, BlockUpdateSchema
-    import uuid
-
+    print("Starting BlockController test...")
     await database.prisma.connect()
+    print("Connected to database.")
     controller = BlockController(database.prisma)
 
-    user_id = uuid.uuid4()  # Example user ID
+    user_id = UUID('12345678-1234-5678-1234-567812345678')  # Example user ID
+    print(f"Using test user ID: {user_id}")
 
-    # Step 1: Create a new block
+    # Step 1: Create a new block (Earth Observation Model)
+    print("\nStep 1: Creating a new Earth Observation Model block...")
     create_schema = BlockCreateSchema(
-        name="ExampleBlock",
-        block_type="DATASET",
-        description="An example block for testing.",
+        name="EarthObservationModelExample",
+        block_type=BlockTypeEnum.MODEL,
+        description="An example Earth Observation model for testing.",
         created_by=user_id,
-        taxonomy={
-            "Science": {
-                "Physics": {}
-            }
-        },
+        taxonomy=Taxonomy(
+            general=GeneralTaxonomy(
+                paper_id="paper123",
+                paper_type=PaperType.EARTH_OBSERVATION,
+                application_areas=[ApplicationArea.AGRICULTURE_FOOD_SECURITY, ApplicationArea.CLIMATE_ATMOSPHERIC_SCIENCE],
+                keywords=["remote sensing", "machine learning"],
+                spatial_scale=SpatialScale.REGIONAL,
+                temporal_scale=TemporalScale.ANNUAL,
+                application_readiness=ApplicationReadiness.PROTOTYPE
+            ),
+            specific=EarthObservationModelTaxonomy(
+                paper_id="paper123",
+                paper_type=PaperType.EARTH_OBSERVATION,
+                application_areas=[ApplicationArea.AGRICULTURE_FOOD_SECURITY, ApplicationArea.CLIMATE_ATMOSPHERIC_SCIENCE],
+                keywords=["remote sensing", "machine learning"],
+                spatial_scale=SpatialScale.REGIONAL,
+                temporal_scale=TemporalScale.ANNUAL,
+                application_readiness=ApplicationReadiness.PROTOTYPE,
+                model_type=ModelType.VISION,
+                architecture=Architecture.CNN,
+                model_characteristics=ModelCharacteristics(
+                    is_stochastic=False,
+                    is_deterministic=True,
+                    is_multi_modal=False,
+                    is_foundation_model=False,
+                    is_physics_informed=False
+                ),
+                input_data_types=[InputDataType.OPTICAL, InputDataType.THERMAL],
+                output_data_type=OutputDataType.CLASSIFICATION,
+                spatial_resolution=SpatialResolution.MEDIUM_HIGH,
+                temporal_resolution=TemporalResolution.ANNUAL,
+                satellite_data_sources=[SatelliteSource.SENTINEL_2, SatelliteSource.LANDSAT_1],
+                processing_level=ProcessingLevel.LEVEL_1
+            )
+        ),
         metadata={
             "vector": [0.1] * 512  # Example 512-dimensional vector
         }
@@ -315,32 +349,62 @@ async def main():
         print("Block creation failed.")
 
     # Step 2: Retrieve the created block
-    retrieved_block = await controller.get_block_by_id(created_block.block_id, user_id)
-    if retrieved_block:
-        print(f"Block Retrieved: {retrieved_block.block_id}, Name: {retrieved_block.name}")
-    else:
-        print("Block retrieval failed.")
+    if created_block:
+        print("\nStep 2: Retrieving the created block...")
+        retrieved_block = await controller.get_block_by_id(created_block.block_id, user_id)
+        if retrieved_block:
+            print(f"Block Retrieved: {retrieved_block.block_id}, Name: {retrieved_block.name}")
+            print(f"Taxonomy: {retrieved_block.taxonomy}")
+        else:
+            print("Block retrieval failed.")
 
-    # Step 3: Update the block's name and taxonomy
-    update_schema = BlockUpdateSchema(
-        name="UpdatedExampleBlock",
-        taxonomy={
-            "Science": {
-                "Chemistry": {}
-            }
-        },
-        metadata={
-            "vector": [0.2] * 512
-        },
-        updated_by=user_id
-    )
-    updated_block = await controller.update_block(created_block.block_id, update_schema, user_id)
-    if updated_block:
-        print(f"Block Updated: {updated_block.block_id}, New Name: {updated_block.name}")
-    else:
-        print("Block update failed.")
+    # Step 3: Update the block's name and taxonomy (to Weather/Climate Model)
+    if created_block:
+        print("\nStep 3: Updating the block to a Weather/Climate Model...")
+        update_schema = BlockUpdateSchema(
+            name="UpdatedWeatherClimateModelExample",
+            taxonomy=Taxonomy(
+                general=GeneralTaxonomy(
+                    paper_id="paper123",
+                    paper_type=PaperType.WEATHER_CLIMATE,
+                    application_areas=[ApplicationArea.WEATHER_FORECASTING, ApplicationArea.CLIMATE_MODELING],
+                    keywords=["climate", "forecasting"],
+                    spatial_scale=SpatialScale.GLOBAL,
+                    temporal_scale=TemporalScale.DECADAL,
+                    application_readiness=ApplicationReadiness.OPERATIONAL
+                ),
+                specific=WeatherClimateModelTaxonomy(
+                    paper_id="paper123",
+                    model_type=ModelType.PHYSICS_BASED,
+                    architecture=Architecture.GCM,
+                    model_characteristics=ModelCharacteristics(
+                        is_stochastic=True,
+                        is_deterministic=False,
+                        is_multi_modal=True,
+                        is_foundation_model=False,
+                        is_physics_informed=True
+                    ),
+                    input_data_types=[InputDataType.REANALYSIS, InputDataType.WEATHER_STATION],
+                    output_data_type=OutputDataType.TIME_SERIES,
+                    spatial_resolution=SpatialResolution.COARSE,
+                    temporal_resolution=TemporalResolution.HOURLY,
+                    climate_weather_data_sources=[ClimateWeatherDataSource.ERA5, ClimateWeatherDataSource.GHCN]
+                )
+            ),
+            metadata={
+                "vector": [0.2] * 512
+            },
+            updated_by=user_id
+        )
+        updated_block = await controller.update_block(created_block.block_id, update_schema, user_id)
+        if updated_block:
+            print(f"Block Updated: {updated_block.block_id}, New Name: {updated_block.name}")
+            print(f"Updated Taxonomy: {updated_block.taxonomy}")
+        else:
+            print("Block update failed.")
 
     # Step 4: Perform a similarity search
+    print("\nStep 4: Performing a similarity search...")
     search_vector = [0.2] * 512
     top_k = 5
     similar_blocks = await controller.perform_similarity_search(search_vector, top_k, user_id)
@@ -352,14 +416,19 @@ async def main():
         print("Similarity search failed or no similar blocks found.")
 
     # Step 5: Delete the block
-    deletion_success = await controller.delete_block(created_block.block_id, user_id)
-    if deletion_success:
-        print(f"Block Deleted: {created_block.block_id}")
-    else:
-        print("Block deletion failed.")
+    if created_block:
+        print("\nStep 5: Deleting the created block...")
+        deletion_success = await controller.delete_block(created_block.block_id, user_id)
+        if deletion_success:
+            print(f"Block Deleted: {created_block.block_id}")
+        else:
+            print("Block deletion failed.")
 
+    print("\nDisconnecting from database...")
     await database.prisma.disconnect()
-
+    print("Test completed.")
 
 if __name__ == "__main__":
+    import os
+    print(f"Database URL: {os.getenv('DATABASE_URL')}")
     asyncio.run(main())
