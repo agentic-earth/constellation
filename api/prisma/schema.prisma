@@ -37,14 +37,15 @@ model audit_logs {
 }
 
 model block_categories {
-  block_category_id String      @id @db.Uuid
-  block_id          String?     @db.Uuid
-  category_id       String?     @db.Uuid
-  created_at        DateTime?   @default(dbgenerated("(now() AT TIME ZONE 'UTC'::text)")) @db.Timestamp(6)
-  blocks            blocks?     @relation(fields: [block_id], references: [block_id], onDelete: Cascade, onUpdate: NoAction)
-  categories        categories? @relation(fields: [category_id], references: [category_id], onDelete: Cascade, onUpdate: NoAction)
+  block_category_id String      @id @default(uuid()) @db.Uuid
+  block_id          String      @db.Uuid
+  category_id       String      @db.Uuid
+  created_at        DateTime?   @default(now()) @db.Timestamptz(6)
 
-  @@index([block_id], map: "idx_block_categories_block_id")
+  blocks    blocks    @relation(fields: [block_id], references: [block_id], onDelete: Cascade, onUpdate: NoAction)
+  categories categories @relation(fields: [category_id], references: [category_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([block_id, category_id], map: "unique_block_category")
   @@index([category_id], map: "idx_block_categories_category_id")
 }
 
@@ -106,17 +107,22 @@ model blocks {
 }
 
 model categories {
-  category_id      String             @id @db.Uuid
-  name             String             @db.VarChar(255)
-  parent_id        String?            @db.Uuid
-  created_at       DateTime?          @default(dbgenerated("(now() AT TIME ZONE 'UTC'::text)")) @db.Timestamp(6)
-  updated_at       DateTime?          @default(dbgenerated("(now() AT TIME ZONE 'UTC'::text)")) @db.Timestamp(6)
+  category_id      String      @id @default(uuid()) @db.Uuid
+  name             String      @db.VarChar(255)
+  parent_id        String?     @db.Uuid
+  created_at       DateTime?   @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?   @default(now()) @db.Timestamptz(6)
+  
   block_categories block_categories[]
-  categories       categories?        @relation("categoriesTocategories", fields: [parent_id], references: [category_id], onDelete: Cascade, onUpdate: NoAction)
-  other_categories categories[]       @relation("categoriesTocategories")
+  
+  // Self-relation to represent hierarchy
+  parent           categories? @relation("CategoryChildren", fields: [parent_id], references: [category_id], onDelete: Cascade, onUpdate: NoAction)
+  children         categories[] @relation("CategoryChildren")
 
+  @@unique([name, parent_id], map: "name_parent_id")
   @@index([name], map: "idx_categories_name")
 }
+
 
 model code_repos {
   repo_id      String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
