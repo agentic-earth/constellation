@@ -1,0 +1,7 @@
+Log file initialized on 2024-10-04 17:16:19.352990
+2024-10-04 17:16:19,353 - BlockController - INFO - block_service.create_block
+2024-10-04 17:16:19,360 - BlockController - ERROR - HTTPException during block creation: Block creation failed. - extra={'status_code': 400, 'detail': 'Block creation failed.'}
+2024-10-04 17:16:20,906 - BlockController - INFO - block_service.create_block
+2024-10-04 17:16:20,907 - BlockController - ERROR - HTTPException during block creation: Block creation failed. - extra={'status_code': 400, 'detail': 'Block creation failed.'}
+2024-10-04 17:16:20,917 - BlockController - INFO - block_service.create_block
+2024-10-04 17:16:20,919 - BlockController - ERROR - HTTPException during block creation: Block creation failed. - extra={'status_code': 400, 'detail': 'Block creation failed.'}

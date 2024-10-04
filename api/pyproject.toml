@@ -18,7 +18,7 @@ requests = "^2.32.3"
 email-validator = "^2.2.0"
 python-jose = "^3.3.0"
 passlib = "^1.7.4"
-
+prisma = "^0.15.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
@@ -26,3 +26,6 @@ pytest = "^8.3.3"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+prisma = "prisma:__main__.main"

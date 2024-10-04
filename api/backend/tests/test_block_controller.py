@@ -90,7 +90,7 @@ from fastapi import HTTPException, status
 import traceback
 
 # Import the BlockController and relevant schemas
-from backend.app.controllers.block_controller import BlockController
+from backend.app.features.core.controllers.block_controller import BlockController
 from backend.app.schemas import (
     BlockCreateSchema,
     BlockUpdateSchema,

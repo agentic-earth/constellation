@@ -22,6 +22,7 @@ from backend.app.logger import ConstellationLogger
 from backend.app.database import get_supabase_client
 from backend.app.schemas import AuditLogResponseSchema, AuditLogUpdateSchema
 from backend.app.utils.serialization_utils import serialize_dict
+from backend.app.features.core.services.audit_service import AuditService
 
 
 class AuditController:

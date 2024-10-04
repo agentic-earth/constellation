@@ -4,6 +4,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, AnyHttpUrl
 from typing import Optional
 import os
+import dotenv
+
+dotenv.load_dotenv(override=True)
 
 class Settings(BaseSettings):
     """
@@ -16,7 +19,6 @@ class Settings(BaseSettings):
         LOG_FORMAT (str): The format string for log messages.
         SECRET_KEY (str): The secret key for JWT token generation.
         POSTGRES_RUL (str): The URL of the Postgres database
-        DATABASE_PWD (str): The password to the Postgres database
     """
     
     SUPABASE_URL: AnyHttpUrl = Field(..., validation_alias="SUPABASE_URL")
@@ -30,7 +32,6 @@ class Settings(BaseSettings):
     SECRET_KEY: str = Field(default="default-secret-key", validation_alias="SECRET_KEY")
     # Add more configuration variables as needed
     POSTGRES_URL: str = Field(..., validation_alias="POSTGRES_URL")
-    DATABASE_PWD: str = Field(..., validation_alias="DATABASE_PWD")
     
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -41,5 +42,5 @@ class Settings(BaseSettings):
 
 # Initialize the settings object
 settings = Settings()
-
 # print("Loaded settings:", settings.dict())
+

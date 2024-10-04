@@ -79,7 +79,7 @@ from datetime import datetime
 from fastapi import HTTPException, status
 
 # Import the controller and schemas
-from backend.app.controllers.edge_controller import EdgeController
+from backend.app.features.core.controllers.edge_controller import EdgeController
 from backend.app.schemas import (
     EdgeCreateSchema,
     EdgeUpdateSchema,
@@ -88,7 +88,7 @@ from backend.app.schemas import (
     EdgeVerificationResponseSchema
 )
 
-from app.models import EdgeTypeEnum
+from backend.app.models import EdgeTypeEnum
 
 # -------------------
 # Fixtures
