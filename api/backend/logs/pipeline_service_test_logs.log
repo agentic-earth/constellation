@@ -1,0 +1,13 @@
+Log file initialized on 2024-10-06 17:25:45.755139
+2024-10-06 17:25:45,755 - pipeline_service_test - INFO - Testing pipeline creation
+2024-10-06 17:25:45,757 - pipeline_service_test - INFO - Testing get_pipeline_by_id
+2024-10-06 17:25:45,758 - pipeline_service_test - INFO - Testing update_pipeline
+2024-10-06 17:25:45,761 - pipeline_service_test - INFO - Testing list_pipelines
+2024-10-06 17:25:45,763 - pipeline_service_test - INFO - Testing assign_block_to_pipeline
+2024-10-06 17:25:45,766 - pipeline_service_test - INFO - Testing get_pipeline_blocks
+2024-10-06 17:25:45,769 - pipeline_service_test - INFO - Testing assign_edge_to_pipeline
+2024-10-06 17:25:45,771 - pipeline_service_test - INFO - Testing get_pipeline_edges
+2024-10-06 17:25:45,773 - pipeline_service_test - INFO - Testing increment_pipeline_run
+2024-10-06 17:25:45,779 - pipeline_service_test - INFO - Testing remove_block_from_pipeline
+2024-10-06 17:25:45,783 - pipeline_service_test - INFO - Testing remove_edge_from_pipeline
+2024-10-06 17:25:45,785 - pipeline_service_test - INFO - Testing delete_pipeline

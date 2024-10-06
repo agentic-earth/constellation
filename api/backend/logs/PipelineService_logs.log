@@ -1,0 +1,2 @@
+Log file initialized on 2024-10-06 17:23:53.171862
+2024-10-06 17:23:53,172 - PipelineService - INFO - Pipeline deleted successfully. - extra={'pipeline_id': UUID('fafafafa-fafa-fafa-fafa-fafafafafafa')}

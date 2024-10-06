@@ -1,9 +1,2 @@
-Log file initialized on 2024-10-06 00:57:34.090624
-2024-10-06 00:57:34,091 - UserService - INFO - User created successfully. - extra={'user_id': '11111111-1111-1111-1111-111111111111', 'username': 'user1', 'email': 'user1@example.com'}
-2024-10-06 00:57:34,185 - UserService - INFO - User retrieved successfully. - extra={'user_id': '11111111-1111-1111-1111-111111111111', 'username': 'user1', 'email': 'user1@example.com'}
-2024-10-06 00:57:34,277 - UserService - INFO - User updated successfully. - extra={'user_id': '11111111-1111-1111-1111-111111111111', 'updated_fields': ['username', 'email', 'updated_at']}
-2024-10-06 00:57:34,373 - UserService - INFO - User deleted successfully. - extra={'user_id': UUID('11111111-1111-1111-1111-111111111111')}
-2024-10-06 00:57:34,466 - UserService - INFO - User created successfully. - extra={'user_id': '22222222-2222-2222-2222-222222222222', 'username': 'user2', 'email': 'user2@example.com'}
-2024-10-06 00:57:34,470 - UserService - INFO - User created successfully. - extra={'user_id': '33333333-3333-3333-3333-333333333333', 'username': 'user3', 'email': 'user3@example.com'}
-2024-10-06 00:57:34,474 - UserService - INFO - Users retrieved successfully. - extra={'count': 2}
-2024-10-06 00:57:34,564 - UserService - INFO - User retrieved successfully by email. - extra={'user_id': '22222222-2222-2222-2222-222222222222', 'email': 'user2@example.com'}
+Log file initialized on 2024-10-06 17:25:45.727855
+2024-10-06 17:25:45,728 - UserService - INFO - User created successfully. - extra={'user_id': '11111111-1111-1111-1111-111111111111', 'username': 'testuser', 'email': 'testuser@example.com'}

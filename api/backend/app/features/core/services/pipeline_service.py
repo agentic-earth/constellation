@@ -84,8 +84,8 @@ class PipelineService:
             current_time = datetime.utcnow()
             pipeline_dict = {
                 "pipeline_id": pipeline_data.get("pipeline_id", str(uuid4())),
-                "name": pipeline_data.get("name"),
-                "created_by": pipeline_data.get("created_by"),
+                "name": pipeline_data["name"],
+                "created_by": pipeline_data["created_by"],
                 "description": pipeline_data.get("description", None),
                 "created_at": current_time,
                 "updated_at": current_time,
@@ -95,7 +95,7 @@ class PipelineService:
             }
 
             # Insert the new pipeline into Prisma
-            created_pipeline = await tx.pipeline.create(data=pipeline_dict)
+            created_pipeline = await tx.pipelines.create(data=pipeline_dict)
 
             if not created_pipeline:
                 self.logger.log(
@@ -137,7 +137,7 @@ class PipelineService:
         """
         try:
             # Retrieve the pipeline from Prisma
-            pipeline = await tx.pipeline.find_unique(where={"pipeline_id": pipeline_id})
+            pipeline = await tx.pipelines.find_unique(where={"pipeline_id": str(pipeline_id)})
 
             if not pipeline:
                 self.logger.log(
@@ -192,8 +192,8 @@ class PipelineService:
             update_dict = {k: v for k, v in update_dict.items() if v is not None}
 
             # Update the pipeline in Prisma
-            updated_pipeline = await tx.pipeline.update(
-                where={"pipeline_id": pipeline_id},
+            updated_pipeline = await tx.pipelines.update(
+                where={"pipeline_id": str(pipeline_id)},
                 data=update_dict
             )
 
@@ -236,7 +236,7 @@ class PipelineService:
         """
         try:
             # Delete the pipeline from Prisma
-            deleted_pipeline = await tx.pipeline.delete(where={"pipeline_id": pipeline_id})
+            deleted_pipeline = await tx.pipelines.delete(where={"pipeline_id": str(pipeline_id)})
 
             if not deleted_pipeline:
                 self.logger.log(
@@ -277,7 +277,7 @@ class PipelineService:
         """
         try:
             # Retrieve the list of pipelines from Prisma with optional filtering
-            pipelines = await tx.pipeline.find_many(where=filters)
+            pipelines = await tx.pipelines.find_many(where=filters)
 
             if not pipelines:
                 self.logger.log(
@@ -327,7 +327,7 @@ class PipelineService:
                 "updated_at": current_time,
             }
             # Create a pipeline_block entry in Prisma
-            created_pipeline_block = await tx.pipelineblock.create(data=pipeline_block_dict)
+            created_pipeline_block = await tx.pipeline_blocks.create(data=pipeline_block_dict)
 
             if not created_pipeline_block:
                 self.logger.log(
@@ -368,7 +368,7 @@ class PipelineService:
         """
         try:
             # Retrieve all blocks assigned to the pipeline from Prisma
-            pipeline_blocks = await tx.pipelineblock.find_many(where={"pipeline_id": pipeline_id})
+            pipeline_blocks = await tx.pipeline_blocks.find_many(where={"pipeline_id": str(pipeline_id)})
 
             if not pipeline_blocks:
                 self.logger.log(
@@ -378,7 +378,7 @@ class PipelineService:
                     extra={"pipeline_id": pipeline_id}
                 )
                 return None
-
+            
             self.logger.log(
                 "PipelineService",
                 "info",
@@ -409,7 +409,7 @@ class PipelineService:
         """
         try:
             # Delete the pipeline_block entry from Prisma
-            deleted_pipeline_block = await tx.pipelineblock.delete(where={"pipeline_block_id": pipeline_block_id})
+            deleted_pipeline_block = await tx.pipeline_blocks.delete(where={"pipeline_block_id": str(pipeline_block_id)})
 
             if not deleted_pipeline_block:
                 self.logger.log(
@@ -461,7 +461,7 @@ class PipelineService:
                 "updated_at": current_time,
             }
             # Create a pipeline_edge entry in Prisma
-            created_pipeline_edge = await tx.pipelineedge.create(data=pipeline_edge_dict)
+            created_pipeline_edge = await tx.pipeline_edges.create(data=pipeline_edge_dict)
 
             if not created_pipeline_edge:
                 self.logger.log(
@@ -502,7 +502,7 @@ class PipelineService:
         """
         try:
             # Retrieve all edges assigned to the pipeline from Prisma
-            pipeline_edges = await tx.pipelineedge.find_many(where={"pipeline_id": pipeline_id})
+            pipeline_edges = await tx.pipeline_edges.find_many(where={"pipeline_id": str(pipeline_id)})
 
             if not pipeline_edges:
                 self.logger.log(
@@ -543,7 +543,7 @@ class PipelineService:
         """
         try:
             # Delete the pipeline_edge entry from Prisma
-            deleted_pipeline_edge = await tx.pipelineedge.delete(where={"pipeline_edge_id": pipeline_edge_id})
+            deleted_pipeline_edge = await tx.pipeline_edges.delete(where={"pipeline_edge_id": str(pipeline_edge_id)})
 
             if not deleted_pipeline_edge:
                 self.logger.log(
@@ -585,7 +585,7 @@ class PipelineService:
         """
         try:
             # Retrieve the pipeline from Prisma
-            pipeline = await tx.pipeline.find_unique(where={"pipeline_id": pipeline_id})
+            pipeline = await tx.pipelines.find_unique(where={"pipeline_id": str(pipeline_id)})
 
             if not pipeline:
                 self.logger.log(
@@ -600,8 +600,8 @@ class PipelineService:
             new_average_runtime = (pipeline.average_runtime * pipeline.times_run + latest_runtime) / (pipeline.times_run + 1)
 
             # Update the pipeline's times_run and average_runtime in Prisma
-            updated_pipeline = await tx.pipeline.update(
-                    where={"pipeline_id": pipeline_id},
+            updated_pipeline = await tx.pipelines.update(
+                    where={"pipeline_id": str(pipeline_id)},
                     data={"times_run": pipeline.times_run + 1, "average_runtime": new_average_runtime}
                 )
 
