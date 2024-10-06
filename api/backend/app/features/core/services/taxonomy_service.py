@@ -22,6 +22,8 @@ from datetime import datetime
 from prisma import Prisma
 from backend.app.taxonomy import Taxonomy, GeneralTaxonomy, EarthObservationModelTaxonomy, WeatherClimateModelTaxonomy, DatasetTaxonomy
 from backend.app.logger import ConstellationLogger
+from prisma.models import taxonomy_categories as PrismaTaxonomyCategories
+from prisma.models import blocks as PrismaBlock
 
 
 class TaxonomyService:
@@ -36,7 +38,7 @@ class TaxonomyService:
         """
         self.logger = ConstellationLogger()
 
-    async def create_or_get_category(self, tx: Prisma, name: str, parent_id: Optional[UUID] = None) -> Optional[UUID]:
+    async def create_or_get_category(self, tx: Prisma, category_data: Dict[str, Any]) -> Optional[PrismaTaxonomyCategories]:
         """
         Creates a new category or retrieves an existing one based on name and parent_id.
 
@@ -49,35 +51,37 @@ class TaxonomyService:
             Optional[UUID]: The UUID of the created or existing category.
         """
         try:
+            category_data = {
+                "category_id": category_data.get("category_id", str(uuid4())),
+                "name": category_data["name"],
+                "parent_id": category_data.get("parent_id", None),
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
+            }
             # Query to find existing category
-            existing_category = await tx.taxonomycategory.find_first(
-                where={"name": name, "parentId": str(parent_id) if parent_id else None}
+            existing_category = await tx.taxonomy_categories.find_first(
+                where={"name": category_data["name"], "parent_id": category_data["parent_id"]}
             )
 
             if existing_category:
                 self.logger.log(
                     "TaxonomyService",
                     "info",
-                    f"Existing category found: {name} (ID: {existing_category.id})",
-                    extra={"category_name": name, "category_id": existing_category.id}
+                    f"Existing category found: {category_data["name"]} (ID: {existing_category.category_id})",
+                    extra={"category_name": category_data["name"], "category_id": existing_category.category_id}
                 )
-                return UUID(existing_category.id)
+                return existing_category
 
             # If not found, create a new category
-            new_category = await tx.taxonomycategory.create(
-                data={
-                    "name": name,
-                    "parentId": str(parent_id) if parent_id else None
-                }
-            )
+            new_category = await tx.taxonomy_categories.create(data=category_data)
 
             self.logger.log(
                 "TaxonomyService",
                 "info",
-                f"Category created: {name} (ID: {new_category.id})",
-                extra={"category_name": name, "category_id": new_category.id}
+                f"Category created: {category_data["name"]} (ID: {new_category.category_id})",
+                extra={"category_name": category_data["name"], "category_id": new_category.category_id}
             )
-            return UUID(new_category.id)
+            return new_category
 
         except Exception as e:
             self.logger.log(
@@ -102,11 +106,15 @@ class TaxonomyService:
         """
         category_ids = []
         for key, value in taxonomy.items():
-            category_id = await self.create_or_get_category(tx, name=key, parent_id=parent_id)
-            if category_id:
-                category_ids.append(category_id)
+            cat_data = {
+                "name": key,
+                "parent_id": parent_id,
+            }
+            category = await self.create_or_get_category(tx, category_data=cat_data)
+            if category:
+                category_ids.append(category.category_id)
                 if isinstance(value, dict):
-                    sub_category_ids = await self.process_taxonomy(tx, taxonomy=value, parent_id=category_id)
+                    sub_category_ids = await self.process_taxonomy(tx, taxonomy=value, parent_id=category.category_id)
                     category_ids.extend(sub_category_ids)
             else:
                 self.logger.log(
@@ -131,10 +139,10 @@ class TaxonomyService:
         """
         try:
             for category_id in category_ids:
-                await tx.blocktaxonomy.create(
+                await tx.block_taxonomies.create(
                     data={
-                        "blockId": str(block_id),
-                        "categoryId": str(category_id)
+                        "block_id": str(block_id),
+                        "category_id": str(category_id)
                     }
                 )
 
@@ -155,7 +163,7 @@ class TaxonomyService:
             )
             return False
 
-    async def create_taxonomy_for_block(self, tx: Prisma, block_id: UUID, taxonomy: Taxonomy) -> bool:
+    async def create_taxonomy_for_block(self, tx: Prisma, block_id: UUID, taxonomy: Dict[str, Any]) -> bool:
         """
         Creates taxonomy categories and associates them with a block.
 
@@ -168,7 +176,7 @@ class TaxonomyService:
             bool: True if successful, False otherwise.
         """
         try:
-            taxonomy_dict = taxonomy.dict(exclude_unset=True)
+            taxonomy_dict = taxonomy
 
             # Process general taxonomy
             general_taxonomy = taxonomy_dict.get('general', {})
@@ -204,7 +212,7 @@ class TaxonomyService:
             )
             return False
 
-    async def search_blocks_by_taxonomy(self, tx: Prisma, taxonomy_filters: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
+    async def search_blocks_by_taxonomy(self, tx: Prisma, taxonomy_filters: Dict[str, Any]) -> Optional[List[PrismaBlock]]:
         """
         Searches for blocks that match the given taxonomy filters.
 
@@ -231,11 +239,11 @@ class TaxonomyService:
                 return []
 
             # Retrieve category_ids matching the filter names
-            categories = await tx.taxonomycategory.find_many(
+            categories = await tx.taxonomy_categories.find_many(
                 where={"name": {"in": category_names}}
             )
 
-            category_ids = [UUID(cat.id) for cat in categories]
+            category_ids = [UUID(cat.category_id) for cat in categories]
 
             if not category_ids:
                 self.logger.log(
@@ -247,11 +255,11 @@ class TaxonomyService:
                 return []
 
             # Retrieve block_ids associated with these category_ids
-            block_taxonomies = await tx.blocktaxonomy.find_many(
-                where={"categoryId": {"in": [str(cid) for cid in category_ids]}}
+            block_taxonomies = await tx.block_taxonomies.find_many(
+                where={"category_id": {"in": [str(cid) for cid in category_ids]}}
             )
 
-            block_ids = list(set([UUID(bt.blockId) for bt in block_taxonomies]))
+            block_ids = list(set([UUID(bt.block_id) for bt in block_taxonomies]))
 
             if not block_ids:
                 self.logger.log(
@@ -263,8 +271,8 @@ class TaxonomyService:
                 return []
 
             # Retrieve block details
-            blocks = await tx.block.find_many(
-                where={"id": {"in": [str(bid) for bid in block_ids]}}
+            blocks = await tx.blocks.find_many(
+                where={"block_id": {"in": [str(bid) for bid in block_ids]}}
             )
 
             self.logger.log(
@@ -273,7 +281,7 @@ class TaxonomyService:
                 f"Found {len(blocks)} blocks matching the taxonomy filters",
                 extra={"taxonomy_filters": taxonomy_filters}
             )
-            return [block.dict() for block in blocks]
+            return blocks
 
         except Exception as e:
             self.logger.log(
@@ -318,9 +326,9 @@ class TaxonomyService:
         """
         try:
             # Retrieve associated category_ids
-            block_taxonomies = await tx.blocktaxonomy.find_many(
-                where={"blockId": str(block_id)},
-                include={"category": True}
+            block_taxonomies = await tx.block_taxonomies.find_many(
+                where={"block_id": str(block_id)},
+                include={"taxonomy_categories": True}
             )
 
             if not block_taxonomies:
@@ -332,7 +340,7 @@ class TaxonomyService:
                 )
                 return None
 
-            categories = [bt.category for bt in block_taxonomies]
+            categories = [bt.taxonomy_categories for bt in block_taxonomies]
             taxonomy_tree = self.build_taxonomy_tree(categories)
 
             self.logger.log(
@@ -352,7 +360,7 @@ class TaxonomyService:
             )
             return None
 
-    def build_taxonomy_tree(self, categories: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def build_taxonomy_tree(self, categories: List[PrismaTaxonomyCategories]) -> Dict[str, Any]:
         """
         Builds a nested taxonomy tree from a flat list of categories.
 
@@ -363,14 +371,14 @@ class TaxonomyService:
             Dict[str, Any]: Nested taxonomy dictionary.
         """
         taxonomy_dict = {}
-        category_map = {UUID(cat['id']): cat for cat in categories}
+        category_map = {UUID(cat.category_id): cat for cat in categories}
 
         for cat_id, cat in category_map.items():
-            parent_id = UUID(cat['parentId']) if cat['parentId'] else None
+            parent_id = UUID(cat.parent_id) if cat.parent_id else None
             if parent_id and parent_id in category_map:
                 parent = taxonomy_dict.setdefault(category_map[parent_id]['name'], {})
-                parent[cat['name']] = {}
+                parent[cat.name] = {}
             else:
-                taxonomy_dict[cat['name']] = {}
+                taxonomy_dict[cat.name] = {}
 
         return taxonomy_dict
