@@ -1,2 +1,2 @@
-Log file initialized on 2024-10-06 17:25:45.727855
-2024-10-06 17:25:45,728 - UserService - INFO - User created successfully. - extra={'user_id': '11111111-1111-1111-1111-111111111111', 'username': 'testuser', 'email': 'testuser@example.com'}
+Log file initialized on 2024-10-06 17:33:43.847585
+2024-10-06 17:33:43,847 - UserService - INFO - User created successfully. - extra={'user_id': '11111111-1111-1111-1111-111111111111', 'username': 'testuser', 'email': 'testuser@example.com'}

@@ -1,0 +1,6 @@
+Log file initialized on 2024-10-06 17:33:43.852547
+2024-10-06 17:33:43,852 - audit_service_test - INFO - Testing audit log creation
+2024-10-06 17:33:43,854 - audit_service_test - INFO - Testing get_audit_log_by_id
+2024-10-06 17:33:43,855 - audit_service_test - INFO - Testing update_audit_log
+2024-10-06 17:33:43,857 - audit_service_test - INFO - Testing list_audit_logs
+2024-10-06 17:33:43,858 - audit_service_test - INFO - Testing delete_audit_log
