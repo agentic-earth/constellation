@@ -1,0 +1,7 @@
+Log file initialized on 2024-10-06 00:57:33.793451
+2024-10-06 00:57:33,793 - user_service_test - INFO - Creating user - extra={'user_data': {'user_id': '11111111111111111111111111111111', 'username': 'user1', 'email': 'user1@example.com', 'password_hash': 'hashed_password1', 'role': 'admin', 'created_at': datetime.datetime(2024, 10, 6, 4, 57, 33, 783592), 'updated_at': datetime.datetime(2024, 10, 6, 4, 57, 33, 783853)}}
+2024-10-06 00:57:34,096 - user_service_test - INFO - Retrieving user by ID - extra={'user_id': '11111111111111111111111111111111'}
+2024-10-06 00:57:34,189 - user_service_test - INFO - Updating user - extra={'user_id': '11111111111111111111111111111111', 'update_data': {'username': 'updated_user1'}}
+2024-10-06 00:57:34,281 - user_service_test - INFO - Deleting user - extra={'user_id': '11111111111111111111111111111111'}
+2024-10-06 00:57:34,377 - user_service_test - INFO - Listing users
+2024-10-06 00:57:34,478 - user_service_test - INFO - Retrieving user by email - extra={'email': 'user2@example.com'}
