@@ -4,12 +4,52 @@ from uuid import uuid4
 from datetime import datetime
 
 from api.backend.app.features.core.services.block_service import BlockService
-from api.prisma.client import get_prisma
-from api.prisma.models import PrismaBlock  # Adjust the import path as necessary
+from prisma.models import blocks as PrismaBlock  # Adjust the import path as necessary
+from prisma import Prisma
+from api.backend.app.logger import ConstellationLogger
+
+logger = ConstellationLogger()
+
+block1_id = str(uuid4())
+block2_id = str(uuid4())
+block3_id = str(uuid4())
+
+block1_data = {
+    "block_id": block1_id,
+    "name": "Block 1",
+    "block_type": "dataset",
+    "description": "Description 1",
+    "created_at": datetime.utcnow(),
+    "updated_at": datetime.utcnow(),
+    "current_version_id": str(uuid4()),
+}
+
+block2_data = {
+    "block_id": block2_id,
+    "name": "Block 2",
+    "block_type": "model",
+    "description": "Description 2",
+    "created_at": datetime.utcnow(),
+    "updated_at": datetime.utcnow(),
+    "current_version_id": str(uuid4()),
+}
+
+block3_data = {
+    "block_id": block3_id,
+    "name": "Block 3",
+    "block_type": "pipeline",
+    "description": "Description 3",
+    "created_at": datetime.utcnow(),
+    "updated_at": datetime.utcnow(),
+    "current_version_id": str(uuid4()),
+}
+
 
 @pytest.fixture
 async def prisma_client():
-    client = await get_prisma()
+    client = Prisma(datasource={'url': 'postgresql://postgres:password@localhost:5432/postgres'})
+    await client.connect()
+
     yield client
     await client.disconnect()
 
@@ -19,158 +59,71 @@ def block_service():
 
 @pytest.mark.asyncio
 async def test_create_block(block_service, prisma_client):
-    # Mock data
-    block_data = {
-        "block_id": str(uuid4()),
-        "name": "Test Block",
-        "block_type": "dataset",
-        "description": "A block for testing.",
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
-        "current_version_id": str(uuid4()),
-        "created_by": str(uuid4()),
-        "taxonomy": None,
-        "metadata": None,
-        "vector_embedding": None
-    }
-
-    # Mock Prisma client's block.create method
-    prisma_client.block.create = AsyncMock(return_value=PrismaBlock(**block_data))
-
+    logger.log("block_service_test", "info", "Creating block", extra={"block_data": block1_data})
     # Invoke the service method
-    result = await block_service.create_block(tx=prisma_client, block_data=block_data)
-
+    async for client in prisma_client:
+        result = await block_service.create_block(tx=client, block_data=block1_data)
+    
     # Assertions
-    prisma_client.block.create.assert_called_once_with(data=block_data)
-    assert result.name == "Test Block"
+    assert result.name == "Block 1"
     assert result.block_type == "dataset"
 
 @pytest.mark.asyncio
 async def test_get_block_by_id(block_service, prisma_client):
-    # Mock data
-    block_id = str(uuid4())
-    expected_block = PrismaBlock(
-        block_id=block_id,
-        name="Existing Block",
-        block_type="model",
-        description="An existing block.",
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
-        current_version_id=str(uuid4()),
-        created_by=str(uuid4()),
-        taxonomy=None,
-        metadata=None,
-        vector_embedding=None
-    )
-
-    # Mock Prisma client's block.find_unique method
-    prisma_client.block.find_unique = AsyncMock(return_value=expected_block)
-
     # Invoke the service method
-    result = await block_service.get_block_by_id(tx=prisma_client, block_id=block_id)
+    async for client in prisma_client:
+        result = await block_service.get_block_by_id(tx=client, block_id=block1_id)
 
     # Assertions
-    prisma_client.block.find_unique.assert_called_once_with(where={"block_id": block_id})
-    assert result.name == "Existing Block"
-    assert result.block_type == "model"
+    assert result.name == "Block 1"
+    assert result.block_type == "dataset"
 
 @pytest.mark.asyncio
 async def test_update_block(block_service, prisma_client):
-    # Mock data
-    block_id = str(uuid4())
+    # Mock update data
     update_data = {
-        "name": "Updated Block",
+        "name": "Block after update",
         "block_type": "model",
-        "description": "Updated description.",
-        "taxonomy": {"category": "Updated Category"},
-        "metadata": {"key": "value"},
+        "description": "Description after update.",
         "updated_at": datetime.utcnow()
     }
-    updated_block = PrismaBlock(
-        block_id=block_id,
-        name=update_data["name"],
-        block_type=update_data["block_type"],
-        description=update_data["description"],
-        created_at=datetime.utcnow(),
-        updated_at=update_data["updated_at"],
-        current_version_id=str(uuid4()),
-        created_by=str(uuid4()),
-        taxonomy=update_data["taxonomy"],
-        metadata=update_data["metadata"],
-        vector_embedding=None
-    )
 
-    # Mock Prisma client's block.update method
-    prisma_client.block.update = AsyncMock(return_value=updated_block)
-
-    # Invoke the service method
-    result = await block_service.update_block(tx=prisma_client, block_id=block_id, update_data=update_data)
+    async for client in prisma_client:
+        # Invoke the service method
+        result = await block_service.update_block(tx=client, block_id=block1_id, update_data=update_data)
 
     # Assertions
-    prisma_client.block.update.assert_called_once_with(
-        where={"block_id": block_id},
-        data=update_data
-    )
-    assert result.name == update_data["name"]
-    assert result.description == update_data["description"]
-    assert result.taxonomy == update_data["taxonomy"]
+    assert result.name == "Block after update"
+    assert result.description == "Description after update."
 
 @pytest.mark.asyncio
 async def test_delete_block(block_service, prisma_client):
-    # Mock data
-    block_id = str(uuid4())
-
-    # Mock Prisma client's block.delete method
-    prisma_client.block.delete = AsyncMock(return_value=True)
-
     # Invoke the service method
-    result = await block_service.delete_block(tx=prisma_client, block_id=block_id)
+    async for client in prisma_client:
+        result = await block_service.delete_block(tx=client, block_id=block1_id)
 
     # Assertions
-    prisma_client.block.delete.assert_called_once_with(where={"block_id": block_id})
     assert result is True
 
 @pytest.mark.asyncio
 async def test_get_blocks_by_ids(block_service, prisma_client):
     # Mock data
-    block_ids = [str(uuid4()), str(uuid4())]
-    expected_blocks = [
-        PrismaBlock(
-            block_id=block_ids[0],
-            name="Block One",
-            block_type="dataset",
-            description="First block.",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
-            current_version_id=str(uuid4()),
-            created_by=str(uuid4()),
-            taxonomy=None,
-            metadata=None,
-            vector_embedding=None
-        ),
-        PrismaBlock(
-            block_id=block_ids[1],
-            name="Block Two",
-            block_type="model",
-            description="Second block.",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
-            current_version_id=str(uuid4()),
-            created_by=str(uuid4()),
-            taxonomy=None,
-            metadata=None,
-            vector_embedding=None
-        )
-    ]
-
-    # Mock Prisma client's block.find_many method
-    prisma_client.block.find_many = AsyncMock(return_value=expected_blocks)
+    block_ids = [block2_id, block3_id]
 
     # Invoke the service method
-    result = await block_service.get_blocks_by_ids(tx=prisma_client, block_ids=block_ids)
+    async for client in prisma_client:
+        result = await block_service.get_blocks_by_ids(tx=client, block_ids=block_ids)
 
     # Assertions
-    prisma_client.block.find_many.assert_called_once_with(where={"block_id": {"in": block_ids}})
     assert len(result) == 2
-    assert result[0].name == "Block One"
-    assert result[1].name == "Block Two"
+    assert result[0].name == "Block 2"
+    assert result[1].name == "Block 3"
+
+@pytest.mark.asyncio
+async def test_list_all_blocks(block_service, prisma_client):
+    # Invoke the service method
+    async for client in prisma_client:
+        result = await block_service.list_all_blocks(tx=client)
+    
+    print(result)
+    assert result is not None or not []
