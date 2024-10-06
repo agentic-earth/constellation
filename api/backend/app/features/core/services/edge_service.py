@@ -49,8 +49,8 @@ class EdgeService:
             # Prepare edge data dictionary
             create_data = {
                 "edge_id": edge_data.get("edge_id", str(uuid4())),
-                "name": edge_data.get("name"),
-                "edge_type": edge_data.get("edge_type"),
+                "name": edge_data["name"],
+                "edge_type": edge_data["edge_type"],
                 "description": edge_data.get("description", None),
                 "source_block_id": str(edge_data.get("source_block_id")) if edge_data.get("source_block_id") else None,
                 "target_block_id": str(edge_data.get("target_block_id")) if edge_data.get("target_block_id") else None,
@@ -157,8 +157,8 @@ class EdgeService:
 
             # Prepare update data with snake_case keys
             update_dict = {
-                "name": update_data.get("name"),
-                "edge_type": update_data.get("edge_type"),
+                "name": update_data.get("name", None),
+                "edge_type": update_data.get("edge_type", None),
                 "description": update_data.get("description", None),
                 "source_block_id": str(update_data.get("source_block_id")) if update_data.get("source_block_id") else None,
                 "target_block_id": str(update_data.get("target_block_id")) if update_data.get("target_block_id") else None,

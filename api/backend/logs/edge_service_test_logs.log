@@ -1,0 +1,7 @@
+Log file initialized on 2024-10-06 00:50:50.866114
+2024-10-06 00:50:50,866 - edge_service_test - INFO - Creating edge - extra={'edge_data': {'edge_id': '11111111111111111111111111111111', 'name': 'Edge 1', 'edge_type': 'type_a', 'description': 'Description 1', 'source_block_id': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'target_block_id': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'created_at': datetime.datetime(2024, 10, 6, 4, 50, 50, 858130), 'updated_at': datetime.datetime(2024, 10, 6, 4, 50, 50, 858372)}}
+2024-10-06 00:50:50,978 - edge_service_test - INFO - Retrieving edge by ID - extra={'edge_id': '11111111111111111111111111111111'}
+2024-10-06 00:50:51,068 - edge_service_test - INFO - Updating edge - extra={'edge_id': '11111111111111111111111111111111', 'update_data': {'name': 'Updated Edge 1'}}
+2024-10-06 00:50:51,156 - edge_service_test - INFO - Deleting edge - extra={'edge_id': '11111111111111111111111111111111'}
+2024-10-06 00:50:51,246 - edge_service_test - INFO - Listing edges - extra={'limit': 10, 'offset': 0}
+2024-10-06 00:50:51,340 - edge_service_test - INFO - Assigning version to edge - extra={'edge_id': '11111111111111111111111111111111', 'version_id': 'v4v4v4v4v4v4v4v4'}

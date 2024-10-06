@@ -1,136 +1,152 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
+from uuid import uuid4, UUID
 from datetime import datetime
 
 from api.backend.app.features.core.services.edge_service import EdgeService
-from api.prisma.client import get_prisma
-from api.prisma.models import PrismaEdge  # Adjust the import path as necessary
+from prisma.models import edges as PrismaEdge  # Adjust the import path as necessary
+from prisma import Prisma
+from api.backend.app.logger import ConstellationLogger
+
+logger = ConstellationLogger()
+
+edge1_id = "1"*32
+edge2_id = "2"*32
+edge3_id = "3"*32
+
+edge1_data = {
+    "edge_id": edge1_id,
+    "name": "Edge 1",
+    "edge_type": "type_a",
+    "description": "Description 1",
+    "source_block_id": "a"*32,
+    "target_block_id": "b"*32,
+    "created_at": datetime.utcnow(),
+    "updated_at": datetime.utcnow(),
+    # "current_version_id": "f1"*16,
+}
+
+edge2_data = {
+    "edge_id": edge2_id,
+    "name": "Edge 2",
+    "edge_type": "type_b",
+    "description": "Description 2",
+    "source_block_id": "c"*32,
+    "target_block_id": "d"*32,
+    "created_at": datetime.utcnow(),
+    "updated_at": datetime.utcnow(),
+    # "current_version_id": "f2"*16,
+}
+
+edge3_data = {
+    "edge_id": edge3_id,
+    "name": "Edge 3",
+    "edge_type": "type_c",
+    "description": "Description 3",
+    "source_block_id": "e"*32,
+    "target_block_id": "f"*32,
+    "created_at": datetime.utcnow(),
+    "updated_at": datetime.utcnow(),
+    # "current_version_id": "f3"*16,
+}
+
 
 @pytest.fixture
 async def prisma_client():
-    client = await get_prisma()
+    client = Prisma(datasource={'url': 'postgresql://postgres:password@localhost:5432/postgres'})
+    await client.connect()
+
     yield client
     await client.disconnect()
+
 
 @pytest.fixture
 def edge_service():
     return EdgeService()
 
+
 @pytest.mark.asyncio
 async def test_create_edge(edge_service, prisma_client):
-    # Mock data
-    edge_data = {
-        "edge_id": str(uuid4()),
-        "name": "Test Edge",
-        "edge_type": "primary",
-        "description": "An edge for testing.",
-        "source_block_id": str(uuid4()),
-        "target_block_id": str(uuid4()),
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
-        "current_version_id": str(uuid4())
-    }
-
-    # Mock Prisma client's edges.create method
-    prisma_client.edges.create = AsyncMock(return_value=PrismaEdge(**edge_data))
-
+    logger.log("edge_service_test", "info", "Creating edge", extra={"edge_data": edge1_data})
     # Invoke the service method
-    result = await edge_service.create_edge(tx=prisma_client, edge_data=edge_data)
+    async for client in prisma_client:
+        result = await edge_service.create_edge(tx=client, edge_data=edge1_data)
 
     # Assertions
-    prisma_client.edges.create.assert_called_once_with(data=edge_data)
-    assert result.name == "Test Edge"
-    assert result.edge_type == "primary"
+    assert result.name == "Edge 1"
+    assert result.edge_type == "type_a"
+
 
 @pytest.mark.asyncio
 async def test_get_edge_by_id(edge_service, prisma_client):
-    # Mock data
-    edge_id = str(uuid4())
-    expected_edge = PrismaEdge(
-        edge_id=edge_id,
-        name="Existing Edge",
-        edge_type="secondary",
-        description="An existing edge.",
-        source_block_id=str(uuid4()),
-        target_block_id=str(uuid4()),
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
-        current_version_id=str(uuid4())
-    )
-
-    # Mock Prisma client's edges.find_unique method
-    prisma_client.edges.find_unique = AsyncMock(return_value=expected_edge)
-
+    logger.log("edge_service_test", "info", "Retrieving edge by ID", extra={"edge_id": edge1_id})
     # Invoke the service method
-    result = await edge_service.get_edge_by_id(tx=prisma_client, edge_id=edge_id)
+    async for client in prisma_client:
+        result = await edge_service.get_edge_by_id(tx=client, edge_id=UUID(edge1_id))
 
     # Assertions
-    prisma_client.edges.find_unique.assert_called_once_with(where={"edge_id": edge_id})
-    assert result.name == "Existing Edge"
-    assert result.edge_type == "secondary"
+    assert result.name == "Edge 1"
+    assert result.edge_type == "type_a"
+
 
 @pytest.mark.asyncio
 async def test_update_edge(edge_service, prisma_client):
-    # Mock data
-    edge_id = str(uuid4())
+    logger.log("edge_service_test", "info", "Updating edge", extra={"edge_id": edge1_id, "update_data": {"name": "Updated Edge 1"}})
+    # Mock update data
     update_data = {
-        "description": "Updated edge description.",
-        "current_version_id": str(uuid4())
+        "name": "Updated Edge 1",
+        "description": "Updated Description",
+        "updated_at": datetime.utcnow()
     }
-    updated_edge = PrismaEdge(
-        edge_id=edge_id,
-        name="Updated Edge",
-        edge_type="primary",
-        description=update_data["description"],
-        source_block_id=str(uuid4()),
-        target_block_id=str(uuid4()),
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
-        current_version_id=update_data["current_version_id"]
-    )
 
-    # Mock Prisma client's edges.update method
-    prisma_client.edges.update = AsyncMock(return_value=updated_edge)
-
-    # Invoke the service method
-    result = await edge_service.update_edge(tx=prisma_client, edge_id=edge_id, edge_data=update_data)
+    async for client in prisma_client:
+        result = await edge_service.update_edge(tx=client, edge_id=UUID(edge1_id), update_data=update_data)
 
     # Assertions
-    prisma_client.edges.update.assert_called_once_with(
-        where={"edge_id": edge_id},
-        data=update_data
-    )
-    assert result.description == update_data["description"]
-    assert result.current_version_id == update_data["current_version_id"]
+    assert result.name == "Updated Edge 1"
+    assert result.description == "Updated Description"
+
 
 @pytest.mark.asyncio
 async def test_delete_edge(edge_service, prisma_client):
-    # Mock data
-    edge_id = str(uuid4())
-
-    # Mock Prisma client's edges.delete method
-    prisma_client.edges.delete = AsyncMock(return_value=True)
-
+    logger.log("edge_service_test", "info", "Deleting edge", extra={"edge_id": edge1_id})
     # Invoke the service method
-    result = await edge_service.delete_edge(tx=prisma_client, edge_id=edge_id)
+    async for client in prisma_client:
+        result = await edge_service.delete_edge(tx=client, edge_id=UUID(edge1_id))
 
     # Assertions
-    prisma_client.edges.delete.assert_called_once_with(where={"edge_id": edge_id})
     assert result is True
 
+
 @pytest.mark.asyncio
-async def test_creates_cycle(edge_service, prisma_client):
-    # Mock data
-    source_block_id = uuid4()
-    target_block_id = uuid4()
+async def test_list_edges(edge_service, prisma_client):
+    logger.log("edge_service_test", "info", "Listing edges", extra={"limit": 10, "offset": 0})
+    # Mock filter and pagination
+    limit = 10
+    offset = 0
 
-    # Mock Prisma client's edges.find_many method to simulate no cycle
-    prisma_client.edges.find_many = AsyncMock(return_value=[])
-
-    # Invoke the service method
-    result = await edge_service.creates_cycle(tx=prisma_client, source_block_id=source_block_id, target_block_id=target_block_id)
+    async for client in prisma_client:
+        await edge_service.create_edge(tx=client, edge_data=edge2_data)
+        await edge_service.create_edge(tx=client, edge_data=edge3_data)
+        result = await edge_service.list_edges(tx=client, limit=limit, offset=offset)
 
     # Assertions
-    prisma_client.edges.find_many.assert_called()
-    assert result is False
+    assert result is not None
+    assert len(result) == 2
+    assert result[0].name == "Edge 2"
+    assert result[1].name == "Edge 3"
+
+
+@pytest.mark.asyncio
+async def test_assign_version_to_edge(edge_service, prisma_client):
+    logger.log("edge_service_test", "info", "Assigning version to edge", extra={"edge_id": edge1_id, "version_id": "v4"*8})
+    # Invoke the service method
+    version_id = UUID("f4"*8 + "f4"*8)  # Adjust to a valid UUID if necessary
+    updated_edge_data = edge2_data.copy()
+    updated_edge_data["current_version_id"] = str(version_id)
+
+    async for client in prisma_client:
+        result = await edge_service.assign_version_to_edge(tx=client, edge_id=UUID(edge2_id), version_id=version_id)
+
+    # Assertions
+    assert result is True

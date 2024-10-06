@@ -224,8 +224,8 @@ model edges {
   created_at                                            DateTime?                     @default(now()) @db.Timestamptz(6)
   updated_at                                            DateTime?                     @default(now()) @db.Timestamptz(6)
   edge_type                                             String                        @default("primary") @db.VarChar(50)
-  source_block_id                                       BigInt?
-  target_block_id                                       BigInt?
+  source_block_id                                       String?                       @db.Uuid
+  target_block_id                                       String?                       @db.Uuid
   edge_vector_representations                           edge_vector_representations[]
   edge_versions_edge_versions_edge_idToedges            edge_versions[]               @relation("edge_versions_edge_idToedges")
   edge_versions_edges_current_version_idToedge_versions edge_versions?                @relation("edges_current_version_idToedge_versions", fields: [current_version_id], references: [version_id], onUpdate: NoAction, map: "fk_edges_current_version")
