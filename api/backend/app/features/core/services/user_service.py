@@ -14,13 +14,14 @@ Design Philosophy:
 """
 
 from typing import Optional, List, Dict, Any
-from uuid import UUID
+from uuid import UUID, uuid4
 from backend.app.models import User
 from backend.app.schemas import UserCreateSchema, UserUpdateSchema, UserResponseSchema
 from backend.app.logger import ConstellationLogger
-from backend.app.utils.helpers import SupabaseClientManager
-from backend.app.schemas import UserResponseSchema
+from prisma import Prisma
+from prisma.models import users as PrismaUser
 from datetime import datetime
+import traceback
 
 
 class UserService:
@@ -30,292 +31,340 @@ class UserService:
 
     def __init__(self):
         """
-        Initializes the UserService with the Supabase client and logger.
+        Initializes the UserService with the logger.
         """
-        self.supabase_manager = SupabaseClientManager()
         self.logger = ConstellationLogger()
+        # Removed SupabaseClientManager initialization
+        # Prisma transactions are passed externally
 
-    def create_user(self, user_data: UserCreateSchema) -> Optional[UserResponseSchema]:
+    # -------------------
+    # User Operations
+    # -------------------
+
+    async def create_user(self, tx: Prisma, user_data: Dict[str, Any]) -> Optional[PrismaUser]:
         """
-        Creates a new user in the Supabase database.
+        Creates a new user in the Prisma-managed database.
 
         Args:
-            user_data (UserCreateSchema): The data required to create a new user.
+            tx (Prisma): The Prisma transaction object.
+            user_data (Dict[str, Any]): The data required to create a new user.
 
         Returns:
-            Optional[UserResponseSchema]: The created user data if successful, None otherwise.
+            Optional[PrismaUser]: The created user data if successful, None otherwise.
         """
         try:
-            # Convert Pydantic schema to dictionary
-            data = user_data.dict()
-            # Note: Password hashing should be handled before passing to this method
-            response = self.supabase_manager.client.table("users").insert(data).execute()
+            # Prepare user data
+            current_time = datetime.utcnow()
+            user_dict = {
+                "user_id": user_data.get("user_id", str(uuid4())),
+                "username": user_data["username"],
+                "email": user_data["email"],
+                "password_hash": user_data["password_hash"],
+                "role": user_data["role"],
+                "created_at": current_time,
+                "updated_at": current_time,
+            }
 
-            if response.status_code in [200, 201] and response.data:
-                created_user = UserResponseSchema(**response.data[0])
-                self.logger.log(
-                    "UserService",
-                    "info",
-                    "User created successfully",
-                    user_id=created_user.user_id,
-                    username=created_user.username,
-                    email=created_user.email
-                )
-                return created_user
-            else:
+            # Insert the new user into Prisma
+            created_user = await tx.users.create(data=user_dict)
+
+            if not created_user:
                 self.logger.log(
                     "UserService",
                     "error",
-                    "Failed to create user",
-                    status_code=response.status_code,
-                    error=response.error
+                    "Failed to create user in Prisma.",
+                    extra={"user_data": user_dict}
                 )
                 return None
+
+            self.logger.log(
+                "UserService",
+                "info",
+                "User created successfully.",
+                extra={"user_id": created_user.user_id, "username": created_user.username, "email": created_user.email}
+            )
+            return created_user
+
         except Exception as e:
             self.logger.log(
                 "UserService",
                 "critical",
-                f"Exception during user creation: {e}"
+                f"Exception during user creation: {e}",
+                extra={"traceback": traceback.format_exc(), "user_data": user_data}
             )
             return None
 
-    def get_user_by_id(self, user_id: UUID) -> Optional[UserResponseSchema]:
+    async def get_user_by_id(self, tx: Prisma, user_id: UUID) -> Optional[PrismaUser]:
         """
         Retrieves a user by their unique identifier.
 
         Args:
+            tx (Prisma): The Prisma transaction object.
             user_id (UUID): The UUID of the user to retrieve.
 
         Returns:
-            Optional[UserResponseSchema]: The user data if found, None otherwise.
+            Optional[PrismaUser]: The user data if found, None otherwise.
         """
         try:
-            response = self.supabase_manager.client.table("users").select("*").eq("user_id", str(user_id)).single().execute()
+            # Retrieve the user from Prisma
+            user = await tx.users.find_unique(where={"user_id": str(user_id)})
 
-            if response.status_code == 200 and response.data:
-                user = UserResponseSchema(**response.data)
-                self.logger.log(
-                    "UserService",
-                    "info",
-                    "User retrieved successfully",
-                    user_id=user.user_id,
-                    username=user.username,
-                    email=user.email
-                )
-                return user
-            else:
+            if not user:
                 self.logger.log(
                     "UserService",
                     "warning",
-                    "User not found",
-                    user_id=user_id,
-                    status_code=response.status_code
+                    "User not found.",
+                    extra={"user_id": user_id}
                 )
                 return None
+
+            self.logger.log(
+                "UserService",
+                "info",
+                "User retrieved successfully.",
+                extra={"user_id": user.user_id, "username": user.username, "email": user.email}
+            )
+            return user
+
         except Exception as e:
             self.logger.log(
                 "UserService",
                 "critical",
-                f"Exception during user retrieval: {e}"
+                f"Exception during user retrieval: {e}",
+                extra={"traceback": traceback.format_exc(), "user_id": user_id}
             )
             return None
 
-    def update_user(self, user_id: UUID, update_data: UserUpdateSchema) -> Optional[UserResponseSchema]:
+    async def update_user(self, tx: Prisma, user_id: UUID, update_data: Dict[str, Any]) -> Optional[PrismaUser]:
         """
         Updates an existing user's information.
 
         Args:
+            tx (Prisma): The Prisma transaction object.
             user_id (UUID): The UUID of the user to update.
-            update_data (UserUpdateSchema): The data to update for the user.
+            update_data (Dict[str, Any]): The data to update for the user.
 
         Returns:
-            Optional[UserResponseSchema]: The updated user data if successful, None otherwise.
+            Optional[PrismaUser]: The updated user data if successful, None otherwise.
         """
         try:
-            data = update_data.dict(exclude_unset=True)
-            response = self.supabase_manager.client.table("users").update(data).eq("user_id", str(user_id)).execute()
+            # Prepare update data
+            current_time = datetime.utcnow()
+            update_dict = {
+                "username": update_data.get("username"),
+                "email": update_data.get("email"),
+                "password_hash": update_data.get("password_hash"),
+                "role": update_data.get("role"),
+                "updated_at": current_time,
+            }
 
-            if response.status_code == 200 and response.data:
-                updated_user = UserResponseSchema(**response.data[0])
-                self.logger.log(
-                    "UserService",
-                    "info",
-                    "User updated successfully",
-                    user_id=updated_user.user_id,
-                    updated_fields=list(data.keys())
-                )
-                return updated_user
-            else:
+            # Remove keys with None values to avoid overwriting existing data with null
+            update_dict = {k: v for k, v in update_dict.items() if v is not None}
+
+            # Update the user in Prisma
+            updated_user = await tx.users.update(
+                where={"user_id": str(user_id)},
+                data=update_dict
+            )
+
+            if not updated_user:
                 self.logger.log(
                     "UserService",
                     "error",
-                    "Failed to update user",
-                    user_id=user_id,
-                    status_code=response.status_code,
-                    error=response.error
+                    "Failed to update user in Prisma.",
+                    extra={"user_id": user_id, "update_data": update_data}
                 )
                 return None
+
+            self.logger.log(
+                "UserService",
+                "info",
+                "User updated successfully.",
+                extra={"user_id": updated_user.user_id, "updated_fields": list(update_dict.keys())}
+            )
+            return updated_user
+
         except Exception as e:
             self.logger.log(
                 "UserService",
                 "critical",
-                f"Exception during user update: {e}"
+                f"Exception during user update: {e}",
+                extra={"traceback": traceback.format_exc(), "user_id": user_id, "update_data": update_data}
             )
             return None
 
-    def delete_user(self, user_id: UUID) -> bool:
+    async def delete_user(self, tx: Prisma, user_id: UUID) -> bool:
         """
-        Deletes a user from the Supabase database.
+        Deletes a user from the Prisma-managed database.
 
         Args:
+            tx (Prisma): The Prisma transaction object.
             user_id (UUID): The UUID of the user to delete.
 
         Returns:
             bool: True if deletion was successful, False otherwise.
         """
         try:
-            response = self.supabase_manager.client.table("users").delete().eq("user_id", str(user_id)).execute()
+            # Delete the user from Prisma
+            deleted_user = await tx.users.delete(where={"user_id": str(user_id)})
 
-            if response.status_code == 200 and response.count > 0:
+            if not deleted_user:
                 self.logger.log(
                     "UserService",
-                    "info",
-                    "User deleted successfully",
-                    user_id=user_id
-                )
-                return True
-            else:
-                self.logger.log(
-                    "UserService",
-                    "warning",
-                    "User not found or already deleted",
-                    user_id=user_id,
-                    status_code=response.status_code
+                    "error",
+                    "Failed to delete user from Prisma.",
+                    extra={"user_id": user_id}
                 )
                 return False
+
+            self.logger.log(
+                "UserService",
+                "info",
+                "User deleted successfully.",
+                extra={"user_id": user_id}
+            )
+            return True
+
         except Exception as e:
             self.logger.log(
                 "UserService",
                 "critical",
-                f"Exception during user deletion: {e}"
+                f"Exception during user deletion: {e}",
+                extra={"traceback": traceback.format_exc(), "user_id": user_id}
             )
             return False
 
-    def list_users(self, filters: Optional[Dict[str, Any]] = None) -> Optional[List[UserResponseSchema]]:
+    async def list_users(self, tx: Prisma, filters: Optional[Dict[str, Any]] = None) -> Optional[List[PrismaUser]]:
         """
         Retrieves a list of users with optional filtering.
 
         Args:
+            tx (Prisma): The Prisma transaction object.
             filters (Optional[Dict[str, Any]]): Key-value pairs to filter the users.
 
         Returns:
-            Optional[List[UserResponseSchema]]: A list of users if successful, None otherwise.
+            Optional[List[PrismaUser]]: A list of users if successful, None otherwise.
         """
         try:
-            query = self.supabase_manager.client.table("users").select("*")
-            if filters:
-                for key, value in filters.items():
-                    query = query.eq(key, value)
-            response = query.execute()
+            # Retrieve the list of users from Prisma with optional filtering
+            users = await tx.users.find_many(where=filters)
 
-            if response.status_code == 200 and response.data:
-                users = [UserResponseSchema(**user) for user in response.data]
-                self.logger.log(
-                    "UserService",
-                    "info",
-                    f"{len(users)} users retrieved successfully",
-                    filters=filters
-                )
-                return users
-            else:
+            if not users:
                 self.logger.log(
                     "UserService",
                     "warning",
-                    "No users found",
-                    filters=filters,
-                    status_code=response.status_code
+                    "No users found.",
+                    extra={"filters": filters}
                 )
-                return []
+                return None
+
+            self.logger.log(
+                "UserService",
+                "info",
+                "Users retrieved successfully.",
+                extra={"count": len(users)}
+            )
+            return users
+
         except Exception as e:
             self.logger.log(
                 "UserService",
                 "critical",
-                f"Exception during listing users: {e}"
+                f"Exception during listing users: {e}",
+                extra={"traceback": traceback.format_exc(), "filters": filters}
             )
             return None
 
-    def authenticate_user(self, email: str, password: str) -> Optional[UserResponseSchema]:
+    ## TODO: to be fixed
+    async def authenticate_user(self, tx: Prisma, email: str, password: str) -> Optional[PrismaUser]:
         """
         Authenticates a user using their email and password.
 
         Args:
+            tx (Prisma): The Prisma transaction object.
             email (str): The user's email.
             password (str): The user's password.
 
         Returns:
-            Optional[UserResponseSchema]: The authenticated user's data if successful, None otherwise.
+            Optional[PrismaUser]: The authenticated user's data if successful, None otherwise.
         """
         try:
-            # Note: Supabase handles authentication via its auth API.
-            # This method assumes that password hashing and verification are handled externally.
-            # For demonstration, we'll perform a basic check.
-            response = self.supabase_manager.client.auth.sign_in(email=email, password=password)
+            # Retrieve the user by email
+            user = await tx.users.find_unique(where={"email": email})
 
-            if response.status_code == 200 and response.user:
-                user = self.get_user_by_id(UUID(response.user.id))
-                self.logger.log(
-                    "UserService",
-                    "info",
-                    "User authenticated successfully",
-                    user_id=user.user_id,
-                    email=user.email
-                )
-                return user
-            else:
+            if not user:
                 self.logger.log(
                     "UserService",
                     "warning",
-                    "Authentication failed",
-                    email=email,
-                    status_code=response.status_code,
-                    error=response.error
+                    "Authentication failed: User not found.",
+                    extra={"email": email}
                 )
                 return None
+
+            # Verify password (assuming password_hash is stored)
+            if not verify_password(password, user.password_hash):
+                self.logger.log(
+                    "UserService",
+                    "warning",
+                    "Authentication failed: Incorrect password.",
+                    extra={"email": email}
+                )
+                return None
+
+            self.logger.log(
+                "UserService",
+                "info",
+                "User authenticated successfully.",
+                extra={"user_id": user.user_id, "email": user.email}
+            )
+            return user
+
         except Exception as e:
             self.logger.log(
                 "UserService",
                 "critical",
-                f"Exception during user authentication: {e}"
+                f"Exception during user authentication: {e}",
+                extra={"traceback": traceback.format_exc(), "email": email}
             )
             return None
 
-    def get_user_by_email(self, email: str) -> Optional[User]:
+    async def get_user_by_email(self, tx: Prisma, email: str) -> Optional[PrismaUser]:
         """
         Retrieves a user by their email.
+
+        Args:
+            tx (Prisma): The Prisma transaction object.
+            email (str): The user's email.
+
+        Returns:
+            Optional[PrismaUser]: The user data if found, None otherwise.
         """
         try:
-            response = self.supabase_manager.client.table("users").select("*").eq("email", email).single().execute()
-            if response.status_code == 200 and response.data:
-                user = User(**response.data)
-                self.logger.log(
-                    "UserService",
-                    "info",
-                    "User retrieved successfully by email",
-                    email=user.email
-                )
-                return user
-            else:
+            # Retrieve the user by email from Prisma
+            user = await tx.users.find_unique(where={"email": email})
+
+            if not user:
                 self.logger.log(
                     "UserService",
                     "warning",
-                    "User not found by email",
-                    email=email
+                    "User not found by email.",
+                    extra={"email": email}
                 )
                 return None
+
+            self.logger.log(
+                "UserService",
+                "info",
+                "User retrieved successfully by email.",
+                extra={"user_id": user.user_id, "email": user.email}
+            )
+            return user
+
         except Exception as e:
             self.logger.log(
                 "UserService",
                 "critical",
-                f"Exception during user retrieval by email: {e}"
+                f"Exception during user retrieval by email: {e}",
+                extra={"traceback": traceback.format_exc(), "email": email}
             )
             return None

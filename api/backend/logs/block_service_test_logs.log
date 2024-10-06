@@ -1,0 +1,2 @@
+Log file initialized on 2024-10-06 00:24:50.374442
+2024-10-06 00:24:50,374 - block_service_test - INFO - Creating block - extra={'block_data': {'block_id': '11111111111111111111111111111111', 'name': 'Block 1', 'block_type': 'dataset', 'description': 'Description 1', 'created_at': datetime.datetime(2024, 10, 6, 4, 24, 50, 364347), 'updated_at': datetime.datetime(2024, 10, 6, 4, 24, 50, 364619)}}

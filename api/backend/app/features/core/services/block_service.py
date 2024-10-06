@@ -4,13 +4,13 @@
 Block Service Module
 
 This module defines the BlockService class responsible for managing all block-related operations.
-It provides methods to create, retrieve, update, and delete blocks within the Supabase backend.
+It provides methods to create, retrieve, update, and delete blocks within the database using Prisma ORM.
 Additionally, it interacts with the TaxonomyService and VectorEmbeddingService to handle associated
 taxonomy categories and vector embeddings, ensuring a cohesive and maintainable architecture.
 
 Design Philosophy:
 - Maintain independence from other services to uphold clear separation of concerns.
-- Utilize Supabase's pg-vector for efficient vector storage and similarity querying.
+- Utilize Prisma ORM for efficient database operations and type safety.
 - Ensure transactional integrity between block operations and associated taxonomy/vector embeddings.
 - Implement robust error handling and comprehensive logging for production readiness.
 """
@@ -20,266 +20,166 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime
 
-from pydantic import BaseModel, ValidationError
-
-from supabase import Client
-from postgrest import APIError as PostgrestError
-
-from backend.app.schemas import (
-    BlockCreateSchema,
-    BlockUpdateSchema,
-    BlockResponseSchema,
-    VectorRepresentationSchema
-)
-
+from prisma import Prisma
+from prisma.models import blocks as PrismaBlock
 from backend.app.logger import ConstellationLogger
-from backend.app.database import get_supabase_client
-from backend.app.utils.serialization_utils import serialize_dict
+import json
 
 
 class BlockService:
     """
     BlockService handles all block-related operations, including CRUD (Create, Read, Update, Delete)
-    functionalities. It interacts directly with the Supabase backend to manage block data and ensures
+    functionalities. It interacts directly with the database using Prisma ORM to manage block data and ensures
     data integrity and consistency throughout operations.
     """
 
     def __init__(self):
         """
-        Initializes the BlockService with the Supabase client and ConstellationLogger for logging purposes.
+        Initializes the BlockService with ConstellationLogger for logging purposes.
         """
-        self.supabase_client: Client = get_supabase_client()
         self.logger = ConstellationLogger()
 
-    def create_block(self, block_data: BlockCreateSchema) -> Optional[BlockResponseSchema]:
+    async def create_block(self, tx: Prisma, block_data: Dict[str, Any]) -> Optional[PrismaBlock]:
         """
-        Creates a new block in the Supabase `blocks` table.
+        Creates a new block in the database.
 
         Args:
-            block_data (BlockCreateSchema): The data required to create a new block.
+            tx (Prisma): The Prisma transaction object.
+            block_data (Dict[str, Any]): The data required to create a new block.
 
         Returns:
-            Optional[BlockResponseSchema]: The created block data if successful, None otherwise.
+            Optional[PrismaBlock]: The created block data if successful, None otherwise.
         """
         try:
-            # Generate UUID for the new block if not provided
-            if not block_data.block_id:
-                block_id = uuid4()
-            else:
-                block_id = block_data.block_id
-            print("new block id:", block_id)
-
-            # Prepare block data with timestamps
-            current_time = datetime.utcnow()
-            block_dict = block_data.dict(exclude_unset=True)
-            block_dict.update({
-                "block_id": str(block_id),
-                "created_at": current_time.isoformat(),
-                "updated_at": current_time.isoformat(),
+            # Prepare block data
+            block_dict = {
+                "block_id": block_data.get("block_id", str(uuid4())),
+                "name": block_data.get("name"),
+                "block_type": block_data.get("block_type"),
+                "description": block_data.get("description"),
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
                 "current_version_id": None  # To be set when creating the first version
-            })
+            }
 
-            # Insert the new block into Supabase
-            response = self.supabase_client.table("blocks").insert(serialize_dict(block_dict)).execute()
-            print("insert new block success")
-
-            # if response.error:
-            #     self.logger.log(
-            #         "BlockService",
-            #         "error",
-            #         "Failed to create block in Supabase.",
-            #         extra={"error": response.error.message, "block_data": block_dict}
-            #     )
-            #     return None
-
-            # Construct the BlockResponseSchema
-            created_block = BlockResponseSchema(
-                block_id=UUID(block_dict["block_id"]),
-                name=block_dict["name"],
-                block_type=block_dict["block_type"],
-                description=block_dict.get("description", ""),
-                created_at=current_time,
-                updated_at=current_time,
-                current_version_id=None,  # To be updated by the caller if necessary
-                taxonomy=None,
-                vector_embedding=None
-            )
+            # Create the new block using Prisma
+            created_block = await tx.blocks.create(data=block_dict)
 
             self.logger.log(
                 "BlockService",
                 "info",
                 "Block created successfully.",
-                extra={"block_id": str(created_block.block_id)}
+                extra={"block_id": created_block.block_id}
             )
             return created_block
 
-        except ValidationError as ve:
-            self.logger.log(
-                "BlockService",
-                "error",
-                "Validation error during block creation.",
-                extra={"error": ve.errors(), "block_data": block_data.dict()}
-            )
-            return None
         except Exception as e:
             self.logger.log(
                 "BlockService",
                 "critical",
-                f"Exception during block creation: {str(e)}",
-                extra={"traceback": traceback.format_exc(), "block_data": block_data.dict()}
+                f"Exception during block creation: {e}",
+                extra={"traceback": traceback.format_exc(), "block_data": block_data}
             )
             return None
 
-    def get_block_by_id(self, block_id: UUID) -> Optional[BlockResponseSchema]:
+    async def get_block_by_id(self, tx: Prisma, block_id: UUID) -> Optional[PrismaBlock]:
         """
-        Retrieves a block by its unique identifier from the Supabase `blocks` table.
+        Retrieves a block by its unique identifier from the database.
 
         Args:
+            tx (Prisma): The Prisma transaction object.
             block_id (UUID): The UUID of the block to retrieve.
 
         Returns:
-            Optional[BlockResponseSchema]: The block data if found, None otherwise.
+            Optional[PrismaBlock]: The block data if found, None otherwise.
         """
         try:
-            response = self.supabase_client.table("blocks").select("*").eq("block_id", str(block_id)).single().execute()
+            block = await tx.blocks.find_unique(where={"block_id": str(block_id)})
 
-            if response.error:
-                if "No rows found" in response.error.message:
-                    self.logger.log(
-                        "BlockService",
-                        "warning",
-                        "Block not found.",
-                        extra={"block_id": str(block_id)}
-                    )
-                else:
-                    self.logger.log(
-                        "BlockService",
-                        "error",
-                        "Failed to retrieve block from Supabase.",
-                        extra={"error": response.error.message, "block_id": str(block_id)}
-                    )
+            if not block:
+                self.logger.log(
+                    "BlockService",
+                    "warning",
+                    "Block not found.",
+                    extra={"block_id": str(block_id)}
+                )
                 return None
-
-            block_data = response.data
-
-            # Construct the BlockResponseSchema
-            retrieved_block = BlockResponseSchema(
-                block_id=UUID(block_data["block_id"]),
-                name=block_data["name"],
-                block_type=block_data["block_type"],
-                description=block_data.get("description", ""),
-                created_at=block_data["created_at"],
-                updated_at=block_data["updated_at"],
-                current_version_id=UUID(block_data["current_version_id"]) if block_data.get("current_version_id") else None,
-                taxonomy=None,
-                vector_embedding=None
-            )
 
             self.logger.log(
                 "BlockService",
                 "info",
                 "Block retrieved successfully.",
-                extra={"block_id": str(retrieved_block.block_id)}
+                extra={"block_id": block.block_id}
             )
-            return retrieved_block
+            return block
 
         except Exception as e:
             self.logger.log(
                 "BlockService",
                 "critical",
-                f"Exception during block retrieval: {str(e)}",
+                f"Exception during block retrieval: {e}",
                 extra={"traceback": traceback.format_exc(), "block_id": str(block_id)}
             )
             return None
 
-    def update_block(self, block_id: UUID, update_data: BlockUpdateSchema) -> Optional[BlockResponseSchema]:
+    async def update_block(self, tx: Prisma, block_id: UUID, update_data: Dict[str, Any]) -> Optional[PrismaBlock]:
         """
-        Updates an existing block's information in the Supabase `blocks` table.
+        Updates an existing block's information in the database.
 
         Args:
+            tx (Prisma): The Prisma transaction object.
             block_id (UUID): The UUID of the block to update.
-            update_data (BlockUpdateSchema): The data to update for the block.
+            update_data (Dict[str, Any]): The data to update for the block.
 
         Returns:
-            Optional[BlockResponseSchema]: The updated block data if successful, None otherwise.
+            Optional[PrismaBlock]: The updated block data if successful, None otherwise.
         """
         try:
-            # Prepare update data with updated_at timestamp
-            current_time = datetime.utcnow()
-            update_dict = update_data.dict(exclude_unset=True)
-            update_dict.update({
-                "updated_at": current_time.isoformat()
-            })
+            # Prepare update data
+            update_dict = {k: v for k, v in update_data.items() if v is not None}
+            update_dict = {
+                "name": update_data.get("name"),
+                "block_type": update_data.get("block_type"),
+                "description": update_data.get("description"),
+                "updated_at": datetime.utcnow()
+            }
 
-            # Update the block in Supabase
-            response = self.supabase_client.table("blocks").update(serialize_dict(update_dict)).eq("block_id", str(block_id)).execute()
+            # Update the block using Prisma
+            updated_block = await tx.blocks.update(
+                where={"block_id": str(block_id)},
+                data=update_dict
+            )
 
-            if response.error:
-                self.logger.log(
-                    "BlockService",
-                    "error",
-                    "Failed to update block in Supabase.",
-                    extra={"error": response.error.message, "block_id": str(block_id), "update_data": update_dict}
-                )
-                return None
-
-            # Retrieve the updated block
-            updated_block = self.get_block_by_id(block_id)
-            if updated_block:
-                self.logger.log(
-                    "BlockService",
-                    "info",
-                    "Block updated successfully.",
-                    extra={"block_id": str(updated_block.block_id)}
-                )
-                return updated_block
-            else:
-                self.logger.log(
-                    "BlockService",
-                    "warning",
-                    "Block updated but retrieval failed.",
-                    extra={"block_id": str(block_id)}
-                )
-                return None
-
-        except ValidationError as ve:
             self.logger.log(
                 "BlockService",
-                "error",
-                "Validation error during block update.",
-                extra={"error": ve.errors(), "update_data": update_data.dict()}
+                "info",
+                "Block updated successfully.",
+                extra={"block_id": updated_block.block_id}
             )
-            return None
+            return updated_block
+
         except Exception as e:
             self.logger.log(
                 "BlockService",
                 "critical",
-                f"Exception during block update: {str(e)}",
-                extra={"traceback": traceback.format_exc(), "block_id": str(block_id), "update_data": update_data.dict()}
+                f"Exception during block update: {e}",
+                extra={"traceback": traceback.format_exc(), "block_id": str(block_id), "update_data": update_data}
             )
             return None
 
-    def delete_block(self, block_id: UUID) -> bool:
+    async def delete_block(self, tx: Prisma, block_id: UUID) -> bool:
         """
-        Deletes a block from the Supabase `blocks` table.
+        Deletes a block from the database.
 
         Args:
+            tx (Prisma): The Prisma transaction object.
             block_id (UUID): The UUID of the block to delete.
 
         Returns:
             bool: True if deletion was successful, False otherwise.
         """
         try:
-            response = self.supabase_client.table("blocks").delete().eq("block_id", str(block_id)).execute()
-
-            if response.error:
-                self.logger.log(
-                    "BlockService",
-                    "error",
-                    "Failed to delete block from Supabase.",
-                    extra={"error": response.error.message, "block_id": str(block_id)}
-                )
-                return False
+            await tx.blocks.delete(where={"block_id": str(block_id)})
 
             self.logger.log(
                 "BlockService",
@@ -293,56 +193,30 @@ class BlockService:
             self.logger.log(
                 "BlockService",
                 "critical",
-                f"Exception during block deletion: {str(e)}",
+                f"Exception during block deletion: {e}",
                 extra={"traceback": traceback.format_exc(), "block_id": str(block_id)}
             )
             return False
 
-    def get_blocks_by_ids(self, block_ids: List[UUID]) -> Optional[List[BlockResponseSchema]]:
+    async def get_blocks_by_ids(self, tx: Prisma, block_ids: List[UUID]) -> Optional[List[PrismaBlock]]:
         """
-        Retrieves multiple blocks by their unique identifiers from the Supabase `blocks` table.
+        Retrieves multiple blocks by their unique identifiers from the database.
 
         Args:
+            tx (Prisma): The Prisma transaction object.
             block_ids (List[UUID]): A list of UUIDs of the blocks to retrieve.
 
         Returns:
-            Optional[List[BlockResponseSchema]]: A list of block data if successful, None otherwise.
+            Optional[List[PrismaBlock]]: A list of block data if successful, None otherwise.
         """
         try:
-            # Convert UUIDs to strings for the query
-            block_ids_str = [str(bid) for bid in block_ids]
-
-            response = self.supabase_client.table("blocks").select("*").in_("block_id", block_ids_str).execute()
-
-            if response.error:
-                self.logger.log(
-                    "BlockService",
-                    "error",
-                    "Failed to retrieve blocks from Supabase.",
-                    extra={"error": response.error.message, "block_ids": block_ids_str}
-                )
-                return None
-
-            blocks = []
-            for block_data in response.data:
-                block = BlockResponseSchema(
-                    block_id=UUID(block_data["block_id"]),
-                    name=block_data["name"],
-                    block_type=block_data["block_type"],
-                    description=block_data.get("description", ""),
-                    created_at=block_data["created_at"],
-                    updated_at=block_data["updated_at"],
-                    current_version_id=UUID(block_data["current_version_id"]) if block_data.get("current_version_id") else None,
-                    taxonomy=None,
-                    vector_embedding=None
-                )
-                blocks.append(block)
+            blocks = await tx.blocks.find_many(where={"block_id": {"in": [str(bid) for bid in block_ids]}})
 
             self.logger.log(
                 "BlockService",
                 "info",
                 f"{len(blocks)} blocks retrieved successfully.",
-                extra={"block_ids": block_ids_str}
+                extra={"block_ids": [str(bid) for bid in block_ids]}
             )
             return blocks
 
@@ -350,16 +224,17 @@ class BlockService:
             self.logger.log(
                 "BlockService",
                 "critical",
-                f"Exception during multiple block retrieval: {str(e)}",
+                f"Exception during multiple block retrieval: {e}",
                 extra={"traceback": traceback.format_exc(), "block_ids": [str(bid) for bid in block_ids]}
             )
             return None
 
-    def associate_version(self, block_id: UUID, version_id: UUID) -> bool:
+    async def associate_version(self, tx: Prisma, block_id: UUID, version_id: UUID) -> bool:
         """
         Associates a specific version with a block by updating the `current_version_id`.
 
         Args:
+            tx (Prisma): The Prisma transaction object.
             block_id (UUID): The UUID of the block.
             version_id (UUID): The UUID of the version to associate.
 
@@ -367,21 +242,10 @@ class BlockService:
             bool: True if association was successful, False otherwise.
         """
         try:
-            update_data = {
-                "current_version_id": str(version_id),
-                "updated_at": datetime.utcnow().isoformat()
-            }
-
-            response = self.supabase_client.table("blocks").update(serialize_dict(update_data)).eq("block_id", str(block_id)).execute()
-
-            if response.error:
-                self.logger.log(
-                    "BlockService",
-                    "error",
-                    "Failed to associate version with block in Supabase.",
-                    extra={"error": response.error.message, "block_id": str(block_id), "version_id": str(version_id)}
-                )
-                return False
+            await tx.blocks.update(
+                where={"block_id": str(block_id)},
+                data={"current_version_id": str(version_id)}
+            )
 
             self.logger.log(
                 "BlockService",
@@ -395,44 +259,23 @@ class BlockService:
             self.logger.log(
                 "BlockService",
                 "critical",
-                f"Exception during version association: {str(e)}",
+                f"Exception during version association: {e}",
                 extra={"traceback": traceback.format_exc(), "block_id": str(block_id), "version_id": str(version_id)}
             )
             return False
 
-    def list_all_blocks(self) -> Optional[List[BlockResponseSchema]]:
+    async def list_all_blocks(self, tx: Prisma) -> Optional[List[PrismaBlock]]:
         """
-        Retrieves all blocks from the Supabase `blocks` table.
+        Retrieves all blocks from the database.
+
+        Args:
+            tx (Prisma): The Prisma transaction object.
 
         Returns:
-            Optional[List[BlockResponseSchema]]: A list of all block data if successful, None otherwise.
+            Optional[List[PrismaBlock]]: A list of all block data if successful, None otherwise.
         """
         try:
-            response = self.supabase_client.table("blocks").select("*").execute()
-
-            if response.error:
-                self.logger.log(
-                    "BlockService",
-                    "error",
-                    "Failed to retrieve all blocks from Supabase.",
-                    extra={"error": response.error.message}
-                )
-                return None
-
-            blocks = []
-            for block_data in response.data:
-                block = BlockResponseSchema(
-                    block_id=UUID(block_data["block_id"]),
-                    name=block_data["name"],
-                    block_type=block_data["block_type"],
-                    description=block_data.get("description", ""),
-                    created_at=block_data["created_at"],
-                    updated_at=block_data["updated_at"],
-                    current_version_id=UUID(block_data["current_version_id"]) if block_data.get("current_version_id") else None,
-                    taxonomy=None,
-                    vector_embedding=None
-                )
-                blocks.append(block)
+            blocks = await tx.blocks.find_many()
 
             self.logger.log(
                 "BlockService",
@@ -446,7 +289,7 @@ class BlockService:
             self.logger.log(
                 "BlockService",
                 "critical",
-                f"Exception during all blocks retrieval: {str(e)}",
+                f"Exception during all blocks retrieval: {e}",
                 extra={"traceback": traceback.format_exc()}
             )
             return None

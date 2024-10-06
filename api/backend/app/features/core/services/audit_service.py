@@ -14,12 +14,11 @@ Design Philosophy:
 """
 
 from typing import Optional, List, Dict, Any
-from uuid import UUID
-from prisma.models import AuditLog
-from backend.app.schemas import AuditLogCreateSchema, AuditLogResponseSchema
+from uuid import UUID, uuid4
 from backend.app.logger import ConstellationLogger
 from datetime import datetime
 from prisma import Prisma
+from prisma.models import audit_logs as PrismaAuditLog
 
 
 class AuditService:
@@ -33,34 +32,34 @@ class AuditService:
         """
         self.logger = ConstellationLogger()
 
-    async def create_audit_log(self, tx: Prisma, audit_data: AuditLogCreateSchema) -> Optional[AuditLogResponseSchema]:
+    async def create_audit_log(self, tx: Prisma, audit_data: Dict[str, Any]) -> Optional[PrismaAuditLog]:
         """
         Creates a new audit log entry in the database.
-
-        Args:
-            tx (Prisma): The Prisma transaction object.
-            audit_data (AuditLogCreateSchema): The data required to create a new audit log.
-
-        Returns:
-            Optional[AuditLogResponseSchema]: The created audit log data if successful, None otherwise.
         """
         try:
-            data = audit_data.dict()
-            created_audit = await tx.auditlog.create(data=data)
+            create_data = {
+                "log_id": str(uuid4()),
+                "user_id": audit_data.get("user_id"),
+                "action_type": audit_data.get("action_type"),
+                "entity_type": audit_data.get("entity_type"),
+                "entity_id": audit_data.get("entity_id"),
+                "timestamp": audit_data.get("timestamp", datetime.utcnow()),
+                "details": audit_data.get("details")
+            }
+            created_audit = await tx.audit_logs.create(data=create_data)
 
             if created_audit:
-                audit_response = AuditLogResponseSchema(**created_audit.dict())
                 self.logger.log(
                     "AuditService",
                     "info",
                     "Audit log created successfully",
-                    log_id=audit_response.log_id,
-                    user_id=audit_response.user_id,
-                    action_type=audit_response.action_type,
-                    entity_type=audit_response.entity_type,
-                    entity_id=audit_response.entity_id
+                    log_id=created_audit.log_id,
+                    user_id=created_audit.user_id,
+                    action_type=created_audit.action_type,
+                    entity_type=created_audit.entity_type,
+                    entity_id=created_audit.entity_id
                 )
-                return audit_response
+                return created_audit
             else:
                 self.logger.log(
                     "AuditService",
@@ -76,33 +75,25 @@ class AuditService:
             )
             return None
 
-    async def get_audit_log_by_id(self, tx: Prisma, log_id: UUID) -> Optional[AuditLogResponseSchema]:
+    async def get_audit_log_by_id(self, tx: Prisma, log_id: UUID) -> Optional[PrismaAuditLog]:
         """
         Retrieves an audit log by its unique identifier.
-
-        Args:
-            tx (Prisma): The Prisma transaction object.
-            log_id (UUID): The UUID of the audit log to retrieve.
-
-        Returns:
-            Optional[AuditLogResponseSchema]: The audit log data if found, None otherwise.
         """
         try:
             audit_log = await tx.auditlog.find_unique(where={"log_id": str(log_id)})
 
             if audit_log:
-                audit_response = AuditLogResponseSchema(**audit_log.dict())
                 self.logger.log(
                     "AuditService",
                     "info",
                     "Audit log retrieved successfully",
-                    log_id=audit_response.log_id,
-                    user_id=audit_response.user_id,
-                    action_type=audit_response.action_type,
-                    entity_type=audit_response.entity_type,
-                    entity_id=audit_response.entity_id
+                    log_id=audit_log.log_id,
+                    user_id=audit_log.user_id,
+                    action_type=audit_log.action_type,
+                    entity_type=audit_log.entity_type,
+                    entity_id=audit_log.entity_id
                 )
-                return audit_response
+                return audit_log
             else:
                 self.logger.log(
                     "AuditService",
@@ -119,56 +110,70 @@ class AuditService:
             )
             return None
 
-    async def list_audit_logs(self, tx: Prisma, filters: Optional[Dict[str, Any]] = None) -> Optional[List[AuditLogResponseSchema]]:
+    async def update_audit_log(self, tx: Prisma, log_id: UUID, update_data: Dict[str, Any]) -> Optional[PrismaAuditLog]:
         """
-        Retrieves a list of audit logs with optional filtering.
-
-        Args:
-            tx (Prisma): The Prisma transaction object.
-            filters (Optional[Dict[str, Any]]): Key-value pairs to filter the audit logs.
-
-        Returns:
-            Optional[List[AuditLogResponseSchema]]: A list of audit logs if successful, None otherwise.
+        Updates an existing audit log entry.
         """
         try:
-            where_clause = filters or {}
-            audit_logs = await tx.auditlog.find_many(where=where_clause)
+            new_update_data = {
+                "user_id": update_data.get("updated_by"),
+                "action_type": audit_data.get("action_type"),
+                "timestamp": update_data.get("updated_at", datetime.utcnow()),
+                "details": audit_data.get("details")
+            }
+            updated_audit = await tx.auditlog.update(
+                where={"log_id": str(log_id)},
+                data=new_update_data
+            )
 
-            if audit_logs:
-                audit_responses = [AuditLogResponseSchema(**audit.dict()) for audit in audit_logs]
+            if updated_audit:
                 self.logger.log(
                     "AuditService",
                     "info",
-                    f"{len(audit_responses)} audit logs retrieved successfully",
-                    filters=filters
+                    "Audit log updated successfully",
+                    log_id=updated_audit.log_id
                 )
-                return audit_responses
+                return updated_audit
             else:
                 self.logger.log(
                     "AuditService",
                     "warning",
-                    "No audit logs found",
-                    filters=filters
+                    "Audit log not found or update failed",
+                    log_id=log_id
                 )
-                return []
+                return None
+        except Exception as e:
+            self.logger.log(
+                "AuditService",
+                "critical",
+                f"Exception during audit log update: {e}"
+            )
+            return None
+
+    async def list_audit_logs(self, tx: Prisma, filters: Optional[Dict[str, Any]] = None) -> List[PrismaAuditLog]:
+        """
+        Retrieves a list of audit logs with optional filtering.
+        """
+        try:
+            audit_logs = await tx.auditlog.find_many(where=filters or {})
+            self.logger.log(
+                "AuditService",
+                "info",
+                f"{len(audit_logs)} audit logs retrieved successfully",
+                filters=filters
+            )
+            return audit_logs
         except Exception as e:
             self.logger.log(
                 "AuditService",
                 "critical",
                 f"Exception during listing audit logs: {e}"
             )
-            return None
+            return []
 
     async def delete_audit_log(self, tx: Prisma, log_id: UUID) -> bool:
         """
         Deletes an audit log from the database.
-
-        Args:
-            tx (Prisma): The Prisma transaction object.
-            log_id (UUID): The UUID of the audit log to delete.
-
-        Returns:
-            bool: True if deletion was successful, False otherwise.
         """
         try:
             deleted_log = await tx.auditlog.delete(where={"log_id": str(log_id)})

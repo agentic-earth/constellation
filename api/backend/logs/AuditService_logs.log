@@ -1,0 +1,2 @@
+Log file initialized on 2024-10-05 02:19:59.960123
+2024-10-05 02:19:59,960 - AuditService - CRITICAL - Exception during audit log creation: Unable to match input value to any allowed input type for the field. Parse errors: [`data.users`: A value is required but not set, Unable to match input value to any allowed input type for the field. Parse errors: [`data.details`: A value is required but not set, `data.details`: A value is required but not set]]

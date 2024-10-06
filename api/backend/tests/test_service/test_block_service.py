@@ -10,9 +10,9 @@ from api.backend.app.logger import ConstellationLogger
 
 logger = ConstellationLogger()
 
-block1_id = str(uuid4())
-block2_id = str(uuid4())
-block3_id = str(uuid4())
+block1_id = "1"*32
+block2_id = "2"*32
+block3_id = "3"*32
 
 block1_data = {
     "block_id": block1_id,
@@ -21,7 +21,7 @@ block1_data = {
     "description": "Description 1",
     "created_at": datetime.utcnow(),
     "updated_at": datetime.utcnow(),
-    "current_version_id": str(uuid4()),
+    # "current_version_id": str(uuid4()),
 }
 
 block2_data = {
@@ -31,17 +31,17 @@ block2_data = {
     "description": "Description 2",
     "created_at": datetime.utcnow(),
     "updated_at": datetime.utcnow(),
-    "current_version_id": str(uuid4()),
+    # "current_version_id": str(uuid4()),
 }
 
 block3_data = {
     "block_id": block3_id,
     "name": "Block 3",
-    "block_type": "pipeline",
+    "block_type": "dataset",
     "description": "Description 3",
     "created_at": datetime.utcnow(),
     "updated_at": datetime.utcnow(),
-    "current_version_id": str(uuid4()),
+    # "current_version_id": str(uuid4()),
 }
 
 
@@ -112,6 +112,8 @@ async def test_get_blocks_by_ids(block_service, prisma_client):
 
     # Invoke the service method
     async for client in prisma_client:
+        await client.blocks.create(data=block2_data)
+        await client.blocks.create(data=block3_data)
         result = await block_service.get_blocks_by_ids(tx=client, block_ids=block_ids)
 
     # Assertions

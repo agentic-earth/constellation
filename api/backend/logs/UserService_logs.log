@@ -1,0 +1,2 @@
+Log file initialized on 2024-10-05 03:21:31.949161
+2024-10-05 03:21:31,949 - UserService - INFO - User created successfully. - extra={'user_id': '3a8116d2-3b0b-4d51-a6e9-9ea2a6d195dc', 'username': 'test_get_user_by_id', 'email': 'test_get_user_by_id@example.com'}
