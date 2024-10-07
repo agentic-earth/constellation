@@ -31,6 +31,58 @@ class BaseSchema(BaseModel):
 
 
 # -------------------
+# Vector Representation Schemas
+# -------------------
+
+
+class VectorRepresentationSchema(BaseSchema):
+    """
+    Schema representing a vector embedding associated with an entity (block or edge).
+    """
+
+    vector_id: UUID = Field(
+        ..., description="Unique identifier for the vector embedding."
+    )
+    entity_type: str = Field(..., description="Type of the entity ('block' or 'edge').")
+    entity_id: UUID = Field(..., description="UUID of the associated entity.")
+    vector: List[float] = Field(
+        ..., description="Vector embedding (e.g., 512-dimensional)."
+    )
+    taxonomy_filter: Optional[Dict[str, Any]] = Field(
+        None, description="Taxonomy constraints for RAG search."
+    )
+    created_at: datetime = Field(
+        ..., description="Timestamp when the vector was created."
+    )
+    updated_at: datetime = Field(
+        ..., description="Timestamp when the vector was last updated."
+    )
+
+
+class VectorRepresentationResponseSchema(VectorRepresentationSchema):
+    """
+    Schema for returning vector embedding details.
+    """
+
+    pass
+
+
+class VectorRepresentationCreateSchema(BaseSchema):
+    """
+    Schema for creating a new vector embedding.
+    """
+
+    entity_type: str = Field(..., description="Type of the entity ('block' or 'edge').")
+    entity_id: UUID = Field(..., description="UUID of the associated entity.")
+    vector: List[float] = Field(
+        ..., description="Vector embedding (e.g., 512-dimensional)."
+    )
+    taxonomy_filter: Optional[Dict[str, Any]] = Field(
+        None, description="Taxonomy constraints for RAG search."
+    )
+
+
+# -------------------
 # User Schemas
 # -------------------
 
@@ -234,6 +286,22 @@ class BlockUpdateSchema(BaseSchema):
         None, description="Updated metadata for the block."
     )
 
+class BlockRetrieveSchema(BaseSchema):
+    """
+    Schema for retrieving a block.
+    """
+
+    block_id: UUID = Field(..., description="Unique identifier for the block.")
+    user_id: UUID = Field(..., description="UUID of the user retrieving the block.")
+
+class BlockDeleteSchema(BaseSchema):
+    """
+    Schema for deleting a block.
+    """
+
+    block_id: UUID = Field(..., description="Unique identifier for the block.")
+    user_id: UUID = Field(..., description="UUID of the user deleting the block.")
+
 
 class BlockResponseSchema(BaseSchema):
     """
@@ -265,7 +333,7 @@ class BlockResponseSchema(BaseSchema):
     metadata: Optional[Dict[str, Any]] = Field(
         None, description="Additional metadata for the block."
     )
-    vector_embedding: Optional["VectorRepresentationSchema"] = Field(
+    vector_embedding: Optional[VectorRepresentationSchema] = Field(
         None, description="Vector embedding associated with the block."
     )
 
@@ -479,7 +547,6 @@ class EdgeCreateSchema(BaseSchema):
     """
     Schema for creating a new edge.
     """
-
     name: str = Field(..., description="Unique name for the edge.")
     edge_type: EdgeTypeEnum = Field(..., description="Type of the edge.")
     description: Optional[str] = Field(None, description="Description of the edge.")
@@ -827,59 +894,6 @@ class PipelineEdgeResponseSchema(BaseSchema):
     updated_at: datetime = Field(
         ..., description="Timestamp when the association was last updated."
     )
-
-
-# -------------------
-# Vector Representation Schemas
-# -------------------
-
-
-class VectorRepresentationSchema(BaseSchema):
-    """
-    Schema representing a vector embedding associated with an entity (block or edge).
-    """
-
-    vector_id: UUID = Field(
-        ..., description="Unique identifier for the vector embedding."
-    )
-    entity_type: str = Field(..., description="Type of the entity ('block' or 'edge').")
-    entity_id: UUID = Field(..., description="UUID of the associated entity.")
-    vector: List[float] = Field(
-        ..., description="Vector embedding (e.g., 512-dimensional)."
-    )
-    taxonomy_filter: Optional[Dict[str, Any]] = Field(
-        None, description="Taxonomy constraints for RAG search."
-    )
-    created_at: datetime = Field(
-        ..., description="Timestamp when the vector was created."
-    )
-    updated_at: datetime = Field(
-        ..., description="Timestamp when the vector was last updated."
-    )
-
-
-class VectorRepresentationResponseSchema(VectorRepresentationSchema):
-    """
-    Schema for returning vector embedding details.
-    """
-
-    pass
-
-
-class VectorRepresentationCreateSchema(BaseSchema):
-    """
-    Schema for creating a new vector embedding.
-    """
-
-    entity_type: str = Field(..., description="Type of the entity ('block' or 'edge').")
-    entity_id: UUID = Field(..., description="UUID of the associated entity.")
-    vector: List[float] = Field(
-        ..., description="Vector embedding (e.g., 512-dimensional)."
-    )
-    taxonomy_filter: Optional[Dict[str, Any]] = Field(
-        None, description="Taxonomy constraints for RAG search."
-    )
-
 
 # -------------------
 # Audit Log Schemas

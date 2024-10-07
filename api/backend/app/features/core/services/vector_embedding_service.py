@@ -175,7 +175,7 @@ class VectorEmbeddingService:
             )
             return False
 
-    async def search_similar_vectors(self, tx: Prisma, query_vector: List[float], taxonomy_filters: Optional[Dict[str, Any]] = None, top_k: int = 10) -> Optional[List[PrismaBlock]]:
+    async def search_similar_blocks(self, tx: Prisma, query_vector: List[float], taxonomy_filters: Optional[Dict[str, Any]] = None, top_k: int = 10) -> Optional[List[PrismaBlock]]:
         """
         Performs a similarity search over blocks based on the provided query vector and optional taxonomy filters using Prisma.
         """

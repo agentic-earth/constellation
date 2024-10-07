@@ -37,6 +37,8 @@ from backend.app.schemas import (
 )
 from backend.app.logger import ConstellationLogger
 
+from prisma.models import edges as PrismaEdge
+
 
 class EdgeController:
     """
@@ -44,11 +46,12 @@ class EdgeController:
     to perform CRUD operations and handle search functionalities.
     """
 
-    def __init__(self):
+    def __init__(self, prisma: Prisma):
         """
         Initializes the EdgeController with instances of EdgeService and AuditService,
         along with the ConstellationLogger for logging purposes.
         """
+        self.prisma = prisma
         self.edge_service = EdgeService()
         self.audit_service = AuditService()
         self.logger = ConstellationLogger()
@@ -57,7 +60,7 @@ class EdgeController:
     # Edge CRUD Operations
     # -------------------
 
-    def create_edge(self, edge_data: EdgeCreateSchema) -> EdgeResponseSchema:
+    async def create_edge(self, edge_data: Dict[str, Any]) -> Optional[PrismaEdge]:
         """
         Creates a new edge.
 
@@ -71,32 +74,38 @@ class EdgeController:
             HTTPException: If edge creation fails due to validation or server errors.
         """
         try:
-            # Step 1: Create Edge
-            edge = self.edge_service.create_edge(edge_data)
-            if not edge:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Edge creation failed due to invalid data.",
+            async with self.prisma.tx() as tx:
+                edge_create_data = {
+                    "name": edge_data["name"],
+                    "edge_type": edge_data["edge_type"],
+                    "description": edge_data["description"],
+                }
+                # Step 1: Create Edge
+                edge = await self.edge_service.create_edge(tx, edge_create_data)
+                if not edge:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Edge creation failed due to invalid data.",
+                    )
+
+                # Step 2: Log the creation in Audit Logs
+                audit_log = {
+                    "user_id": edge_data.created_by,  # Assuming `created_by` exists in EdgeCreateSchema
+                    "action_type": "CREATE",
+                    "entity_type": "edge",
+                    "entity_id": str(edge.edge_id),
+                    "details": f"Edge '{edge.name}' created successfully.",
+                }
+                self.audit_service.create_audit_log(audit_log)
+
+                # Step 3: Log the creation in ConstellationLogger
+                self.logger.log(
+                    "EdgeController",
+                    "info",
+                    "Edge created successfully.",
+                    extra={"edge_id": str(edge.edge_id)},
                 )
-
-            # Step 2: Log the creation in Audit Logs
-            audit_log = {
-                "user_id": edge_data.created_by,  # Assuming `created_by` exists in EdgeCreateSchema
-                "action_type": "CREATE",
-                "entity_type": "edge",
-                "entity_id": str(edge.edge_id),
-                "details": f"Edge '{edge.name}' created successfully.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            # Step 3: Log the creation in ConstellationLogger
-            self.logger.log(
-                "EdgeController",
-                "info",
-                "Edge created successfully.",
-                extra={"edge_id": str(edge.edge_id)},
-            )
-            return edge
+                return edge
 
         except HTTPException as he:
             # Log HTTPExceptions with error level
@@ -120,7 +129,7 @@ class EdgeController:
                 detail="Internal Server Error during edge creation.",
             )
 
-    def get_edge_by_id(self, edge_id: UUID) -> EdgeResponseSchema:
+    async def get_edge_by_id(self, edge_id: UUID) -> Optional[PrismaEdge]:
         """
         Retrieves an edge by its unique identifier.
 
@@ -134,41 +143,32 @@ class EdgeController:
             HTTPException: If the edge is not found or retrieval fails.
         """
         try:
-            # Step 1: Retrieve Edge
-            edge = self.edge_service.get_edge_by_id(edge_id)
-            if not edge:
-                # Log the failed retrieval in Audit Logs
+            async with self.prisma.tx() as tx:
+                # Step 1: Retrieve Edge
+                edge = await self.edge_service.get_edge_by_id(tx, edge_id)
+                if not edge:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND, detail="Edge not found."
+                    )
+
+                # Step 2: Log the retrieval in Audit Logs
                 audit_log = {
                     "user_id": None,  # Replace with actual user ID if available
                     "action_type": "READ",
                     "entity_type": "edge",
-                    "entity_id": str(edge_id),
-                    "details": "Edge not found.",
+                    "entity_id": str(edge.edge_id),
+                    "details": f"Edge '{edge.name}' retrieved successfully.",
                 }
                 self.audit_service.create_audit_log(audit_log)
 
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, detail="Edge not found."
+                # Step 3: Log the retrieval in ConstellationLogger
+                self.logger.log(
+                    "EdgeController",
+                    "info",
+                    "Edge retrieved successfully.",
+                    extra={"edge_id": str(edge.edge_id)},
                 )
-
-            # Step 2: Log the retrieval in Audit Logs
-            audit_log = {
-                "user_id": None,  # Replace with actual user ID if available
-                "action_type": "READ",
-                "entity_type": "edge",
-                "entity_id": str(edge.edge_id),
-                "details": f"Edge '{edge.name}' retrieved successfully.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            # Step 3: Log the retrieval in ConstellationLogger
-            self.logger.log(
-                "EdgeController",
-                "info",
-                "Edge retrieved successfully.",
-                extra={"edge_id": str(edge.edge_id)},
-            )
-            return edge
+                return edge
 
         except HTTPException as he:
             # Log HTTPExceptions with error level
@@ -192,9 +192,7 @@ class EdgeController:
                 detail="Internal Server Error during edge retrieval.",
             )
 
-    def update_edge(
-        self, edge_id: UUID, update_data: EdgeUpdateSchema
-    ) -> EdgeResponseSchema:
+    async def update_edge(self, edge_id: UUID, update_data: Dict[str, Any]) -> Optional[PrismaEdge]:
         """
         Updates an existing edge's information.
 
@@ -209,32 +207,38 @@ class EdgeController:
             HTTPException: If edge update fails due to validation or server errors.
         """
         try:
-            # Step 1: Update Edge Details
-            edge = self.edge_service.update_edge(edge_id, update_data)
-            if not edge:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Edge update failed due to invalid data.",
+            async with self.prisma.tx() as tx:
+                update_edge_data = {
+                    "name": update_data["name"],
+                    "edge_type": update_data["edge_type"],
+                    "description": update_data["description"],
+                }
+                # Step 1: Update Edge Details
+                edge = await self.edge_service.update_edge(tx, edge_id, update_edge_data)
+                if not edge:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Edge update failed due to invalid data.",
+                    )
+
+                # Step 2: Log the update in Audit Logs
+                audit_log = {
+                    "user_id": update_data.updated_by,  # Assuming `updated_by` exists in EdgeUpdateSchema
+                    "action_type": "UPDATE",
+                    "entity_type": "edge",
+                    "entity_id": str(edge.edge_id),
+                    "details": f"Edge '{edge.name}' updated with fields: {list(update_data.dict().keys())}.",
+                }
+                self.audit_service.create_audit_log(audit_log)
+
+                # Step 3: Log the update in ConstellationLogger
+                self.logger.log(
+                    "EdgeController",
+                    "info",
+                    "Edge updated successfully.",
+                    extra={"edge_id": str(edge.edge_id)},
                 )
-
-            # Step 2: Log the update in Audit Logs
-            audit_log = {
-                "user_id": update_data.updated_by,  # Assuming `updated_by` exists in EdgeUpdateSchema
-                "action_type": "UPDATE",
-                "entity_type": "edge",
-                "entity_id": str(edge.edge_id),
-                "details": f"Edge '{edge.name}' updated with fields: {list(update_data.dict().keys())}.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            # Step 3: Log the update in ConstellationLogger
-            self.logger.log(
-                "EdgeController",
-                "info",
-                "Edge updated successfully.",
-                extra={"edge_id": str(edge.edge_id)},
-            )
-            return edge
+                return edge
 
         except HTTPException as he:
             # Log HTTPExceptions with error level
@@ -272,32 +276,33 @@ class EdgeController:
             HTTPException: If edge deletion fails.
         """
         try:
-            # Step 1: Delete Edge
-            deletion_success = self.edge_service.delete_edge(edge_id)
-            if not deletion_success:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Edge deletion failed.",
+            async with self.prisma.tx() as tx:
+                # Step 1: Delete Edge
+                deletion_success = await self.edge_service.delete_edge(tx, edge_id)
+                if not deletion_success:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Edge deletion failed.",
+                    )
+
+                # Step 2: Log the deletion in Audit Logs
+                audit_log = {
+                    "user_id": None,  # Replace with actual user ID if available
+                    "action_type": "DELETE",
+                    "entity_type": "edge",
+                    "entity_id": str(edge_id),
+                    "details": f"Edge with ID '{edge_id}' deleted successfully.",
+                }
+                self.audit_service.create_audit_log(audit_log)
+
+                # Step 3: Log the deletion in ConstellationLogger
+                self.logger.log(
+                    "EdgeController",
+                    "info",
+                    "Edge deleted successfully.",
+                    extra={"edge_id": str(edge_id)},
                 )
-
-            # Step 2: Log the deletion in Audit Logs
-            audit_log = {
-                "user_id": None,  # Replace with actual user ID if available
-                "action_type": "DELETE",
-                "entity_type": "edge",
-                "entity_id": str(edge_id),
-                "details": f"Edge with ID '{edge_id}' deleted successfully.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            # Step 3: Log the deletion in ConstellationLogger
-            self.logger.log(
-                "EdgeController",
-                "info",
-                "Edge deleted successfully.",
-                extra={"edge_id": str(edge_id)},
-            )
-            return True
+                return True
 
         except HTTPException as he:
             # Log HTTPExceptions with error level
@@ -326,7 +331,7 @@ class EdgeController:
         filters: Optional[Dict[str, Any]] = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[EdgeResponseSchema]:
+    ) -> List[PrismaEdge]:
         """
         Retrieves a list of edges with optional filtering and pagination.
 
@@ -342,34 +347,33 @@ class EdgeController:
             HTTPException: If edge listing fails due to server errors.
         """
         try:
-            # Step 1: Retrieve Edges with Filters
-            edges = self.edge_service.list_edges(
-                filters=filters, limit=limit, offset=offset
-            )
-            if edges is None:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to retrieve edges.",
+            async with self.prisma.tx() as tx:
+                # Step 1: Retrieve Edges with Filters
+                edges = await self.edge_service.list_edges(tx, filters=filters, limit=limit, offset=offset)
+                if edges is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Failed to retrieve edges.",
+                    )
+
+                # Step 2: Log the listing in Audit Logs
+                audit_log = {
+                    "user_id": None,  # Replace with actual user ID if available
+                    "action_type": "READ",
+                    "entity_type": "edge",
+                    "entity_id": None,
+                    "details": f"Listed edges with filters: {filters}, limit: {limit}, offset: {offset}.",
+                }
+                self.audit_service.create_audit_log(audit_log)
+
+                # Step 3: Log the listing in ConstellationLogger
+                self.logger.log(
+                    "EdgeController",
+                    "info",
+                    f"Listed {len(edges)} edges successfully.",
+                    extra={"filters": filters, "limit": limit, "offset": offset},
                 )
-
-            # Step 2: Log the listing in Audit Logs
-            audit_log = {
-                "user_id": None,  # Replace with actual user ID if available
-                "action_type": "READ",
-                "entity_type": "edge",
-                "entity_id": None,
-                "details": f"Listed edges with filters: {filters}, limit: {limit}, offset: {offset}.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            # Step 3: Log the listing in ConstellationLogger
-            self.logger.log(
-                "EdgeController",
-                "info",
-                f"Listed {len(edges)} edges successfully.",
-                extra={"filters": filters, "limit": limit, "offset": offset},
-            )
-            return edges
+                return edges
 
         except HTTPException as he:
             # Log HTTPExceptions with error level
@@ -411,55 +415,54 @@ class EdgeController:
             HTTPException: If edge search fails due to server errors.
         """
         try:
-            # Step 1: Perform Search
-            edges = self.edge_service.search_edges(
-                query_params=query_params, limit=limit, offset=offset
-            )
-            if edges is None:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Edge search failed.",
+            async with self.prisma.tx() as tx:
+                # Step 1: Perform Search
+                edges = await self.edge_service.search_edges(tx, query_params=query_params, limit=limit, offset=offset)
+                if edges is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Edge search failed.",
+                    )
+
+                # Step 2: Count Total Matching Edges
+                total_count = await self.edge_service.count_edges(tx, filters=query_params)
+                if total_count is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Failed to count edges.",
+                    )
+
+                # Step 3: Calculate Total Pages
+                total_pages = (total_count + limit - 1) // limit if limit > 0 else 1
+
+                # Step 4: Log the search in Audit Logs
+                audit_log = {
+                    "user_id": None,  # Replace with actual user ID if available
+                    "action_type": "SEARCH",
+                    "entity_type": "edge",
+                    "entity_id": None,
+                    "details": f"Edge search performed with filters: {query_params}, limit: {limit}, offset: {offset}.",
+                }
+                self.audit_service.create_audit_log(audit_log)
+
+                # Step 5: Log the search in ConstellationLogger
+                self.logger.log(
+                    "EdgeController",
+                    "info",
+                    f"Edge search completed with {len(edges)} results.",
+                    extra={
+                        "query_params": query_params,
+                        "limit": limit,
+                        "offset": offset,
+                        "total_count": total_count,
+                        "total_pages": total_pages,
+                    },
                 )
 
-            # Step 2: Count Total Matching Edges
-            total_count = self.edge_service.count_edges(filters=query_params)
-            if total_count is None:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to count edges.",
-                )
+                # Note: Since we are restricted from using undefined schemas, we'll return the list along with pagination metadata as a dictionary.
+                # This can be adjusted based on how the response is handled in the API routes.
 
-            # Step 3: Calculate Total Pages
-            total_pages = (total_count + limit - 1) // limit if limit > 0 else 1
-
-            # Step 4: Log the search in Audit Logs
-            audit_log = {
-                "user_id": None,  # Replace with actual user ID if available
-                "action_type": "SEARCH",
-                "entity_type": "edge",
-                "entity_id": None,
-                "details": f"Edge search performed with filters: {query_params}, limit: {limit}, offset: {offset}.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            # Step 5: Log the search in ConstellationLogger
-            self.logger.log(
-                "EdgeController",
-                "info",
-                f"Edge search completed with {len(edges)} results.",
-                extra={
-                    "query_params": query_params,
-                    "limit": limit,
-                    "offset": offset,
-                    "total_count": total_count,
-                    "total_pages": total_pages,
-                },
-            )
-
-            # Note: Since we are restricted from using undefined schemas, we'll return the list along with pagination metadata as a dictionary.
-            # This can be adjusted based on how the response is handled in the API routes.
-
-            return edges
+                return edges
 
         except HTTPException as he:
             # Log HTTPExceptions with error level
@@ -486,7 +489,7 @@ class EdgeController:
     # -------------------
     # Edge Verification Endpoint
     # -------------------
-
+    # TODO: to be fixed
     def verify_edge(
         self, verification_request: EdgeVerificationRequestSchema
     ) -> EdgeVerificationResponseSchema:

@@ -23,22 +23,26 @@ from backend.app.database import get_supabase_client
 from backend.app.schemas import AuditLogResponseSchema, AuditLogUpdateSchema
 from backend.app.utils.serialization_utils import serialize_dict
 from backend.app.features.core.services.audit_service import AuditService
-
+from prisma import Prisma
+from prisma.client import get_prisma
+from fastapi import HTTPException, status
+from prisma.models import audit_logs as PrismaAuditLog
+import json
 
 class AuditController:
     """
     AuditController handles all audit-related operations, including creating audit logs for various actions.
     """
 
-    def __init__(self):
+    def __init__(self, prisma: Prisma):
         """
-        Initializes the AuditController with the Supabase client and logger.
+        Initializes the AuditController with the Prisma client and logger.
         """
-        self.client = get_supabase_client()
+        self.prisma = prisma
         self.logger = ConstellationLogger()
         self.audit_service = AuditService()
 
-    def create_audit_log(self, audit_data: Dict[str, Any]) -> bool:
+    async def create_audit_log(self, audit_data: AuditLogCreateSchema) -> Optional[PrismaAuditLog]:
         """
         Creates an audit log entry in the `audit_logs` table.
 
@@ -46,53 +50,32 @@ class AuditController:
             audit_data (Dict[str, Any]): Dictionary containing audit details.
 
         Returns:
-            bool: True if audit log creation was successful, False otherwise.
+            Optional[PrismaAuditLog]: The created audit log if successful, None otherwise.
         """
         try:
-            # Ensure mandatory fields are present
-            required_fields = {"action_type", "entity_type", "entity_id", "details"}
-            if not required_fields.issubset(audit_data.keys()):
-                self.logger.log(
-                    "AuditController",
-                    "error",
-                    "Missing required fields in audit_data.",
-                    extra={"audit_data": audit_data},
-                )
-                return False
+            async with self.prisma.tx() as tx:
+                create_data = { 
+                    "user_id": audit_data.user_id,
+                    "action_type": audit_data.action_type,
+                    "entity_type": audit_data.entity_type,
+                    "entity_id": audit_data.entity_id,
+                    "details": json.dumps(audit_data.details),
+                }
 
-            # Generate UUID for the audit log
-            audit_log_id = uuid4()
-            audit_data["log_id"] = str(audit_log_id)
+                audit_log = await self.audit_service.create_audit_log(tx, create_data)
 
-            # Add timestamp
-            audit_data["timestamp"] = datetime.utcnow().isoformat()
-
-            # Serialize the data
-            serialized_data = serialize_dict(audit_data)
-
-            # Insert the audit log into the database
-            response = self.client.table("audit_logs").insert(serialized_data).execute()
-
-            if response.error:
-                self.logger.log(
-                    "AuditController",
-                    "error",
-                    "Failed to create audit log.",
-                    extra={"error": response.error.message, "audit_data": audit_data},
-                )
-                return False
-
-            self.logger.log(
-                "AuditController",
-                "info",
-                "Audit log created successfully.",
-                extra={
-                    "log_id": str(audit_log_id),
-                    "entity_id": audit_data["entity_id"],
-                    "action_type": audit_data["action_type"],
-                },
-            )
-            return True
+                if not audit_log:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Audit log creation failed.",
+                    )
+                else:
+                    self.logger.log(
+                        "AuditController",
+                        "info",
+                        "Audit log created successfully.",
+                    )
+                return audit_log
 
         except Exception as e:
             self.logger.log(
@@ -101,9 +84,9 @@ class AuditController:
                 f"Exception during audit log creation: {str(e)}",
                 extra={"traceback": traceback.format_exc(), "audit_data": audit_data},
             )
-            return False
+            return None
 
-    def get_audit_log_by_id(self, log_id: UUID) -> Optional[AuditLogResponseSchema]:
+    async def get_audit_log_by_id(self, log_id: UUID) -> Optional[PrismaAuditLog]:
         """
         Retrieves an audit log by its unique identifier.
 
@@ -111,18 +94,26 @@ class AuditController:
             log_id (UUID): The UUID of the audit log to retrieve.
 
         Returns:
-            Optional[AuditLogResponseSchema]: The audit log data if found, None otherwise.
+            Optional[PrismaAuditLog]: The audit log data if found, None otherwise.
         """
         try:
-            audit_log = self.audit_service.get_audit_log_by_id(log_id)
-            if audit_log:
-                self.logger.log(
-                    "AuditController",
-                    "info",
-                    "Audit log retrieved successfully.",
-                    log_id=audit_log.log_id,
-                )
-            return audit_log
+            async with self.prisma.tx() as tx:
+                audit_log = await self.audit_service.get_audit_log_by_id(tx, log_id)
+                
+                if not audit_log:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Audit log not found.",
+                    )
+                else:
+                    self.logger.log(
+                        "AuditController",
+                        "info",
+                        "Audit log retrieved successfully.",
+                    )
+
+                return audit_log
+            
         except Exception as e:
             self.logger.log(
                 "AuditController",
@@ -131,9 +122,9 @@ class AuditController:
             )
             return None
 
-    def update_audit_log(
+    async def update_audit_log(
         self, log_id: UUID, update_data: AuditLogUpdateSchema
-    ) -> Optional[AuditLogResponseSchema]:
+    ) -> Optional[PrismaAuditLog]:
         """
         Updates an existing audit log's information.
 
@@ -142,25 +133,38 @@ class AuditController:
             update_data (AuditLogUpdateSchema): The data to update for the audit log.
 
         Returns:
-            Optional[AuditLogResponseSchema]: The updated audit log data if successful, None otherwise.
+            Optional[PrismaAuditLog]: The updated audit log data if successful, None otherwise.
         """
         try:
-            audit_log = self.audit_service.update_audit_log(log_id, update_data)
-            if audit_log:
-                self.logger.log(
-                    "AuditController",
-                    "info",
-                    "Audit log updated successfully.",
-                    log_id=audit_log.log_id,
-                )
-            return audit_log
+            async with self.prisma.tx() as tx:
+                update_audit_data = {
+                    "action_type": update_data.action_type,
+                    "details": json.dumps(update_data.details),
+                }
+                updated_audit = await self.audit_service.update_audit_log(tx, log_id, update_audit_data)
+
+                if not updated_audit:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Audit log update failed.",
+                    )
+                else:
+                    self.logger.log(
+                        "AuditController",
+                        "info",
+                        "Audit log updated successfully.",
+                    )
+                
+                return updated_audit
         except Exception as e:
             self.logger.log(
-                "AuditController", "critical", f"Exception during audit log update: {e}"
+                "AuditController",
+                "critical",
+                f"Exception during audit log update: {e}",
             )
             return None
 
-    def delete_audit_log(self, log_id: UUID) -> bool:
+    async def delete_audit_log(self, log_id: UUID) -> bool:
         """
         Deletes an audit log.
 
@@ -171,15 +175,23 @@ class AuditController:
             bool: True if deletion was successful, False otherwise.
         """
         try:
-            success = self.audit_service.delete_audit_log(log_id)
-            if success:
-                self.logger.log(
-                    "AuditController",
-                    "info",
-                    "Audit log deleted successfully.",
-                    log_id=log_id,
-                )
-            return success
+            async with self.prisma.tx() as tx:
+                success = await self.audit_service.delete_audit_log(tx, log_id)
+
+                if not success:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Audit log deletion failed.",
+                    )
+                else:
+                    self.logger.log(
+                        "AuditController",
+                        "info",
+                        "Audit log deleted successfully.",
+                        log_id=log_id,
+                    )
+                
+                return success
         except Exception as e:
             self.logger.log(
                 "AuditController",
@@ -188,9 +200,9 @@ class AuditController:
             )
             return False
 
-    def list_audit_logs(
+    async def list_audit_logs(
         self, filters: Optional[Dict[str, Any]] = None
-    ) -> Optional[List[AuditLogResponseSchema]]:
+    ) -> List[PrismaAuditLog]:
         """
         Lists audit logs with optional filtering.
 
@@ -198,22 +210,30 @@ class AuditController:
             filters (Optional[Dict[str, Any]]): Key-value pairs to filter the audit logs.
 
         Returns:
-            Optional[List[AuditLogResponseSchema]]: A list of audit logs if successful, None otherwise.
+            Optional[List[PrismaAuditLog]]: A list of audit logs if successful, None otherwise.
         """
         try:
-            audit_logs = self.audit_service.list_audit_logs(filters)
-            if audit_logs is not None:
-                self.logger.log(
-                    "AuditController",
-                    "info",
-                    f"{len(audit_logs)} audit logs retrieved successfully.",
-                    filters=filters,
-                )
-            return audit_logs
+            async with self.prisma.tx() as tx:
+                audit_logs = await self.audit_service.list_audit_logs(tx, filters)
+
+                if not audit_logs:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Audit logs not found.",
+                    )
+                else:
+                    self.logger.log(
+                        "AuditController",
+                        "info",
+                        f"{len(audit_logs)} audit logs retrieved successfully.",
+                        filters=filters,
+                    )
+                
+                return audit_logs
         except Exception as e:
             self.logger.log(
                 "AuditController",
                 "critical",
                 f"Exception during listing audit logs: {e}",
             )
-            return None
+            return []
