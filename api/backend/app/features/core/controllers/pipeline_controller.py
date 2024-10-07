@@ -43,6 +43,8 @@ from backend.app.schemas import (
     PipelineVerificationResponseSchema,
 )
 from backend.app.logger import ConstellationLogger
+from prisma import Prisma
+from prisma.models import pipelines as PrismaPipeline
 
 
 class PipelineController:
@@ -51,11 +53,12 @@ class PipelineController:
     BlockService, EdgeService, and AuditService to perform CRUD operations and handle complex workflows.
     """
 
-    def __init__(self):
+    def __init__(self, prisma: Prisma):
         """
         Initializes the PipelineController with instances of PipelineService, BlockService,
         EdgeService, and AuditService, along with the ConstellationLogger for logging purposes.
         """
+        self.prisma = prisma
         self.pipeline_service = PipelineService()
         self.block_service = BlockService()
         self.edge_service = EdgeService()
@@ -66,9 +69,7 @@ class PipelineController:
     # Pipeline CRUD Operations
     # -------------------
 
-    def create_pipeline(
-        self, pipeline_data: PipelineCreateSchema
-    ) -> PipelineResponseSchema:
+    async def create_pipeline(self, pipeline_data: PipelineCreateSchema) -> Optional[PrismaPipeline]:
         """
         Creates a new pipeline.
 
@@ -76,38 +77,39 @@ class PipelineController:
             pipeline_data (PipelineCreateSchema): The data required to create a new pipeline.
 
         Returns:
-            PipelineResponseSchema: The created pipeline data if successful.
+            PrismaPipeline: The created pipeline data if successful.
 
         Raises:
             HTTPException: If pipeline creation fails due to validation or server errors.
         """
         try:
-            # Create the pipeline using the PipelineService
-            pipeline = self.pipeline_service.create_pipeline(pipeline_data)
-            if not pipeline:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Pipeline creation failed due to invalid data.",
+            async with self.prisma.tx() as tx:
+                # Create the pipeline using the PipelineService
+                pipeline = await self.pipeline_service.create_pipeline(tx, pipeline_data)
+                if not pipeline:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Pipeline creation failed due to invalid data.",
+                    )
+
+                # Log the creation in Audit Logs
+                audit_log = {
+                    "user_id": pipeline_data.created_by,
+                    "action_type": "CREATE",
+                    "entity_type": "pipeline",
+                    "entity_id": str(pipeline.pipeline_id),
+                    "details": f"Pipeline '{pipeline.name}' created successfully.",
+                }
+                self.audit_service.create_audit_log(audit_log)
+
+                # Log the creation event
+                self.logger.log(
+                    "PipelineController",
+                    "info",
+                    "Pipeline created successfully.",
+                    extra={"pipeline_id": str(pipeline.pipeline_id)},
                 )
-
-            # Log the creation in Audit Logs
-            audit_log = {
-                "user_id": pipeline_data.created_by,
-                "action_type": "CREATE",
-                "entity_type": "pipeline",
-                "entity_id": str(pipeline.pipeline_id),
-                "details": f"Pipeline '{pipeline.name}' created successfully.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            # Log the creation event
-            self.logger.log(
-                "PipelineController",
-                "info",
-                "Pipeline created successfully.",
-                extra={"pipeline_id": str(pipeline.pipeline_id)},
-            )
-            return pipeline
+                return pipeline
 
         except HTTPException as he:
             # Log HTTPExceptions with error level
@@ -131,7 +133,7 @@ class PipelineController:
                 detail="Internal Server Error during pipeline creation.",
             )
 
-    def get_pipeline_by_id(self, pipeline_id: UUID) -> PipelineResponseSchema:
+    async def get_pipeline_by_id(self, pipeline_id: UUID) -> Optional[PrismaPipeline]:
         """
         Retrieves a pipeline by its unique identifier.
 
@@ -139,47 +141,48 @@ class PipelineController:
             pipeline_id (UUID): The UUID of the pipeline to retrieve.
 
         Returns:
-            PipelineResponseSchema: The pipeline data if found.
+            PrismaPipeline: The pipeline data if found.
 
         Raises:
             HTTPException: If the pipeline is not found or retrieval fails.
         """
         try:
-            # Retrieve the pipeline using the PipelineService
-            pipeline = self.pipeline_service.get_pipeline_by_id(pipeline_id)
-            if not pipeline:
-                # Log the failed retrieval in Audit Logs
+            async with self.prisma.tx() as tx:
+                # Retrieve the pipeline using the PipelineService
+                pipeline = await self.pipeline_service.get_pipeline_by_id(tx, pipeline_id)
+                if not pipeline:
+                    # Log the failed retrieval in Audit Logs
+                    audit_log = {
+                        "user_id": None,  # Replace with actual user ID if available
+                        "action_type": "READ",
+                        "entity_type": "pipeline",
+                        "entity_id": str(pipeline_id),
+                        "details": "Pipeline not found.",
+                    }
+                    self.audit_service.create_audit_log(audit_log)
+
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND, detail="Pipeline not found."
+                    )
+
+                # Log the successful retrieval in Audit Logs
                 audit_log = {
                     "user_id": None,  # Replace with actual user ID if available
                     "action_type": "READ",
                     "entity_type": "pipeline",
-                    "entity_id": str(pipeline_id),
-                    "details": "Pipeline not found.",
+                    "entity_id": str(pipeline.pipeline_id),
+                    "details": f"Pipeline '{pipeline.name}' retrieved successfully.",
                 }
                 self.audit_service.create_audit_log(audit_log)
 
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, detail="Pipeline not found."
+                # Log the retrieval event
+                self.logger.log(
+                    "PipelineController",
+                    "info",
+                    "Pipeline retrieved successfully.",
+                    extra={"pipeline_id": str(pipeline.pipeline_id)},
                 )
-
-            # Log the successful retrieval in Audit Logs
-            audit_log = {
-                "user_id": None,  # Replace with actual user ID if available
-                "action_type": "READ",
-                "entity_type": "pipeline",
-                "entity_id": str(pipeline.pipeline_id),
-                "details": f"Pipeline '{pipeline.name}' retrieved successfully.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            # Log the retrieval event
-            self.logger.log(
-                "PipelineController",
-                "info",
-                "Pipeline retrieved successfully.",
-                extra={"pipeline_id": str(pipeline.pipeline_id)},
-            )
-            return pipeline
+                return pipeline
 
         except HTTPException as he:
             # Log HTTPExceptions with error level
@@ -206,9 +209,7 @@ class PipelineController:
                 detail="Internal Server Error during pipeline retrieval.",
             )
 
-    def update_pipeline(
-        self, pipeline_id: UUID, update_data: PipelineUpdateSchema
-    ) -> PipelineResponseSchema:
+    async def update_pipeline(self, pipeline_id: UUID, update_data: PipelineUpdateSchema) -> Optional[PrismaPipeline]:
         """
         Updates an existing pipeline's information.
 
@@ -223,32 +224,33 @@ class PipelineController:
             HTTPException: If pipeline update fails due to validation or server errors.
         """
         try:
-            # Update the pipeline using the PipelineService
-            pipeline = self.pipeline_service.update_pipeline(pipeline_id, update_data)
-            if not pipeline:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Pipeline update failed due to invalid data.",
+            async with self.prisma.tx() as tx:
+                # Update the pipeline using the PipelineService
+                pipeline = await self.pipeline_service.update_pipeline(tx, pipeline_id, update_data)
+                if not pipeline:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Pipeline update failed due to invalid data.",
+                    )
+
+                # Log the update in Audit Logs
+                audit_log = {
+                    "user_id": update_data.updated_by,
+                    "action_type": "UPDATE",
+                    "entity_type": "pipeline",
+                    "entity_id": str(pipeline.pipeline_id),
+                    "details": f"Pipeline '{pipeline.name}' updated with fields: {list(update_data.dict().keys())}.",
+                }
+                self.audit_service.create_audit_log(audit_log)
+
+                # Log the update event
+                self.logger.log(
+                    "PipelineController",
+                    "info",
+                    "Pipeline updated successfully.",
+                    extra={"pipeline_id": str(pipeline.pipeline_id)},
                 )
-
-            # Log the update in Audit Logs
-            audit_log = {
-                "user_id": update_data.updated_by,
-                "action_type": "UPDATE",
-                "entity_type": "pipeline",
-                "entity_id": str(pipeline.pipeline_id),
-                "details": f"Pipeline '{pipeline.name}' updated with fields: {list(update_data.dict().keys())}.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            # Log the update event
-            self.logger.log(
-                "PipelineController",
-                "info",
-                "Pipeline updated successfully.",
-                extra={"pipeline_id": str(pipeline.pipeline_id)},
-            )
-            return pipeline
+                return pipeline
 
         except HTTPException as he:
             # Log HTTPExceptions with error level
@@ -275,7 +277,7 @@ class PipelineController:
                 detail="Internal Server Error during pipeline update.",
             )
 
-    def delete_pipeline(self, pipeline_id: UUID) -> bool:
+    async def delete_pipeline(self, pipeline_id: UUID) -> bool:
         """
         Deletes a pipeline.
 
@@ -289,32 +291,33 @@ class PipelineController:
             HTTPException: If pipeline deletion fails.
         """
         try:
-            # Delete the pipeline using the PipelineService
-            deletion_success = self.pipeline_service.delete_pipeline(pipeline_id)
-            if not deletion_success:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Pipeline deletion failed.",
+            async with self.prisma.tx() as tx:
+                # Delete the pipeline using the PipelineService
+                deletion_success = self.pipeline_service.delete_pipeline(pipeline_id)
+                if not deletion_success:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Pipeline deletion failed.",
+                    )
+
+                # Log the deletion in Audit Logs
+                audit_log = {
+                    "user_id": None,  # Replace with actual user ID if available
+                    "action_type": "DELETE",
+                    "entity_type": "pipeline",
+                    "entity_id": str(pipeline_id),
+                    "details": f"Pipeline '{pipeline_id}' deleted successfully.",
+                }
+                self.audit_service.create_audit_log(audit_log)
+
+                # Log the deletion event
+                self.logger.log(
+                    "PipelineController",
+                    "info",
+                    "Pipeline deleted successfully.",
+                    extra={"pipeline_id": str(pipeline_id)},
                 )
-
-            # Log the deletion in Audit Logs
-            audit_log = {
-                "user_id": None,  # Replace with actual user ID if available
-                "action_type": "DELETE",
-                "entity_type": "pipeline",
-                "entity_id": str(pipeline_id),
-                "details": f"Pipeline '{pipeline_id}' deleted successfully.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            # Log the deletion event
-            self.logger.log(
-                "PipelineController",
-                "info",
-                "Pipeline deleted successfully.",
-                extra={"pipeline_id": str(pipeline_id)},
-            )
-            return True
+                return True
 
         except HTTPException as he:
             # Log HTTPExceptions with error level
@@ -341,9 +344,7 @@ class PipelineController:
                 detail="Internal Server Error during pipeline deletion.",
             )
 
-    def list_pipelines(
-        self, filters: Optional[Dict[str, Any]] = None
-    ) -> List[PipelineResponseSchema]:
+    async def list_pipelines(self, filters: Optional[Dict[str, Any]] = None) -> List[PrismaPipeline]:
         """
         Lists pipelines with optional filtering.
 
@@ -357,32 +358,33 @@ class PipelineController:
             HTTPException: If pipeline listing fails due to server errors.
         """
         try:
-            # List pipelines using the PipelineService
-            pipelines = self.pipeline_service.list_pipelines(filters)
-            if pipelines is None:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to retrieve pipelines.",
+            async with self.prisma.tx() as tx:
+                # List pipelines using the PipelineService
+                pipelines = self.pipeline_service.list_pipelines(filters)
+                if pipelines is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Failed to retrieve pipelines.",
+                    )
+
+                # Log the listing in Audit Logs
+                audit_log = {
+                    "user_id": None,  # Replace with actual user ID if available
+                    "action_type": "READ",
+                    "entity_type": "pipeline",
+                    "entity_id": None,
+                    "details": f"Listed pipelines with filters: {filters}.",
+                }
+                self.audit_service.create_audit_log(audit_log)
+
+                # Log the listing event
+                self.logger.log(
+                    "PipelineController",
+                    "info",
+                    f"Listed {len(pipelines)} pipelines successfully.",
+                    extra={"filters": filters},
                 )
-
-            # Log the listing in Audit Logs
-            audit_log = {
-                "user_id": None,  # Replace with actual user ID if available
-                "action_type": "READ",
-                "entity_type": "pipeline",
-                "entity_id": None,
-                "details": f"Listed pipelines with filters: {filters}.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            # Log the listing event
-            self.logger.log(
-                "PipelineController",
-                "info",
-                f"Listed {len(pipelines)} pipelines successfully.",
-                extra={"filters": filters},
-            )
-            return pipelines
+                return pipelines
 
         except HTTPException as he:
             # Log HTTPExceptions with error level
@@ -410,12 +412,12 @@ class PipelineController:
     # Advanced Pipeline Operations
     # -------------------
 
-    def create_pipeline_with_dependencies(
+    async def create_pipeline_with_dependencies(
         self,
         pipeline_data: PipelineCreateSchema,
         blocks: List[PipelineBlockCreateSchema],
         edges: List[PipelineEdgeCreateSchema],
-    ) -> PipelineResponseSchema:
+    ) -> PrismaPipeline:
         """
         Creates a pipeline along with its associated blocks and edges.
 
@@ -431,107 +433,108 @@ class PipelineController:
             HTTPException: If any part of the creation process fails.
         """
         try:
-            # Create the pipeline
-            pipeline = self.pipeline_service.create_pipeline(pipeline_data)
-            if not pipeline:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Failed to create pipeline.",
-                )
-            self.logger.log(
-                "PipelineController",
-                "info",
-                "Pipeline created successfully.",
-                extra={"pipeline_id": str(pipeline.pipeline_id)},
-            )
-
-            # Assign blocks to the pipeline
-            for block_data in blocks:
-                assigned_block = self.block_service.create_block(block_data.block_data)
-                if not assigned_block:
-                    self.logger.log(
-                        "PipelineController",
-                        "error",
-                        f"Failed to create block: {block_data.block_data.name}",
-                    )
+            async with self.prisma.tx() as tx:
+                # Create the pipeline
+                pipeline = await self.pipeline_service.create_pipeline(tx, pipeline_data)
+                if not pipeline:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Failed to create block: {block_data.block_data.name}",
+                        detail="Failed to create pipeline.",
                     )
-
-                # Assign the block to the pipeline
-                assigned_pipeline_block = (
-                    self.pipeline_service.assign_block_to_pipeline(block_data)
+                self.logger.log(
+                    "PipelineController",
+                    "info",
+                    "Pipeline created successfully.",
+                    extra={"pipeline_id": str(pipeline.pipeline_id)},
                 )
-                if not assigned_pipeline_block:
+
+                # Assign blocks to the pipeline
+                for block_data in blocks:
+                    assigned_block = await self.block_service.create_block(tx, block_data.block_data)
+                    if not assigned_block:
+                        self.logger.log(
+                            "PipelineController",
+                            "error",
+                            f"Failed to create block: {block_data.block_data.name}",
+                        )
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Failed to create block: {block_data.block_data.name}",
+                        )
+
+                    # Assign the block to the pipeline
+                    assigned_pipeline_block = (
+                        await self.pipeline_service.assign_block_to_pipeline(tx, block_data)
+                    )
+                    if not assigned_pipeline_block:
+                        self.logger.log(
+                            "PipelineController",
+                            "error",
+                            f"Failed to assign block {assigned_block.block_id} to pipeline.",
+                        )
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Failed to assign block {assigned_block.block_id} to pipeline.",
+                        )
+
                     self.logger.log(
                         "PipelineController",
-                        "error",
-                        f"Failed to assign block {assigned_block.block_id} to pipeline.",
+                        "info",
+                        f"Block {assigned_block.block_id} assigned to pipeline {pipeline.pipeline_id}.",
                     )
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Failed to assign block {assigned_block.block_id} to pipeline.",
+
+                # Assign edges to the pipeline
+                for edge_data in edges:
+                    assigned_edge = await self.edge_service.create_edge(tx, edge_data.edge_data)
+                    if not assigned_edge:
+                        self.logger.log(
+                            "PipelineController",
+                            "error",
+                            f"Failed to create edge: {edge_data.edge_data.name}",
+                        )
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Failed to create edge: {edge_data.edge_data.name}",
+                        )
+
+                    # Assign the edge to the pipeline
+                    assigned_pipeline_edge = await self.pipeline_service.assign_edge_to_pipeline(
+                        tx, edge_data
                     )
+                    if not assigned_pipeline_edge:
+                        self.logger.log(
+                            "PipelineController",
+                            "error",
+                            f"Failed to assign edge {assigned_edge.edge_id} to pipeline.",
+                        )
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Failed to assign edge {assigned_edge.edge_id} to pipeline.",
+                        )
+
+                    self.logger.log(
+                        "PipelineController",
+                        "info",
+                        f"Edge {assigned_edge.edge_id} assigned to pipeline {pipeline.pipeline_id}.",
+                    )
+
+                # Log the creation in Audit Logs
+                audit_log = {
+                    "user_id": pipeline_data.created_by,
+                    "action_type": "CREATE",
+                    "entity_type": "pipeline",
+                    "entity_id": str(pipeline.pipeline_id),
+                    "details": f"Pipeline '{pipeline.name}' created with {len(blocks)} blocks and {len(edges)} edges.",
+                }
+                self.audit_service.create_audit_log(audit_log)
 
                 self.logger.log(
                     "PipelineController",
                     "info",
-                    f"Block {assigned_block.block_id} assigned to pipeline {pipeline.pipeline_id}.",
+                    "Pipeline and dependencies created successfully.",
+                    extra={"pipeline_id": str(pipeline.pipeline_id)},
                 )
-
-            # Assign edges to the pipeline
-            for edge_data in edges:
-                assigned_edge = self.edge_service.create_edge(edge_data.edge_data)
-                if not assigned_edge:
-                    self.logger.log(
-                        "PipelineController",
-                        "error",
-                        f"Failed to create edge: {edge_data.edge_data.name}",
-                    )
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Failed to create edge: {edge_data.edge_data.name}",
-                    )
-
-                # Assign the edge to the pipeline
-                assigned_pipeline_edge = self.pipeline_service.assign_edge_to_pipeline(
-                    edge_data
-                )
-                if not assigned_pipeline_edge:
-                    self.logger.log(
-                        "PipelineController",
-                        "error",
-                        f"Failed to assign edge {assigned_edge.edge_id} to pipeline.",
-                    )
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Failed to assign edge {assigned_edge.edge_id} to pipeline.",
-                    )
-
-                self.logger.log(
-                    "PipelineController",
-                    "info",
-                    f"Edge {assigned_edge.edge_id} assigned to pipeline {pipeline.pipeline_id}.",
-                )
-
-            # Log the creation in Audit Logs
-            audit_log = {
-                "user_id": pipeline_data.created_by,
-                "action_type": "CREATE",
-                "entity_type": "pipeline",
-                "entity_id": str(pipeline.pipeline_id),
-                "details": f"Pipeline '{pipeline.name}' created with {len(blocks)} blocks and {len(edges)} edges.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            self.logger.log(
-                "PipelineController",
-                "info",
-                "Pipeline and dependencies created successfully.",
-                extra={"pipeline_id": str(pipeline.pipeline_id)},
-            )
-            return pipeline
+                return pipeline
 
         except HTTPException as he:
             # Log HTTPExceptions with error level
@@ -555,7 +558,7 @@ class PipelineController:
                 detail="Internal Server Error during pipeline creation with dependencies.",
             )
 
-    def delete_pipeline_with_dependencies(self, pipeline_id: UUID) -> bool:
+    async def delete_pipeline_with_dependencies(self, pipeline_id: UUID) -> bool:
         """
         Deletes a pipeline along with all its associated blocks and edges.
 
@@ -569,107 +572,108 @@ class PipelineController:
             HTTPException: If any part of the deletion process fails.
         """
         try:
-            # Retrieve all blocks associated with the pipeline
-            pipeline_blocks = self.pipeline_service.get_pipeline_blocks(pipeline_id)
-            if pipeline_blocks is None:
-                self.logger.log(
-                    "PipelineController", "error", "Failed to retrieve pipeline blocks."
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to retrieve pipeline blocks.",
-                )
+            async with self.prisma.tx() as tx:
+                # Retrieve all blocks associated with the pipeline
+                pipeline_blocks = await self.pipeline_service.get_pipeline_blocks(tx, pipeline_id)
+                if pipeline_blocks is None:
+                    self.logger.log(
+                        "PipelineController", "error", "Failed to retrieve pipeline blocks."
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Failed to retrieve pipeline blocks.",
+                    )
 
-            # Retrieve all edges associated with the pipeline
-            pipeline_edges = self.pipeline_service.get_pipeline_edges(pipeline_id)
-            if pipeline_edges is None:
-                self.logger.log(
-                    "PipelineController", "error", "Failed to retrieve pipeline edges."
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to retrieve pipeline edges.",
-                )
+                # Retrieve all edges associated with the pipeline
+                pipeline_edges = await self.pipeline_service.get_pipeline_edges(tx, pipeline_id)
+                if pipeline_edges is None:
+                    self.logger.log(
+                        "PipelineController", "error", "Failed to retrieve pipeline edges."
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Failed to retrieve pipeline edges.",
+                    )
 
-            # Delete all edges first to maintain referential integrity
-            for edge in pipeline_edges:
-                success = self.pipeline_service.remove_edge_from_pipeline(
-                    edge.pipeline_edge_id
-                )
+                # Delete all edges first to maintain referential integrity
+                for edge in pipeline_edges:
+                    success = await self.pipeline_service.remove_edge_from_pipeline(
+                        tx, edge.pipeline_edge_id
+                    )
+                    if not success:
+                        self.logger.log(
+                            "PipelineController",
+                            "error",
+                            f"Failed to delete edge {edge.pipeline_edge_id} from pipeline.",
+                        )
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Failed to delete edge {edge.pipeline_edge_id} from pipeline.",
+                        )
+
+                    # Optionally, delete the edge entity itself
+                    await self.edge_service.delete_edge(tx, edge.edge_id)
+                    self.logger.log(
+                        "PipelineController",
+                        "info",
+                        f"Edge {edge.edge_id} deleted successfully.",
+                    )
+
+                # Delete all blocks
+                for block in pipeline_blocks:
+                    success = await self.pipeline_service.remove_block_from_pipeline(
+                        tx, block.pipeline_block_id
+                    )
+                    if not success:
+                        self.logger.log(
+                            "PipelineController",
+                            "error",
+                            f"Failed to delete block {block.pipeline_block_id} from pipeline.",
+                        )
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Failed to delete block {block.pipeline_block_id} from pipeline.",
+                        )
+
+                    # Optionally, delete the block entity itself
+                    await self.block_service.delete_block(tx, block.block_id)
+                    self.logger.log(
+                        "PipelineController",
+                        "info",
+                        f"Block {block.block_id} deleted successfully.",
+                    )
+
+                # Finally, delete the pipeline
+                success = await self.pipeline_service.delete_pipeline(tx, pipeline_id)
                 if not success:
                     self.logger.log(
                         "PipelineController",
                         "error",
-                        f"Failed to delete edge {edge.pipeline_edge_id} from pipeline.",
+                        f"Failed to delete pipeline {pipeline_id}.",
                     )
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Failed to delete edge {edge.pipeline_edge_id} from pipeline.",
+                        detail="Pipeline deletion failed.",
                     )
 
-                # Optionally, delete the edge entity itself
-                self.edge_service.delete_edge(edge.edge_id)
+                # Log the deletion in Audit Logs
+                audit_log = {
+                    "user_id": None,  # Replace with actual user ID if available
+                    "action_type": "DELETE",
+                    "entity_type": "pipeline",
+                    "entity_id": str(pipeline_id),
+                    "details": f"Pipeline '{pipeline_id}' and all associated blocks and edges were deleted.",
+                }
+                await self.audit_service.create_audit_log(audit_log)
+
+                # Log the deletion event
                 self.logger.log(
                     "PipelineController",
                     "info",
-                    f"Edge {edge.edge_id} deleted successfully.",
+                    f"Pipeline {pipeline_id} and all associated blocks and edges deleted successfully.",
+                    extra={"pipeline_id": str(pipeline_id)},
                 )
-
-            # Delete all blocks
-            for block in pipeline_blocks:
-                success = self.pipeline_service.remove_block_from_pipeline(
-                    block.pipeline_block_id
-                )
-                if not success:
-                    self.logger.log(
-                        "PipelineController",
-                        "error",
-                        f"Failed to delete block {block.pipeline_block_id} from pipeline.",
-                    )
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Failed to delete block {block.pipeline_block_id} from pipeline.",
-                    )
-
-                # Optionally, delete the block entity itself
-                self.block_service.delete_block(block.block_id)
-                self.logger.log(
-                    "PipelineController",
-                    "info",
-                    f"Block {block.block_id} deleted successfully.",
-                )
-
-            # Finally, delete the pipeline
-            success = self.pipeline_service.delete_pipeline(pipeline_id)
-            if not success:
-                self.logger.log(
-                    "PipelineController",
-                    "error",
-                    f"Failed to delete pipeline {pipeline_id}.",
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Pipeline deletion failed.",
-                )
-
-            # Log the deletion in Audit Logs
-            audit_log = {
-                "user_id": None,  # Replace with actual user ID if available
-                "action_type": "DELETE",
-                "entity_type": "pipeline",
-                "entity_id": str(pipeline_id),
-                "details": f"Pipeline '{pipeline_id}' and all associated blocks and edges were deleted.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            # Log the deletion event
-            self.logger.log(
-                "PipelineController",
-                "info",
-                f"Pipeline {pipeline_id} and all associated blocks and edges deleted successfully.",
-                extra={"pipeline_id": str(pipeline_id)},
-            )
-            return True
+                return True
 
         except HTTPException as he:
             # Log HTTPExceptions with error level
@@ -696,6 +700,7 @@ class PipelineController:
                 detail="Internal Server Error during pipeline deletion with dependencies.",
             )
 
+    ## TODO: to be fixed
     def verify_pipeline(
         self, verification_request: PipelineVerificationRequestSchema
     ) -> PipelineVerificationResponseSchema:

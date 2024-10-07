@@ -31,16 +31,20 @@ from backend.app.features.core.services import UserService, AuditService
 from backend.app.schemas import UserCreateSchema, UserUpdateSchema, UserResponseSchema
 from backend.app.logger import ConstellationLogger
 
+from prisma import Prisma
+from prisma.models import users as PrismaUser
+
 
 class UserController:
     """
     UserController orchestrates user-related operations by interacting with UserService and AuditService.
     """
 
-    def __init__(self):
+    def __init__(self, prisma: Prisma):
         """
         Initializes the UserController with instances of UserService, AuditService, and ConstellationLogger.
         """
+        self.prisma = prisma
         self.user_service = UserService()
         self.audit_service = AuditService()
         self.logger = ConstellationLogger()
@@ -49,7 +53,7 @@ class UserController:
     # Basic User Operations
     # -------------------
 
-    def create_user(self, user_data: UserCreateSchema) -> Optional[UserResponseSchema]:
+    async def create_user(self, user_data: UserCreateSchema) -> Optional[PrismaUser]:
         """
         Creates a new user.
 
@@ -59,35 +63,36 @@ class UserController:
         Returns:
             Optional[UserResponseSchema]: The created user data if successful, None otherwise.
         """
-        user = self.user_service.create_user(user_data)
-        if user:
-            self.audit_service.create_audit_log(
-                {
-                    "user_id": user.user_id,
-                    "action_type": "CREATE",
-                    "entity_type": "user",
-                    "entity_id": user.user_id,
-                    "details": f"User '{user.username}' created.",
-                }
-            )
-            self.logger.log(
-                "UserController",
-                "info",
-                "User created successfully.",
-                user_id=user.user_id,
-                username=user.username,
-                email=user.email,
-            )
-        else:
-            self.logger.log(
-                "UserController",
-                "error",
-                "User creation failed.",
-                user_data=user_data.dict(),
-            )
-        return user
+        async with self.prisma.tx() as tx:
+            user = await self.user_service.create_user(tx, user_data)
+            if user:
+                await self.audit_service.create_audit_log(
+                    {
+                        "user_id": user.user_id,
+                        "action_type": "CREATE",
+                        "entity_type": "user",
+                        "entity_id": user.user_id,
+                        "details": f"User '{user.username}' created.",
+                    }
+                )
+                self.logger.log(
+                    "UserController",
+                    "info",
+                    "User created successfully.",
+                    user_id=user.user_id,
+                    username=user.username,
+                    email=user.email,
+                )
+            else:
+                self.logger.log(
+                    "UserController",
+                    "error",
+                    "User creation failed.",
+                    user_data=user_data.dict(),
+                )
+            return user
 
-    def get_user_by_id(self, user_id: UUID) -> Optional[UserResponseSchema]:
+    async def get_user_by_id(self, user_id: UUID) -> Optional[PrismaUser]:
         """
         Retrieves a user by their unique identifier.
 
@@ -97,25 +102,35 @@ class UserController:
         Returns:
             Optional[UserResponseSchema]: The user data if found, None otherwise.
         """
-        user = self.user_service.get_user_by_id(user_id)
-        if user:
-            self.logger.log(
-                "UserController",
-                "info",
-                "User retrieved successfully.",
-                user_id=user.user_id,
-                username=user.username,
-                email=user.email,
-            )
-        else:
-            self.logger.log(
-                "UserController", "warning", "User not found.", user_id=user_id
-            )
-        return user
+        async with self.prisma.tx() as tx:
+            user = await self.user_service.get_user_by_id(tx, user_id)
+            if user:
+                await self.audit_service.create_audit_log(
+                    {
+                        "user_id": user_id,
+                        "action_type": "READ",
+                        "entity_type": "user",
+                        "entity_id": user_id,
+                        "details": f"User '{updated_user.username}' READ.",
+                    }
+                )
+                self.logger.log(
+                    "UserController",
+                    "info",
+                    "User retrieved successfully.",
+                    user_id=user.user_id,
+                    username=user.username,
+                    email=user.email,
+                )
+            else:
+                self.logger.log(
+                    "UserController", "warning", "User not found.", user_id=user_id
+                )
+            return user
 
-    def update_user(
+    async def update_user(
         self, user_id: UUID, update_data: UserUpdateSchema
-    ) -> Optional[UserResponseSchema]:
+    ) -> Optional[PrismaUser]:
         """
         Updates an existing user's information.
 
@@ -126,36 +141,37 @@ class UserController:
         Returns:
             Optional[UserResponseSchema]: The updated user data if successful, None otherwise.
         """
-        updated_user = self.user_service.update_user(user_id, update_data)
-        if updated_user:
-            self.audit_service.create_audit_log(
-                {
-                    "user_id": user_id,
-                    "action_type": "UPDATE",
-                    "entity_type": "user",
-                    "entity_id": user_id,
-                    "details": f"User '{updated_user.username}' updated.",
-                }
-            )
-            self.logger.log(
-                "UserController",
-                "info",
-                "User updated successfully.",
-                user_id=updated_user.user_id,
-                username=updated_user.username,
-                email=updated_user.email,
-            )
-        else:
-            self.logger.log(
-                "UserController",
-                "error",
-                "User update failed.",
-                user_id=user_id,
-                update_data=update_data.dict(),
-            )
-        return updated_user
+        async with self.prisma.tx() as tx:
+            updated_user = await self.user_service.update_user(tx, user_id, update_data)
+            if updated_user:
+                await self.audit_service.create_audit_log(
+                    {
+                        "user_id": user_id,
+                        "action_type": "UPDATE",
+                        "entity_type": "user",
+                        "entity_id": user_id,
+                        "details": f"User '{updated_user.username}' updated.",
+                    }
+                )
+                self.logger.log(
+                    "UserController",
+                    "info",
+                    "User updated successfully.",
+                    user_id=updated_user.user_id,
+                    username=updated_user.username,
+                    email=updated_user.email,
+                )
+            else:
+                self.logger.log(
+                    "UserController",
+                    "error",
+                    "User update failed.",
+                    user_id=user_id,
+                    update_data=update_data.dict(),
+                )
+            return updated_user
 
-    def delete_user(self, user_id: UUID) -> bool:
+    async def delete_user(self, user_id: UUID) -> bool:
         """
         Deletes a user.
 
@@ -165,32 +181,33 @@ class UserController:
         Returns:
             bool: True if deletion was successful, False otherwise.
         """
-        success = self.user_service.delete_user(user_id)
-        if success:
-            self.audit_service.create_audit_log(
-                {
-                    "user_id": user_id,
-                    "action_type": "DELETE",
-                    "entity_type": "user",
-                    "entity_id": user_id,
-                    "details": f"User with ID '{user_id}' deleted.",
-                }
-            )
-            self.logger.log(
-                "UserController", "info", "User deleted successfully.", user_id=user_id
-            )
-        else:
-            self.logger.log(
-                "UserController",
-                "warning",
-                "User deletion failed or user already deleted.",
-                user_id=user_id,
-            )
-        return success
+        async with self.prisma.tx() as tx:
+            success = await self.user_service.delete_user(tx, user_id)
+            if success:
+                await self.audit_service.create_audit_log(
+                    {
+                        "user_id": user_id,
+                        "action_type": "DELETE",
+                        "entity_type": "user",
+                        "entity_id": user_id,
+                        "details": f"User with ID '{user_id}' deleted.",
+                    }
+                )
+                self.logger.log(
+                    "UserController", "info", "User deleted successfully.", user_id=user_id
+                )
+            else:
+                self.logger.log(
+                    "UserController",
+                    "warning",
+                    "User deletion failed or user already deleted.",
+                    user_id=user_id,
+                )
+            return success
 
-    def list_users(
+    async def list_users(
         self, filters: Optional[Dict[str, Any]] = None
-    ) -> Optional[List[UserResponseSchema]]:
+    ) -> Optional[List[PrismaUser]]:
         """
         Lists users with optional filtering.
 
@@ -200,20 +217,22 @@ class UserController:
         Returns:
             Optional[List[UserResponseSchema]]: A list of users if successful, None otherwise.
         """
-        users = self.user_service.list_users(filters)
-        if users is not None:
-            self.logger.log(
-                "UserController",
-                "info",
-                f"{len(users)} users retrieved successfully.",
-                filters=filters,
-            )
-        else:
-            self.logger.log(
-                "UserController", "error", "Failed to retrieve users.", filters=filters
-            )
-        return users
+        async with self.prisma.tx() as tx:
+            users = await self.user_service.list_users(tx, filters)
+            if users is not None:
+                self.logger.log(
+                    "UserController",
+                    "info",
+                    f"{len(users)} users retrieved successfully.",
+                    filters=filters,
+                )
+            else:
+                self.logger.log(
+                    "UserController", "error", "Failed to retrieve users.", filters=filters
+                )
+            return users
 
+    # TODO: to be fixed
     def authenticate_user(
         self, email: str, password: str
     ) -> Optional[UserResponseSchema]:
