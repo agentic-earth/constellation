@@ -46,7 +46,9 @@ def parse_instructions(input: dict) -> CallableOperation:
     return CallableOperation(operation=operation, parameters=parameters)
 
 
-def generate_dependencies_and_run_config(instruction: CallableOperation) -> Tuple[Dict, Dict]:
+def generate_dependencies_and_run_config(
+    instruction: CallableOperation,
+) -> Tuple[Dict, Dict]:
     result = {}
     run_config = {"ops": {}}
     alias_counter = [1]
@@ -66,8 +68,10 @@ def generate_dependencies_and_run_config(instruction: CallableOperation) -> Tupl
             else:
                 input_values[key] = param
 
-        if input_values:                        #This addressed a config input format error that was causing the pipeline to fail
-            run_config["ops"][alias] = {        #Retained copy of error if needed
+        if (
+            input_values
+        ):  # This addressed a config input format error that was causing the pipeline to fail
+            run_config["ops"][alias] = {  # Retained copy of error if needed
                 "inputs": {k: {"value": v} for k, v in input_values.items()}
             }
 
@@ -84,7 +88,7 @@ def define_composite_job(name: str, raw_input: dict) -> Tuple[JobDefinition, Dic
     deps = {}
     run_config = {}
     deps, run_config = generate_dependencies_and_run_config(instruction)
-    
+
     graph = GraphDefinition(
         name=name,
         node_defs=OP_DEFS,
@@ -151,6 +155,6 @@ def build_execute_job():
     dynamic_configs.map(parse_and_execute_job)
 
 
-@repository
+@repository(name="main")
 def deploy_docker_repository():
     return [build_execute_job]
