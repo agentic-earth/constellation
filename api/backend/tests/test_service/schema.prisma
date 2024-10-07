@@ -309,7 +309,7 @@ model users {
 model vector_representations {
   vector_id       String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   entity_type     String
-  entity_id       String                @db.Uuid
+  entity_id       String                @unique @db.Uuid
   vector          Unsupported("vector")
   taxonomy_filter Json?
   created_at      DateTime?             @default(now()) @db.Timestamptz(6)

@@ -221,7 +221,7 @@ class TaxonomyService:
             taxonomy_filters (Dict[str, Any]): Filters based on taxonomy categories.
 
         Returns:
-            Optional[List[Dict[str, Any]]]: List of blocks matching the filters, or None if an error occurs.
+            Optional[List[PrismaBlock]]: List of blocks matching the filters, or None if an error occurs.
         """
         try:
             # Flatten taxonomy filters to handle nested structures

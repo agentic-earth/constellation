@@ -1,144 +1,198 @@
 import pytest
+import json
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
+from uuid import uuid4, UUID
 from datetime import datetime
 
+from prisma import Prisma
+from prisma.models import vector_representations as PrismaVectorRepresentation
+from prisma.models import blocks as PrismaBlock
+
 from api.backend.app.features.core.services.vector_embedding_service import VectorEmbeddingService
-from api.prisma.client import get_prisma
-from api.prisma.models import PrismaVectorEmbedding  # Adjust the import path as necessary
+from api.backend.app.logger import ConstellationLogger
+
+
+logger = ConstellationLogger()
+
+# Test Data
+block1_id = "b1"*16
+block1_data = {
+    "block_id": block1_id,
+    "name": "Block 1",
+    "block_type": "dataset",
+    "description": "Description 1",
+}
+
+vector1_id = "c1"*16
+vector1_data = {
+    "vector_id": vector1_id,
+    "entity_type": "block",
+    "entity_id": block1_id,
+    "vector": [0.1] * 512,
+    "taxonomy_filter": json.dumps({"category": "Climate"}),
+}
+
+test_taxonomy_filters = json.dumps({"category": "Climate"})
+
+updated_vector = [0.2] * 512
+updated_taxonomy_filters = json.dumps({"category": "Weather"})
+
+# block2 and vector2
+block2_id = "b2"*16
+block2_data = {
+    "block_id": block2_id,
+    "name": "Block 2",
+    "block_type": "dataset",
+    "description": "Description 2",
+}
+
+vector2_id = "c2"*16
+vector2_data = {
+    "vector_id": vector2_id,
+    "entity_type": "block",
+    "entity_id": block2_id,
+    "vector": [0.3] * 512,
+    "taxonomy_filter": json.dumps({"category": "Climate"}),
+}
+
+# block3 and vector3
+block3_id = "b3"*16
+block3_data = {
+    "block_id": block3_id,
+    "name": "Block 3",
+    "block_type": "dataset",
+    "description": "Description 3",
+}
+
+vector3_id = "c3"*16
+vector3_data = {
+    "vector_id": vector3_id,
+    "entity_type": "block",
+    "entity_id": block3_id,
+    "vector": [0.1] * 256 + [0.2] * 256,
+    "taxonomy_filter": json.dumps({"category": "Climate"}),
+}
+
+# block4 and vector4
+block4_id = "b4"*16
+block4_data = {
+    "block_id": block4_id,
+    "name": "Block 4",
+    "block_type": "dataset",
+    "description": "Description 4",
+}
+
+vector4_id = "c4"*16
+vector4_data = {
+    "vector_id": vector4_id,
+    "entity_type": "block",
+    "entity_id": block4_id,
+    "vector": [0.1] * 512,
+    "taxonomy_filter": json.dumps({"category": "Climate"}),
+}
+
 
 @pytest.fixture
 async def prisma_client():
-    client = await get_prisma()
+    client = Prisma(datasource={'url': 'postgresql://postgres:password@localhost:5432/postgres'})
+    await client.connect()
+
     yield client
     await client.disconnect()
+
 
 @pytest.fixture
 def vector_embedding_service():
     return VectorEmbeddingService()
 
+
+@pytest.mark.asyncio
+async def test_setup(vector_embedding_service, prisma_client):
+    async for client in prisma_client:
+        await client.blocks.create(data=block1_data)
+        await client.blocks.create(data=block2_data)
+        await client.blocks.create(data=block3_data)
+        await client.blocks.create(data=block4_data)
+
 @pytest.mark.asyncio
 async def test_create_vector_embedding(vector_embedding_service, prisma_client):
-    # Mock data
-    embedding_data = {
-        "vector_embedding_id": str(uuid4()),
-        "entity_type": "block",
-        "entity_id": str(uuid4()),
-        "vector": [0.1, 0.2, 0.3],
-        "taxonomy_filter": {"category": "Climate Data"},
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
-    }
-
-    # Mock Prisma client's vector_embedding.create method
-    prisma_client.vector_embedding.create = AsyncMock(return_value=PrismaVectorEmbedding(**embedding_data))
-
+    logger.log("vector_embedding_service_test", "info", "Creating vector embedding", extra={"vector_data": vector1_data})
     # Invoke the service method
-    result = await vector_embedding_service.create_vector_embedding(tx=prisma_client, embedding_data=embedding_data)
+    async for client in prisma_client:
+        created_vector = await vector_embedding_service.create_vector_embedding(client, vector1_data)
+        logger.log("vector_embedding_service_test", "info", "Vector embedding created successfully.", extra={"created_vector": created_vector})
 
-    # Assertions
-    prisma_client.vector_embedding.create.assert_called_once_with(data=embedding_data)
-    assert result.entity_type == "block"
-    assert result.vector == [0.1, 0.2, 0.3]
+        # Assertions
+        assert created_vector is not None
+        assert created_vector.vector_id is not None
+        assert created_vector.entity_type == vector1_data["entity_type"]
+        assert created_vector.entity_id == str(UUID(block1_id))
+        assert created_vector.vector == vector1_data["vector"]
+        assert created_vector.taxonomy_filter == json.loads(vector1_data["taxonomy_filter"])
+
 
 @pytest.mark.asyncio
-async def test_get_vector_embedding_by_id(vector_embedding_service, prisma_client):
-    # Mock data
-    embedding_id = str(uuid4())
-    expected_embedding = PrismaVectorEmbedding(
-        vector_embedding_id=embedding_id,
-        entity_type="block",
-        entity_id=str(uuid4()),
-        vector=[0.1, 0.2, 0.3],
-        taxonomy_filter={"category": "Climate Data"},
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
-    )
+async def test_get_vector_embedding(vector_embedding_service, prisma_client):
+    async for client in prisma_client:
+        retrieved_vector = await vector_embedding_service.get_vector_embedding(client, UUID(block1_id))
 
-    # Mock Prisma client's vector_embedding.find_unique method
-    prisma_client.vector_embedding.find_unique = AsyncMock(return_value=expected_embedding)
+        logger.log("vector_embedding_service_test", "info", "Vector embedding retrieved successfully.", extra={"retrieved_vector": retrieved_vector})
+        # Assertions
+        assert retrieved_vector is not None
+        assert retrieved_vector.vector_id == str(UUID(vector1_id))
+        assert retrieved_vector.entity_type == "block"
+        assert retrieved_vector.entity_id == str(UUID(block1_id))
+        assert retrieved_vector.vector == vector1_data["vector"]
+        assert retrieved_vector.taxonomy_filter == json.loads(vector1_data["taxonomy_filter"])
 
-    # Invoke the service method
-    result = await vector_embedding_service.get_vector_embedding_by_id(tx=prisma_client, embedding_id=embedding_id)
-
-    # Assertions
-    prisma_client.vector_embedding.find_unique.assert_called_once_with(where={"vector_embedding_id": embedding_id})
-    assert result.entity_type == "block"
-    assert result.vector == [0.1, 0.2, 0.3]
 
 @pytest.mark.asyncio
 async def test_update_vector_embedding(vector_embedding_service, prisma_client):
-    # Mock data
-    embedding_id = str(uuid4())
-    update_data = {
-        "vector": [0.4, 0.5, 0.6],
-        "taxonomy_filter": {"category": "Updated Climate Data"}
+    logger.log("vector_embedding_service_test", "info", "Updating vector embedding")
+
+    # Prepare update data
+    update_vector_data = {
+        "vector": updated_vector,
+        "taxonomy_filter": updated_taxonomy_filters
     }
-    updated_embedding = PrismaVectorEmbedding(
-        vector_embedding_id=embedding_id,
-        entity_type="block",
-        entity_id=str(uuid4()),
-        vector=update_data["vector"],
-        taxonomy_filter=update_data["taxonomy_filter"],
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
-    )
-
-    # Mock Prisma client's vector_embedding.update method
-    prisma_client.vector_embedding.update = AsyncMock(return_value=updated_embedding)
 
     # Invoke the service method
-    result = await vector_embedding_service.update_vector_embedding(tx=prisma_client, embedding_id=embedding_id, update_data=update_data)
+    async for client in prisma_client:
+        updated_vector_data = await vector_embedding_service.update_vector_embedding(
+            client,
+            UUID(block1_id),
+            update_vector_data
+        )
 
-    # Assertions
-    prisma_client.vector_embedding.update.assert_called_once_with(
-        where={"vector_embedding_id": embedding_id},
-        data=update_data
-    )
-    assert result.vector == update_data["vector"]
-    assert result.taxonomy_filter == update_data["taxonomy_filter"]
-
-@pytest.mark.asyncio
-async def test_delete_vector_embedding(vector_embedding_service, prisma_client):
-    # Mock data
-    embedding_id = str(uuid4())
-
-    # Mock Prisma client's vector_embedding.delete method
-    prisma_client.vector_embedding.delete = AsyncMock(return_value=True)
-
-    # Invoke the service method
-    result = await vector_embedding_service.delete_vector_embedding(tx=prisma_client, embedding_id=embedding_id)
-
-    # Assertions
-    prisma_client.vector_embedding.delete.assert_called_once_with(where={"vector_embedding_id": embedding_id})
-    assert result is True
+        assert updated_vector_data is not None
+        assert updated_vector_data.vector == updated_vector
+        assert updated_vector_data.taxonomy_filter == json.loads(updated_taxonomy_filters)
 
 @pytest.mark.asyncio
 async def test_search_similar_vectors(vector_embedding_service, prisma_client):
-    # Mock data
-    query_text = "Sample query"
-    taxonomy_filters = {"category": "Climate Data"}
-    top_k = 3
-    expected_results = [
-        PrismaVectorEmbedding(
-            vector_embedding_id=str(uuid4()),
-            entity_type="block",
-            entity_id=str(uuid4()),
-            vector=[0.1, 0.2, 0.3],
-            taxonomy_filter=taxonomy_filters,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
-        )
-    ]
+    query_vector = [0.4] * 512
+    
+    async for client in prisma_client:
+        await vector_embedding_service.create_vector_embedding(client, vector2_data)
+        await vector_embedding_service.create_vector_embedding(client, vector3_data)
+        await vector_embedding_service.create_vector_embedding(client, vector4_data)
 
-    # Mock Prisma client's vector_embedding.find_many method
-    prisma_client.vector_embedding.find_many = AsyncMock(return_value=expected_results)
+        # Invoke the service method
+        result = await vector_embedding_service.search_similar_vectors(tx=client, query_vector=query_vector)
+
+        logger.log("vector_embedding_service_test", "info", "Similarity search completed.", extra={"result": result})
+
+        # Assertions
+        assert len(result) == 4
+        assert result[0].entity_type == "block"
+
+@pytest.mark.asyncio
+async def test_delete_vector_embedding(vector_embedding_service, prisma_client):
+    logger.log("vector_embedding_service_test", "info", "Deleting vector embedding")
 
     # Invoke the service method
-    result = await vector_embedding_service.search_similar_vectors(tx=prisma_client, query_text=query_text, taxonomy_filters=taxonomy_filters, top_k=top_k)
+    async for client in prisma_client:
+        delete_success = await vector_embedding_service.delete_vector_embedding(client, UUID(block1_id))
 
     # Assertions
-    prisma_client.vector_embedding.find_many.assert_called_once()
-    assert len(result) == 1
-    assert result[0].entity_type == "block"
-    assert result[0].taxonomy_filter == taxonomy_filters
+    assert delete_success is True

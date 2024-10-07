@@ -20,15 +20,12 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime
 
-from pydantic import BaseModel
-
-from backend.app.schemas import VectorRepresentationSchema, BlockResponseSchema
 from backend.app.logger import ConstellationLogger
-from backend.app.database import get_supabase_client
-from backend.app.utils.serialization_utils import serialize_dict
+from backend.app.features.core.services.taxonomy_service import TaxonomyService
 
-from supabase import Client
-from postgrest import APIError as PostgrestError
+from prisma import Prisma
+from prisma.models import vector_representations as PrismaVectorRepresentation
+from prisma.models import blocks as PrismaBlock
 
 
 class VectorEmbeddingService:
@@ -38,84 +35,58 @@ class VectorEmbeddingService:
     """
 
     def __init__(self):
-        """
-        Initializes the VectorEmbeddingService with the Supabase client and logger.
-        """
-        self.supabase_client: Client = get_supabase_client()
         self.logger = ConstellationLogger()
 
-    def create_vector_embedding(self, vector_data: VectorRepresentationSchema) -> Optional[VectorRepresentationSchema]:
+    async def create_vector_embedding(self, tx: Prisma, vector_data: Dict[str, Any]) -> PrismaVectorRepresentation:
         """
-        Creates a new vector embedding in Supabase's `vector_representations` table.
-
-        Args:
-            vector_data (VectorRepresentationSchema): The vector embedding data to create.
-
-        Returns:
-            Optional[VectorRepresentationSchema]: The created vector embedding schema if successful, None otherwise.
+        Creates a new vector embedding in the database using Prisma.
         """
         try:
             # Generate UUID if not provided
-            if not vector_data.vector_id:
-                vector_data.vector_id = uuid4()
+            vector_create_data = {
+                "vector_id": vector_data.get("vector_id", str(uuid4())),
+                "entity_type": vector_data["entity_type"],
+                "entity_id": vector_data["entity_id"],
+                "vector": vector_data["vector"],
+                "taxonomy_filter": vector_data.get("taxonomy_filter"),
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
 
-            # Add timestamps
-            current_time = datetime.utcnow()
-            vector_data.created_at = current_time
-            vector_data.updated_at = current_time
-
-            # Insert into Supabase
-            response = self.supabase_client.table("vector_representations").insert(serialize_dict(vector_data.dict())).execute()
-
-            if response.error:
-                self.logger.log(
-                    "VectorEmbeddingService",
-                    "error",
-                    "Failed to insert vector embedding into Supabase.",
-                    extra={"error": response.error.message, "vector_data": vector_data.dict()}
-                )
-                return None
+            # Insert into database using Prisma
+            created_vector = await tx.vector_representations.create(data=vector_create_data)
 
             self.logger.log(
                 "VectorEmbeddingService",
                 "info",
                 "Vector embedding created successfully.",
-                extra={"vector_id": str(vector_data.vector_id), "entity_id": str(vector_data.entity_id)}
+                extra={"vector_id": str(created_vector.vector_id), "entity_id": str(created_vector.entity_id)}
             )
-            return vector_data
+            return created_vector
 
         except Exception as e:
             self.logger.log(
                 "VectorEmbeddingService",
                 "critical",
                 f"Exception during vector embedding creation: {str(e)}",
-                extra={"traceback": traceback.format_exc(), "vector_data": vector_data.dict()}
+                extra={"traceback": traceback.format_exc(), "vector_data": vector_data}
             )
             return None
 
-    def get_vector_embedding(self, block_id: UUID) -> Optional[VectorRepresentationSchema]:
+    async def get_vector_embedding(self, tx: Prisma, block_id: UUID) -> Optional[PrismaVectorRepresentation]:
         """
-        Retrieves the vector embedding associated with a specific block.
-
-        Args:
-            block_id (UUID): UUID of the block.
-
-        Returns:
-            Optional[VectorRepresentationSchema]: The vector embedding schema if found, None otherwise.
+        Retrieves the vector embedding associated with a specific block using Prisma.
         """
         try:
-            response = self.supabase_client.table("vector_representations").select("*").eq("entity_id", str(block_id)).eq("entity_type", "block").single().execute()
+            self.logger.log(
+                "VectorEmbeddingService",
+                "info",
+                "Retrieving vector embedding.",
+                extra={"block_id": str(block_id)}
+            )
+            vector = await tx.vector_representations.find_unique(where={"entity_id": str(block_id)})
 
-            if response.data:
-                vector_schema = VectorRepresentationSchema(**response.data)
-                self.logger.log(
-                    "VectorEmbeddingService",
-                    "info",
-                    "Vector embedding retrieved successfully.",
-                    extra={"vector_id": str(vector_schema.vector_id), "block_id": str(block_id)}
-                )
-                return vector_schema
-            else:
+            if not vector:
                 self.logger.log(
                     "VectorEmbeddingService",
                     "warning",
@@ -123,6 +94,15 @@ class VectorEmbeddingService:
                     extra={"block_id": str(block_id)}
                 )
                 return None
+
+            self.logger.log(
+                "VectorEmbeddingService",
+                "info",
+                "Vector embedding retrieved successfully.",
+                extra={"vector": vector}
+            )
+
+            return vector
 
         except Exception as e:
             self.logger.log(
@@ -133,53 +113,32 @@ class VectorEmbeddingService:
             )
             return None
 
-    def update_vector_embedding(self, block_id: UUID, new_vector: Optional[List[float]] = None, taxonomy_filters: Optional[Dict[str, Any]] = None) -> bool:
+    async def update_vector_embedding(self, tx: Prisma, block_id: UUID, update_data: Dict[str, Any]) -> Optional[PrismaVectorRepresentation]:
         """
-        Updates the vector embedding for a specific block.
-
-        Args:
-            block_id (UUID): UUID of the block.
-            new_vector (Optional[List[float]]): New vector data to update.
-            taxonomy_filters (Optional[Dict[str, Any]]): New taxonomy constraints for RAG search.
-
-        Returns:
-            bool: True if the update was successful, False otherwise.
+        Updates the vector embedding for a specific block using Prisma.
         """
         try:
-            update_data = {}
-            if new_vector:
-                update_data["vector"] = new_vector
-            if taxonomy_filters:
-                update_data["taxonomy_filter"] = taxonomy_filters
-            if update_data:
-                update_data["updated_at"] = datetime.utcnow()
+            update_data = {
+                "vector": update_data.get("vector"),
+                "taxonomy_filter": update_data.get("taxonomy_filter"),
+                "updated_at": datetime.utcnow()
+            }
 
-                response = self.supabase_client.table("vector_representations").update(serialize_dict(update_data)).eq("entity_id", str(block_id)).eq("entity_type", "block").execute()
+            update_data = {k: v for k, v in update_data.items() if v is not None}
 
-                if response.error:
-                    self.logger.log(
-                        "VectorEmbeddingService",
-                        "error",
-                        "Failed to update vector embedding in Supabase.",
-                        extra={"error": response.error.message, "block_id": str(block_id), "update_data": update_data}
-                    )
-                    return False
+            # Update using Prisma
+            updated_vector = await tx.vector_representations.update(
+                where={"entity_id": str(block_id)},
+                data=update_data
+            )
 
-                self.logger.log(
-                    "VectorEmbeddingService",
-                    "info",
-                    "Vector embedding updated successfully.",
-                    extra={"block_id": str(block_id)}
-                )
-                return True
-            else:
-                self.logger.log(
-                    "VectorEmbeddingService",
-                    "warning",
-                    "No update data provided for vector embedding.",
-                    extra={"block_id": str(block_id)}
-                )
-                return False
+            self.logger.log(
+                "VectorEmbeddingService",
+                "info",
+                "Vector embedding updated successfully.",
+                extra={"block_id": str(block_id)}
+            )
+            return updated_vector
 
         except Exception as e:
             self.logger.log(
@@ -188,29 +147,16 @@ class VectorEmbeddingService:
                 f"Exception during vector embedding update: {str(e)}",
                 extra={"traceback": traceback.format_exc(), "block_id": str(block_id)}
             )
-            return False
+            return None
 
-    def delete_vector_embedding(self, block_id: UUID) -> bool:
+    async def delete_vector_embedding(self, tx: Prisma, block_id: UUID) -> bool:
         """
-        Deletes the vector embedding associated with a specific block from Supabase.
-
-        Args:
-            block_id (UUID): UUID of the block.
-
-        Returns:
-            bool: True if deletion was successful, False otherwise.
+        Deletes the vector embedding associated with a specific block from the database using Prisma.
         """
         try:
-            response = self.supabase_client.table("vector_representations").delete().eq("entity_id", str(block_id)).eq("entity_type", "block").execute()
-
-            if response.error:
-                self.logger.log(
-                    "VectorEmbeddingService",
-                    "error",
-                    "Failed to delete vector embedding from Supabase.",
-                    extra={"error": response.error.message, "block_id": str(block_id)}
-                )
-                return False
+            await tx.vector_representations.delete(
+                where={"entity_id": str(block_id)}
+            )
 
             self.logger.log(
                 "VectorEmbeddingService",
@@ -229,23 +175,15 @@ class VectorEmbeddingService:
             )
             return False
 
-    def search_similar_blocks(self, query_vector: List[float], taxonomy_filters: Optional[Dict[str, Any]] = None, top_k: int = 10) -> Optional[List[BlockResponseSchema]]:
+    async def search_similar_vectors(self, tx: Prisma, query_vector: List[float], taxonomy_filters: Optional[Dict[str, Any]] = None, top_k: int = 10) -> Optional[List[PrismaBlock]]:
         """
-        Performs a similarity search over blocks based on the provided query vector and optional taxonomy filters.
-
-        Args:
-            query_vector (List[float]): The vector to search against.
-            taxonomy_filters (Optional[Dict[str, Any]]): Taxonomy constraints to filter the blocks before similarity search.
-            top_k (int): Number of top similar blocks to retrieve.
-
-        Returns:
-            Optional[List[BlockResponseSchema]]: List of blocks matching the similarity search criteria.
+        Performs a similarity search over blocks based on the provided query vector and optional taxonomy filters using Prisma.
         """
         try:
             # Step 1: Apply taxonomy filters if provided
             if taxonomy_filters:
                 taxonomy_service = TaxonomyService()
-                matching_blocks = taxonomy_service.search_blocks_by_taxonomy(taxonomy_filters)
+                matching_blocks = await taxonomy_service.search_blocks_by_taxonomy(tx, taxonomy_filters)
                 if not matching_blocks:
                     self.logger.log(
                         "VectorEmbeddingService",
@@ -254,26 +192,18 @@ class VectorEmbeddingService:
                         extra={"taxonomy_filters": taxonomy_filters}
                     )
                     return []
-                block_ids = [str(block['block_id']) for block in matching_blocks]
+                block_ids = [str(block.block_id) for block in matching_blocks]
             else:
-                block_ids = None  # No taxonomy filtering
+                block_ids = []  # No taxonomy filtering
 
-            # Step 2: Construct the similarity search query
-            search_query = {
-                "vector": query_vector,
-                "similarity_threshold": None,  # Adjust as needed
-                "top_k": top_k
-            }
-
-            # Step 3: Build the Supabase SQL query for similarity search using pg-vector
+            # Step 3: Build the SQL query for similarity search using pg-vector
             if block_ids:
                 # If filtering by taxonomy, include WHERE entity_id IN (...)
                 supabase_sql = f"""
                     SELECT *
                     FROM vector_representations
-                    WHERE entity_type = 'block'
-                    AND entity_id IN ({', '.join([f"'{bid}'" for bid in block_ids])})
-                    ORDER BY vector <-> '[{', '.join(map(str, query_vector))}]'::vector
+                    WHERE entity_id IN ({', '.join([f"'{bid}'" for bid in block_ids])})
+                    ORDER BY vector <-> $1::vector ASC
                     LIMIT {top_k};
                 """
             else:
@@ -281,40 +211,30 @@ class VectorEmbeddingService:
                 supabase_sql = f"""
                     SELECT *
                     FROM vector_representations
-                    WHERE entity_type = 'block'
-                    ORDER BY vector <-> '[{', '.join(map(str, query_vector))}]'::vector
+                    ORDER BY vector <-> $1::vector ASC
                     LIMIT {top_k};
                 """
 
-            # Execute the SQL query
-            response = self.supabase_client.rpc("pg_execute_sql", {"sql": supabase_sql}).execute()
-
-            if response.error:
-                self.logger.log(
-                    "VectorEmbeddingService",
-                    "error",
-                    "Failed to execute similarity search query.",
-                    extra={"error": response.error.message, "sql": supabase_sql}
-                )
-                return None
-
-            similar_vectors = response.data
+            # Perform the similarity search using Prisma's raw SQL execution
+            similar_vectors = await tx.vector_representations.query_raw(
+                supabase_sql,
+                query_vector
+            )
 
             if not similar_vectors:
                 self.logger.log(
                     "VectorEmbeddingService",
-                    "info",
-                    "No similar vectors found for the query.",
-                    extra={"query_vector": query_vector, "taxonomy_filters": taxonomy_filters}
+                    "error",
+                    "Failed to execute similarity search query.",
                 )
-                return []
+                return None
 
             # Extract block IDs from the similar vectors
             similar_block_ids = [UUID(vector['entity_id']) for vector in similar_vectors]
 
             # Retrieve block details
             block_service = BlockService()
-            similar_blocks = block_service.get_blocks_by_ids(similar_block_ids)
+            similar_blocks = await block_service.get_blocks_by_ids(tx, similar_block_ids)
 
             self.logger.log(
                 "VectorEmbeddingService",
@@ -336,11 +256,15 @@ class VectorEmbeddingService:
 # -------------------
 # Testing Utility
 # -------------------
-def main():
+async def main():
     """
     Main function to test basic CRUD operations of the VectorEmbeddingService.
     """
     import json
+
+    # Initialize Prisma client
+    prisma = Prisma()
+    await prisma.connect()
 
     service = VectorEmbeddingService()
 
@@ -350,39 +274,33 @@ def main():
     test_taxonomy_filters = {"category": "Climate"}
 
     # Create Vector Embedding
-    vector_data = VectorRepresentationSchema(
-        vector_id=uuid4(),
-        entity_type="block",
-        entity_id=test_block_id,
-        vector=test_vector,
-        taxonomy_filter=test_taxonomy_filters,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
-    )
-    created_vector = service.create_vector_embedding(vector_data)
+    created_vector = await service.create_vector_embedding(prisma, vector_data)
     if created_vector:
         print(f"Vector Embedding Created: {created_vector.vector_id}")
 
     # Retrieve Vector Embedding
-    retrieved_vector = service.get_vector_embedding(test_block_id)
+    retrieved_vector = await service.get_vector_embedding(prisma, test_block_id)
     if retrieved_vector:
         print(f"Vector Embedding Retrieved: {retrieved_vector.vector_id}")
 
     # Update Vector Embedding
     new_vector = [0.2] * 512
-    update_success = service.update_vector_embedding(test_block_id, new_vector=new_vector, taxonomy_filters={"category": "Weather"})
+    update_success = await service.update_vector_embedding(prisma, test_block_id, new_vector=new_vector, taxonomy_filters={"category": "Weather"})
     if update_success:
         print("Vector Embedding Updated Successfully.")
 
     # Perform Similarity Search
-    search_results = service.search_similar_blocks(query_vector=new_vector, taxonomy_filters={"category": "Weather"}, top_k=5)
+    search_results = await service.search_similar_blocks(prisma, query_vector=new_vector, taxonomy_filters={"category": "Weather"}, top_k=5)
     if search_results:
         print(f"Similarity Search Results: {[block.block_id for block in search_results]}")
 
     # Delete Vector Embedding
-    deletion_success = service.delete_vector_embedding(test_block_id)
+    deletion_success = await service.delete_vector_embedding(prisma, test_block_id)
     if deletion_success:
         print("Vector Embedding Deleted Successfully.")
 
+    await prisma.disconnect()
+
 if __name__ == "__main__":
-    main()
+    import asyncio
+    asyncio.run(main())

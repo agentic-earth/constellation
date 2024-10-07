@@ -38,11 +38,11 @@ class AuditService:
         """
         try:
             create_data = {
-                "log_id": str(uuid4()),
-                "user_id": audit_data.get("user_id"),
-                "action_type": audit_data.get("action_type"),
-                "entity_type": audit_data.get("entity_type"),
-                "entity_id": audit_data.get("entity_id"),
+                "log_id": audit_data.get("log_id", str(uuid4())),
+                "user_id": audit_data["user_id"],
+                "action_type": audit_data["action_type"],
+                "entity_type": audit_data["entity_type"],
+                "entity_id": audit_data["entity_id"],
                 "timestamp": audit_data.get("timestamp", datetime.utcnow()),
                 "details": audit_data.get("details")
             }
