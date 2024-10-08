@@ -396,104 +396,104 @@ class EdgeService:
             )
             return None
 
-    # TODO: To be fixed
-    async def can_connect_blocks(self, tx: Prisma, source_block_id: UUID, target_block_id: UUID) -> EdgeVerificationResponseSchema:
-        """
-        Determines if two blocks can be connected via an edge based on business rules.
+    # # TODO: To be fixed
+    # async def can_connect_blocks(self, tx: Prisma, source_block_id: UUID, target_block_id: UUID) -> EdgeVerificationResponseSchema:
+    #     """
+    #     Determines if two blocks can be connected via an edge based on business rules.
 
-        Args:
-            tx (Prisma): The Prisma transaction object.
-            source_block_id (UUID): The UUID of the source block.
-            target_block_id (UUID): The UUID of the target block.
+    #     Args:
+    #         tx (Prisma): The Prisma transaction object.
+    #         source_block_id (UUID): The UUID of the source block.
+    #         target_block_id (UUID): The UUID of the target block.
 
-        Returns:
-            Dict[str, Any]: The result of the verification.
-        """
-        response = {
-            "can_connect": True,
-            "reasons": [],
-            "existing_edges": []
-        }
-        try:
-            # Rule 1: Check for existing edges
-            existing = await tx.edges.find_many(
-                where={
-                    "source_block_id": str(source_block_id),
-                    "target_block_id": str(target_block_id)
-                }
-            )
+    #     Returns:
+    #         Dict[str, Any]: The result of the verification.
+    #     """
+    #     response = {
+    #         "can_connect": True,
+    #         "reasons": [],
+    #         "existing_edges": []
+    #     }
+    #     try:
+    #         # Rule 1: Check for existing edges
+    #         existing = await tx.edges.find_many(
+    #             where={
+    #                 "source_block_id": str(source_block_id),
+    #                 "target_block_id": str(target_block_id)
+    #             }
+    #         )
 
-            if existing:
-                response["can_connect"] = False
-                response["reasons"].append("An edge already exists between these blocks.")
-                response["existing_edges"] = [edge.dict() for edge in existing]
+    #         if existing:
+    #             response["can_connect"] = False
+    #             response["reasons"].append("An edge already exists between these blocks.")
+    #             response["existing_edges"] = [edge.dict() for edge in existing]
 
-            # Rule 2: Enforce specific edge types (example)
-            # Fetch source and target block types
-            source_block = await tx.blocks.find_unique(where={"block_id": str(source_block_id)})
-            target_block = await tx.blocks.find_unique(where={"block_id": str(target_block_id)})
+    #         # Rule 2: Enforce specific edge types (example)
+    #         # Fetch source and target block types
+    #         source_block = await tx.blocks.find_unique(where={"block_id": str(source_block_id)})
+    #         target_block = await tx.blocks.find_unique(where={"block_id": str(target_block_id)})
 
-            if source_block and target_block:
-                # Example Rule: Only 'primary' blocks can connect to 'secondary' blocks
-                if source_block.block_type == "primary" and target_block.block_type != "secondary":
-                    response["can_connect"] = False
-                    response["reasons"].append("Primary blocks can only connect to secondary blocks.")
+    #         if source_block and target_block:
+    #             # Example Rule: Only 'primary' blocks can connect to 'secondary' blocks
+    #             if source_block.block_type == "primary" and target_block.block_type != "secondary":
+    #                 response["can_connect"] = False
+    #                 response["reasons"].append("Primary blocks can only connect to secondary blocks.")
 
-            # Rule 3: Prevent cycles (Advanced)
-            if await self.creates_cycle(tx, source_block_id, target_block_id):
-                response["can_connect"] = False
-                response["reasons"].append("Connecting these blocks would create a cycle in the graph.")
+    #         # Rule 3: Prevent cycles (Advanced)
+    #         if await self.creates_cycle(tx, source_block_id, target_block_id):
+    #             response["can_connect"] = False
+    #             response["reasons"].append("Connecting these blocks would create a cycle in the graph.")
 
-            return response
+    #         return response
 
-        except Exception as exc:
-            self.logger.log(
-                "EdgeService",
-                "critical",
-                f"Exception during block connection verification: {exc}",
-                extra={"traceback": traceback.format_exc()}
-            )
-            response["can_connect"] = False
-            response["reasons"].append("An error occurred during verification.")
-            return response
+    #     except Exception as exc:
+    #         self.logger.log(
+    #             "EdgeService",
+    #             "critical",
+    #             f"Exception during block connection verification: {exc}",
+    #             extra={"traceback": traceback.format_exc()}
+    #         )
+    #         response["can_connect"] = False
+    #         response["reasons"].append("An error occurred during verification.")
+    #         return response
 
-    async def creates_cycle(self, tx: Prisma, source_block_id: UUID, target_block_id: UUID) -> bool:
-        """
-        Determines if adding an edge would create a cycle in the graph.
+    # async def creates_cycle(self, tx: Prisma, source_block_id: UUID, target_block_id: UUID) -> bool:
+    #     """
+    #     Determines if adding an edge would create a cycle in the graph.
 
-        Args:
-            tx (Prisma): The Prisma transaction object.
-            source_block_id (UUID): The UUID of the source block.
-            target_block_id (UUID): The UUID of the target block.
+    #     Args:
+    #         tx (Prisma): The Prisma transaction object.
+    #         source_block_id (UUID): The UUID of the source block.
+    #         target_block_id (UUID): The UUID of the target block.
 
-        Returns:
-            bool: True if a cycle would be created, False otherwise.
-        """
-        try:
-            # Perform a Depth-First Search (DFS) from the target block to see if we can reach the source block
-            stack = [target_block_id]
-            visited = set()
+    #     Returns:
+    #         bool: True if a cycle would be created, False otherwise.
+    #     """
+    #     try:
+    #         # Perform a Depth-First Search (DFS) from the target block to see if we can reach the source block
+    #         stack = [target_block_id]
+    #         visited = set()
 
-            while stack:
-                current = stack.pop()
-                if current == source_block_id:
-                    return True
-                if current not in visited:
-                    visited.add(current)
-                    # Get all outgoing edges from current block
-                    edges = await tx.edges.find_many(
-                        where={"source_block_id": str(current)},
-                        select={"target_block_id": True}
-                    )
-                    for edge in edges:
-                        stack.append(UUID(edge.target_block_id))
-            return False
-        except Exception as e:
-            self.logger.log(
-                "EdgeService",
-                "critical",
-                f"Exception during cycle detection: {str(e)}",
-                extra={"traceback": traceback.format_exc(), "source_block_id": str(source_block_id), "target_block_id": str(target_block_id)}
-            )
-            # Default to cycle creation prevention on error
-            return True
+    #         while stack:
+    #             current = stack.pop()
+    #             if current == source_block_id:
+    #                 return True
+    #             if current not in visited:
+    #                 visited.add(current)
+    #                 # Get all outgoing edges from current block
+    #                 edges = await tx.edges.find_many(
+    #                     where={"source_block_id": str(current)},
+    #                     select={"target_block_id": True}
+    #                 )
+    #                 for edge in edges:
+    #                     stack.append(UUID(edge.target_block_id))
+    #         return False
+    #     except Exception as e:
+    #         self.logger.log(
+    #             "EdgeService",
+    #             "critical",
+    #             f"Exception during cycle detection: {str(e)}",
+    #             extra={"traceback": traceback.format_exc(), "source_block_id": str(source_block_id), "target_block_id": str(target_block_id)}
+    #         )
+    #         # Default to cycle creation prevention on error
+    #         return True

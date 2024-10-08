@@ -39,6 +39,8 @@ from backend.app.schemas import (
     BlockCreateSchema,
     BlockUpdateSchema,
     BlockResponseSchema,
+    BlockRetrieveSchema,
+    BlockDeleteSchema,
     VectorRepresentationSchema,
     VectorRepresentationCreateSchema,
     VectorRepresentationResponseSchema,
@@ -46,8 +48,6 @@ from backend.app.schemas import (
 from backend.app.taxonomy import SearchQuery, SearchResult
 from backend.app.logger import ConstellationLogger
 from prisma import Prisma
-from prisma.models import blocks as PrismaBlock
-from prisma.models import vector_representations as PrismaVectorRepresentation
 
 
 class BlockController:
@@ -70,9 +70,14 @@ class BlockController:
         self.audit_service = AuditService()
         self.logger = ConstellationLogger()
 
-    async def create_block(self, block_data: BlockCreateSchema) -> Optional[BlockResponseSchema]:
+    async def create_block(self, user_id: UUID, block_data: BlockCreateSchema) -> Optional[BlockResponseSchema]:
         """
         Creates a new block along with its optional taxonomy.
+        Args:
+            user_id (UUID): The user ID of the user creating the block.
+            block_data (BlockCreateSchema): The data for creating the block.
+        Returns:
+            Optional[BlockResponseSchema]: The created block.
         """
         try:
             async with self.prisma.tx() as tx:
@@ -127,14 +132,19 @@ class BlockController:
                 #         )
 
                 # Step 4: Log the creation in Audit Logs
-                audit_log = {
-                    "user_id": block_data.created_by, # not None
+                create_audit_log_data = {
+                    "user_id": user_id, # not None
                     "action_type": "CREATE",
                     "entity_type": "block",
-                    "entity_id": str(block.block_id),
-                    "details": f"Block '{block.name}' created with taxonomy and vector embedding.",
+                    "entity_id": block.block_id,
                 }
-                await self.audit_service.create_audit_log(tx, audit_log)
+                audit_log = await self.audit_service.create_audit_log(tx, create_audit_log_data)
+
+                if not audit_log:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Audit log creation failed.",
+                    )
 
                 self.logger.log(
                     "BlockController",
@@ -145,7 +155,7 @@ class BlockController:
 
                 block_response = BlockResponseSchema(**block.dict())
                 block_response.created_by = block_data.created_by
-                block_response.updated_by = block_data.updated_by
+                block_response.updated_by = block_data.created_by
                 block_response.taxonomy = block_data.taxonomy
                 return block_response   
 
@@ -171,11 +181,17 @@ class BlockController:
                 detail="Internal Server Error.",
             )
     
-    async def get_block_by_id(self, block_data: BlockRetrieveSchema) -> Optional[BlockResponseSchema]:
+    async def get_block_by_id(self, user_id: UUID, block_data: BlockRetrieveSchema) -> Optional[BlockResponseSchema]:
         """
         Retrieves a block by its unique identifier, including its taxonomy and vector embedding.
+        Args:
+            user_id (UUID): The user ID of the user retrieving the block.
+            block_data (BlockRetrieveSchema): The data for retrieving the block.
+        Returns:
+            Optional[BlockResponseSchema]: The retrieved block.
         """
         try:
+            
             async with self.prisma.tx() as tx:
                 # Step 1: Retrieve Block
                 block = await self.block_service.get_block_by_id(tx, block_data.block_id)
@@ -183,22 +199,24 @@ class BlockController:
                     raise HTTPException(
                         status_code=status.HTTP_404_NOT_FOUND, detail="Block not found."
                     )
+                ## TODO: how to populate at once
+                block_response = BlockResponseSchema(**block.dict())
 
                 # Step 2: Retrieve Taxonomy
                 taxonomy = await self.taxonomy_service.get_taxonomy_for_block(
                     tx=tx, block_id=block.block_id
                 )
 
-                if taxonomy:
-                    block_response.taxonomy = taxonomy
-                else:
+                if not taxonomy:
                     self.logger.log(
                         "BlockController",
                         "warning",
                         f"No taxonomy found for block {block.block_id}.",
                         extra={"block_id": str(block.block_id)},
                     )
-
+                else:
+                    block_response.taxonomy = taxonomy
+                    
                 # Step 3: Retrieve Vector Embedding
                 vector_embedding = await self.vector_embedding_service.get_vector_embedding(
                     tx=tx, block_id=block.block_id
@@ -215,14 +233,19 @@ class BlockController:
                     )
 
                 # Step 4: Log the retrieval in Audit Logs
-                audit_log = {
-                    "user_id": block_data.user_id,
+                create_audit_log_data = {
+                    "user_id": user_id,
                     "action_type": "READ",
                     "entity_type": "block",
-                    "entity_id": str(block.block_id),
-                    "details": f"Block '{block.name}' retrieved.",
+                    "entity_id": block.block_id,
                 }
-                await self.audit_service.create_audit_log(tx, audit_log)
+                audit_log = await self.audit_service.create_audit_log(tx, create_audit_log_data)
+
+                if not audit_log:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Audit log creation failed.",
+                    )
 
                 self.logger.log(
                     "BlockController",
@@ -231,7 +254,6 @@ class BlockController:
                     extra={"block_id": str(block.block_id)},
                 )
 
-                block_response.update(**block.dict())
                 return block_response
 
         except HTTPException as he:
@@ -254,9 +276,15 @@ class BlockController:
                 detail="Internal Server Error.",
             )
 
-    async def update_block(self, block_id: UUID, update_data: BlockUpdateSchema) -> Optional[BlockResponseSchema]:
+    async def update_block(self, user_id: UUID, block_id: UUID, update_data: BlockUpdateSchema) -> Optional[BlockResponseSchema]:
         """
         Updates an existing block's information, including optional taxonomy and vector embedding.
+        Args:
+            user_id (UUID): The user ID of the user updating the block.
+            block_id (UUID): The ID of the block to update.
+            update_data (BlockUpdateSchema): The data for updating the block.
+        Returns:
+            Optional[BlockResponseSchema]: The updated block.
         """
         try:
             async with self.prisma.tx() as tx:
@@ -273,6 +301,7 @@ class BlockController:
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Block update failed.",
                     )
+                block_response = BlockResponseSchema(**block.dict())
 
                 # Step 2: Update Taxonomy Associations (if taxonomy provided)
                 if update_data.taxonomy:
@@ -286,6 +315,8 @@ class BlockController:
                             f"Block {block.block_id} updated without taxonomy associations.",
                             extra={"block_id": str(block.block_id)},
                         )
+                    else:
+                        block_response.taxonomy = update_data.taxonomy
 
                 # Step 3: Update Vector Embedding (if metadata provided)
                 # if update_data.metadata:
@@ -307,14 +338,19 @@ class BlockController:
 
 
                 # Step 4: Log the update in Audit Logs
-                audit_log = {
-                    "user_id": update_data.updated_by,  # not None
+                create_audit_log_data = {
+                    "user_id": user_id,  # not None
                     "action_type": "UPDATE",
                     "entity_type": "block",
-                    "entity_id": str(block.block_id),
-                    "details": f"Block '{block.name}' updated with fields: {list(update_data.dict().keys())}.",
+                    "entity_id": block.block_id,
                 }
-                await self.audit_controller.create_audit_log(audit_log)
+                audit_log = await self.audit_service.create_audit_log(tx, create_audit_log_data)
+
+                if not audit_log:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Audit log creation failed.",
+                    )
 
                 self.logger.log(
                     "BlockController",
@@ -323,8 +359,8 @@ class BlockController:
                     extra={"block_id": str(block.block_id)},
                 )
 
-                block_response = BlockResponseSchema(**block.dict())
-                block_response.taxonomy = update_data.taxonomy
+                block_response.updated_by = update_data.updated_by
+
                 return block_response
 
         except HTTPException as he:
@@ -347,18 +383,20 @@ class BlockController:
                 detail="Internal Server Error.",
             )
 
-    async def delete_block(self, block_data: BlockDeleteSchema) -> bool:
+    async def delete_block(self, user_id: UUID, block_data: BlockDeleteSchema) -> bool:
         """
         Deletes a block along with its associated taxonomy and vector embedding.
+        Args:
+            user_id (UUID): The user ID of the user deleting the block.
+            block_data (BlockDeleteSchema): The data for deleting the block.
+        Returns:
+            bool: True if the block was deleted successfully, False otherwise.
         """
         try:
             async with self.prisma.tx() as tx:
                 # Delete Vector Embedding
                 await self.vector_embedding_service.delete_vector_embedding(tx=tx, block_id=block_data.block_id)
-                
-                # Delete Taxonomy
-                await self.taxonomy_service.delete_taxonomy_for_block(tx=tx, block_id=block_data.block_id)
-                
+
                 # Delete Block
                 deleted = await self.block_service.delete_block(tx=tx, block_id=block_data.block_id)
                 if not deleted:
@@ -368,14 +406,19 @@ class BlockController:
                     )
 
                 # Log the deletion in Audit Logs
-                audit_log = {
-                    "user_id": None,  # Replace with actual user ID if available
+                create_audit_log_data = {
+                    "user_id": user_id,  # Replace with actual user ID if available
                     "action_type": "DELETE",
                     "entity_type": "block",
-                    "entity_id": str(block_data.block_id),
-                    "details": f"Block with ID '{block_data.block_id}' deleted along with its taxonomy and vector embedding.",
+                    "entity_id": block_data.block_id,
                 }
-                await self.audit_controller.create_audit_log(audit_log)
+                audit_log = await self.audit_service.create_audit_log(tx, create_audit_log_data)
+
+                if not audit_log:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Audit log creation failed.",
+                    )
 
                 self.logger.log(
                     "BlockController",
@@ -398,7 +441,7 @@ class BlockController:
                 "BlockController",
                 "critical",
                 f"Exception during block deletion: {str(e)}",
-                extra={"traceback": traceback.format_exc(), "block_id": str(block_id)},
+                extra={"traceback": traceback.format_exc(), "block_id": str(block_data.block_id)},
             )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -409,7 +452,16 @@ class BlockController:
     # Vector Embedding CRUD Operations
     # -------------------
     
-    async def update_vector_embedding(self, block_id: UUID, update_data: VectorRepresentationCreateSchema) -> Optional[PrismaVectorRepresentation]:
+    async def update_vector_embedding(self, user_id: UUID, block_id: UUID, update_data: VectorRepresentationCreateSchema) -> Optional[VectorRepresentationResponseSchema]:
+        """
+        Updates the vector embedding associated with a specific block.
+        Args:
+            user_id (UUID): The user ID of the user updating the vector embedding.
+            block_id (UUID): The ID of the block to update.
+            update_data (VectorRepresentationCreateSchema): The data for updating the vector embedding.
+        Returns:
+            Optional[VectorRepresentationResponseSchema]: The updated vector embedding.
+        """
         try:
             async with self.prisma.tx() as tx:
                 update_vector_data = {
@@ -433,14 +485,19 @@ class BlockController:
                     )
     
                 # Log the update in Audit Logs
-                audit_log = {
-                    "user_id": None,  # Replace with actual user ID if available
+                create_audit_log_data = {
+                    "user_id": user_id,  # Replace with actual user ID if available
                     "action_type": "UPDATE",
                     "entity_type": "vector_embedding",
-                    "entity_id": str(block_id),  # Assuming entity_id refers to block_id
-                    "details": f"Vector embedding updated for block '{block_id}'.",
+                    "entity_id": block_id,  # Assuming entity_id refers to block_id
                 }
-                await self.audit_controller.create_audit_log(audit_log)
+                audit_log = await self.audit_service.create_audit_log(tx, create_audit_log_data)
+
+                if not audit_log:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Audit log creation failed.",
+                    )
     
                 self.logger.log(
                     "BlockController",
@@ -448,7 +505,8 @@ class BlockController:
                     "Vector embedding updated successfully.",
                     extra={"block_id": str(block_id)},
                 )
-                return updated_vector
+
+                return VectorRepresentationResponseSchema(**updated_vector.dict())
     
         except HTTPException as he:
             self.logger.log(
@@ -470,9 +528,14 @@ class BlockController:
                 detail="Internal Server Error.",
             )
 
-    async def get_vector_embedding(self, block_id: UUID) -> Optional[PrismaVectorRepresentation]:
+    async def get_vector_embedding(self, user_id: UUID, block_id: UUID) -> Optional[VectorRepresentationResponseSchema]:
         """
         Retrieves the vector embedding associated with a specific block.
+        Args:
+            user_id (UUID): The user ID of the user retrieving the vector embedding.
+            block_id (UUID): The ID of the block to retrieve.
+        Returns:
+            Optional[VectorRepresentationResponseSchema]: The retrieved vector embedding.
         """
         try:
             async with self.prisma.tx() as tx:
@@ -486,14 +549,18 @@ class BlockController:
                     )
     
                 # Log the retrieval in Audit Logs
-                audit_log = {
-                    "user_id": None,  # Replace with actual user ID if available
+                create_audit_log_data = {
+                    "user_id": user_id,  # Replace with actual user ID if available
                     "action_type": "READ",
                     "entity_type": "vector_embedding",
-                    "entity_id": str(vector_embedding.vector_id),
-                    "details": f"Vector embedding retrieved for block '{block_id}'.",
+                    "entity_id": block_id,
                 }
-                await self.audit_controller.create_audit_log(audit_log)
+                audit_log = await self.audit_service.create_audit_log(tx, create_audit_log_data)
+                if not audit_log:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Audit log creation failed.",
+                    )
     
                 self.logger.log(
                     "BlockController",
@@ -504,7 +571,7 @@ class BlockController:
                         "vector_id": str(vector_embedding.vector_id),
                     },
                 )
-                return vector_embedding
+                return VectorRepresentationResponseSchema(**vector_embedding.dict())
     
         except HTTPException as he:
             self.logger.log(
@@ -526,7 +593,15 @@ class BlockController:
                 detail="Internal Server Error.",
             )
 
-    async def create_vector_embedding(self, vector_data: VectorRepresentationCreateSchema) -> Optional[PrismaVectorRepresentation]:
+    async def create_vector_embedding(self, user_id: UUID, vector_data: VectorRepresentationCreateSchema) -> Optional[VectorRepresentationResponseSchema]:
+        """
+        Creates a new vector embedding for a specific block.
+        Args:
+            user_id (UUID): The user ID of the user creating the vector embedding.
+            vector_data (VectorRepresentationCreateSchema): The data for creating the vector embedding.
+        Returns:
+            Optional[VectorRepresentationResponseSchema]: The created vector embedding.
+        """
         try:
             async with self.prisma.tx() as tx:
                 create_vector_data = {
@@ -534,13 +609,12 @@ class BlockController:
                     "entity_id": vector_data.entity_id,
                     "vector": vector_data.vector,
                     "taxonomy_filter": vector_data.taxonomy_filter,
-                    "created_at": datetime.utcnow(),
-                    "updated_at": datetime.utcnow()
                 }
 
                 vector_embedding = await self.vector_embedding_service.create_vector_embedding(
                     tx=tx, vector_data=create_vector_data
                 )
+
                 if vector_embedding is None:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
@@ -548,14 +622,19 @@ class BlockController:
                     )
     
                 # Log the creation in Audit Logs
-                audit_log = {
-                    "user_id": None,  # Replace with actual user ID if available
+                create_audit_log_data = {
+                    "user_id": user_id,  # Replace with actual user ID if available
                     "action_type": "CREATE",
-                    "entity_type": "vector_embedding",
-                    "entity_id": str(vector_embedding.vector_id),
-                    "details": f"Vector embedding created for {vector_data.entity_type} '{vector_data.entity_id}'.",
+                    "entity_type": "block",
+                    "entity_id": vector_embedding.vector_id,
                 }
-                await self.audit_controller.create_audit_log(audit_log)
+                audit_log = await self.audit_service.create_audit_log(tx, create_audit_log_data)
+
+                if not audit_log:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Audit log creation failed.",
+                    )
     
                 self.logger.log(
                     "BlockController",
@@ -566,7 +645,7 @@ class BlockController:
                         "entity_type": vector_data.entity_type,
                     },
                 )
-                return vector_embedding
+                return VectorRepresentationResponseSchema(**vector_embedding.dict())
     
         except HTTPException as he:
             self.logger.log(
@@ -591,9 +670,14 @@ class BlockController:
                 detail="Internal Server Error.",
             )
 
-    async def delete_vector_embedding(self, block_id: UUID) -> bool:
+    async def delete_vector_embedding(self, user_id: UUID, block_id: UUID) -> bool:
         """
         Deletes the vector embedding associated with a specific block.
+        Args:
+            user_id (UUID): The user ID of the user deleting the vector embedding.
+            block_id (UUID): The ID of the block to delete.
+        Returns:
+            bool: True if the vector embedding was deleted successfully, False otherwise.
         """
         try:
             async with self.prisma.tx() as tx:
@@ -607,14 +691,18 @@ class BlockController:
                     )
     
                 # Log the deletion in Audit Logs
-                audit_log = {
-                    "user_id": None,  # Replace with actual user ID if available
+                create_audit_log_data = {
+                    "user_id": user_id,  # Replace with actual user ID if available
                     "action_type": "DELETE",
                     "entity_type": "vector_embedding",
-                    "entity_id": str(block_id),  # Assuming entity_id refers to block_id
-                    "details": f"Vector embedding deleted for block '{block_id}'.",
+                    "entity_id": block_id,
                 }
-                await self.audit_controller.create_audit_log(audit_log)
+                audit_log = await self.audit_service.create_audit_log(tx, create_audit_log_data)
+                if not audit_log:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Audit log creation failed.",
+                    )
     
                 self.logger.log(
                     "BlockController",
@@ -651,12 +739,20 @@ class BlockController:
     # TODO: change query_text to query_vector
     async def perform_similarity_search(
         self,
+        user_id: UUID,
         query_text: str,
         taxonomy_filters: Optional[Dict[str, Any]] = None,
         top_k: int = 10,
     ) -> Optional[List[BlockResponseSchema]]:
         """
         Performs a similarity search over blocks based on the provided query text and optional taxonomy filters.
+        Args:
+            user_id (UUID): The user ID of the user performing the similarity search.
+            query_text (str): The text to perform the similarity search on.
+            taxonomy_filters (Optional[Dict[str, Any]]): Optional taxonomy filters for the similarity search.
+            top_k (int): The number of results to return.
+        Returns:
+            Optional[List[BlockResponseSchema]]: The list of similar blocks.
         """
         try:
             async with self.prisma.tx() as tx:
@@ -670,14 +766,18 @@ class BlockController:
                     )
     
                 # Log the search in Audit Logs
-                audit_log = {
-                    "user_id": None,  # Replace with actual user ID if available
+                create_audit_log_data = {
+                    "user_id": user_id,  # Replace with actual user ID if available
                     "action_type": "SEARCH",
                     "entity_type": "block",
                     "entity_id": None,
-                    "details": f"Similarity search performed with query: '{query_text}' and taxonomy filters: {taxonomy_filters}.",
                 }
-                await self.audit_controller.create_audit_log(audit_log)
+                audit_log = await self.audit_service.create_audit_log(tx, create_audit_log_data)
+                if not audit_log:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Audit log creation failed.",
+                    )
     
                 self.logger.log(
                     "BlockController",

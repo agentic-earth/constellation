@@ -1,2 +1,2 @@
-Log file initialized on 2024-10-06 04:14:31.099977
-2024-10-06 04:14:31,100 - TaxonomyService - INFO - Taxonomy retrieved for block b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1. - extra={'block_id': 'b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1'}
+Log file initialized on 2024-10-08 16:34:04.118603
+2024-10-08 16:34:04,119 - TaxonomyService - INFO - No taxonomy associated with block 6ac6217a-f6ce-4cdf-87ec-17294a235f5d. - extra={'block_id': '6ac6217a-f6ce-4cdf-87ec-17294a235f5d'}

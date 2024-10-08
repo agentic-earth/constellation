@@ -17,6 +17,7 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from backend.app.logger import ConstellationLogger
 from datetime import datetime
+import json
 from prisma import Prisma
 from prisma.models import audit_logs as PrismaAuditLog
 
@@ -39,12 +40,12 @@ class AuditService:
         try:
             create_data = {
                 "log_id": audit_data.get("log_id", str(uuid4())),
-                "user_id": audit_data["user_id"],
+                "user_id": str(audit_data["user_id"]),
                 "action_type": audit_data["action_type"],
                 "entity_type": audit_data["entity_type"],
-                "entity_id": audit_data["entity_id"],
+                "entity_id": str(audit_data["entity_id"]),
                 "timestamp": audit_data.get("timestamp", datetime.utcnow()),
-                "details": audit_data.get("details")
+                "details": json.dumps(audit_data.get("details"))
             }
             created_audit = await tx.audit_logs.create(data=create_data)
 
@@ -116,7 +117,7 @@ class AuditService:
         """
         try:
             new_update_data = {
-                "user_id": update_data.get("updated_by"),
+                "user_id": str(update_data.get("updated_by")),
                 "action_type": audit_data.get("action_type"),
                 "timestamp": update_data.get("updated_at", datetime.utcnow()),
                 "details": audit_data.get("details")

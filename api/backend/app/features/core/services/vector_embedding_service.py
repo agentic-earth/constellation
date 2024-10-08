@@ -19,7 +19,7 @@ import traceback
 from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime
-
+import json
 from backend.app.logger import ConstellationLogger
 from backend.app.features.core.services.taxonomy_service import TaxonomyService
 
@@ -46,9 +46,9 @@ class VectorEmbeddingService:
             vector_create_data = {
                 "vector_id": vector_data.get("vector_id", str(uuid4())),
                 "entity_type": vector_data["entity_type"],
-                "entity_id": vector_data["entity_id"],
+                "entity_id": str(vector_data["entity_id"]),
                 "vector": vector_data["vector"],
-                "taxonomy_filter": vector_data.get("taxonomy_filter"),
+                "taxonomy_filter": json.dumps(vector_data["taxonomy_filter"]),
                 "created_at": datetime.utcnow(),
                 "updated_at": datetime.utcnow()
             }
@@ -203,7 +203,7 @@ class VectorEmbeddingService:
                     SELECT *
                     FROM vector_representations
                     WHERE entity_id IN ({', '.join([f"'{bid}'" for bid in block_ids])})
-                    ORDER BY vector <-> $1::vector ASC
+                    ORDER BY cosine_distance(vector, $1::double precision[]) ASC
                     LIMIT {top_k};
                 """
             else:
@@ -211,7 +211,7 @@ class VectorEmbeddingService:
                 supabase_sql = f"""
                     SELECT *
                     FROM vector_representations
-                    ORDER BY vector <-> $1::vector ASC
+                    ORDER BY cosine_distance(vector, $1::double precision[]) ASC
                     LIMIT {top_k};
                 """
 

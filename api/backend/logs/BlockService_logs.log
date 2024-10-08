@@ -1,4 +1,10 @@
-Log file initialized on 2024-10-06 17:25:45.733567
-2024-10-06 17:25:45,733 - BlockService - INFO - Block created successfully. - extra={'block_id': 'b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1'}
-2024-10-06 17:25:45,737 - BlockService - INFO - Block created successfully. - extra={'block_id': 'b2b2b2b2-b2b2-b2b2-b2b2-b2b2b2b2b2b2'}
-2024-10-06 17:25:45,741 - BlockService - INFO - Block created successfully. - extra={'block_id': 'b3b3b3b3-b3b3-b3b3-b3b3-b3b3b3b3b3b3'}
+Log file initialized on 2024-10-08 16:34:03.990301
+2024-10-08 16:34:03,990 - BlockService - INFO - Block created successfully. - extra={'block_id': '6881a912-1c35-47e5-baa8-1030cebc9083'}
+2024-10-08 16:34:04,097 - BlockService - INFO - Block created successfully. - extra={'block_id': '6ac6217a-f6ce-4cdf-87ec-17294a235f5d'}
+2024-10-08 16:34:04,112 - BlockService - INFO - Block retrieved successfully. - extra={'block_id': '6ac6217a-f6ce-4cdf-87ec-17294a235f5d'}
+2024-10-08 16:34:04,228 - BlockService - INFO - Block created successfully. - extra={'block_id': 'f6507bf5-ec2b-4ef0-a529-9d47cec2b1c3'}
+2024-10-08 16:34:04,242 - BlockService - INFO - Block updated successfully. - extra={'block_id': 'f6507bf5-ec2b-4ef0-a529-9d47cec2b1c3'}
+2024-10-08 16:34:04,342 - BlockService - INFO - Block created successfully. - extra={'block_id': 'da10dbda-8758-43c1-95d9-0c86b0723418'}
+2024-10-08 16:34:04,361 - BlockService - INFO - Block deleted successfully. - extra={'block_id': 'da10dbda-8758-43c1-95d9-0c86b0723418'}
+2024-10-08 16:34:04,370 - BlockService - WARNING - Block not found. - extra={'block_id': 'da10dbda-8758-43c1-95d9-0c86b0723418'}
+2024-10-08 16:34:04,460 - BlockService - INFO - Block created successfully. - extra={'block_id': '0f66f828-a4f2-404d-9e63-5a1d4999d5ff'}

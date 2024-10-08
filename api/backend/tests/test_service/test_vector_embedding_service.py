@@ -178,7 +178,7 @@ async def test_search_similar_vectors(vector_embedding_service, prisma_client):
         await vector_embedding_service.create_vector_embedding(client, vector4_data)
 
         # Invoke the service method
-        result = await vector_embedding_service.search_similar_vectors(tx=client, query_vector=query_vector)
+        result = await vector_embedding_service.search_similar_blocks(tx=client, query_vector=query_vector)
 
         logger.log("vector_embedding_service_test", "info", "Similarity search completed.", extra={"result": result})
 
