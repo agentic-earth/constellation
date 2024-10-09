@@ -16,6 +16,10 @@ Responsibilities:
 - Ensure transactional safety and data consistency.
 """
 
+import sys
+sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api")
+sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api/backend")
+
 import traceback
 from prisma import Prisma
 from uuid import UUID
@@ -32,9 +36,9 @@ import asyncio
 class BlockController:
     def __init__(self, prisma: Prisma):
         self.prisma = prisma
-        self.block_service = BlockService(prisma)
-        self.taxonomy_service = TaxonomyService(prisma)
-        self.audit_service = AuditService(prisma)
+        self.block_service = BlockService()
+        self.taxonomy_service = TaxonomyService()
+        self.audit_service = AuditService()
         self.logger = ConstellationLogger().get_logger("BlockController")
 
     async def create_block(self, block_data: Dict[str, Any], user_id: UUID) -> Optional[Dict[str, Any]]:
@@ -291,20 +295,6 @@ class BlockController:
         except Exception as e:
             print(f"An error occurred during similarity search: {e}")
             print(traceback.format_exc())
-            
-            # Audit Logging for Failed Similarity Search
-            error_audit_log = {
-                "user_id": str(user_id),
-                "action_type": "ERROR",
-                "entity_type": "block",
-                "entity_id": "SIMILARITY_SEARCH_ERROR",
-                "details": {
-                    "error_message": str(e),
-                    "top_k": top_k
-                }
-            }
-            await self.audit_service.create_audit_log(error_audit_log)
-            
             return None
 
 # -------------------
