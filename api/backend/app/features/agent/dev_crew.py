@@ -19,13 +19,7 @@ import sys
 sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api")
 sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api/backend")
 
-import os
 from backend.app.logger import ConstellationLogger
-
-# Add the parent directory of 'backend' to the Python path
-# Before running, be sure to run the following command: `cd api` to get to the api directory
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '/backend')))
-
 from crewai import Crew, Task
 from backend.app.features.core.services.pipeline_service import PipelineService
 from backend.app.features.core.services.taxonomy_service import TaxonomyService

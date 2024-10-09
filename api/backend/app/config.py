@@ -52,11 +52,3 @@ settings = Settings()
 print("Loaded settings:", settings.dict())
 print("ENV file path:", ROOT_DIR / ".env")
 print("DATABASE_URL:", settings.DATABASE_URL)
-
-# Add this to your existing config
-HAYSTACK_CONFIG = {
-    "document_store": "InMemoryDocumentStore",
-    "retriever": "EmbeddingRetriever",
-    "embedding_model": "sentence-transformers/multi-qa-mpnet-base-dot-v1",
-    "generator_model": "gpt-3.5-turbo"
-}
