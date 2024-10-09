@@ -1,8 +1,2 @@
-Log file initialized on 2024-10-03 04:09:44.579508
-2024-10-03 04:09:44,579 - UserService - INFO - User created successfully - user_id=7d0235e1-dc07-4e4f-a667-8d3f9280e0c4
-2024-10-03 04:09:44,709 - UserService - INFO - User retrieved successfully - user_id=7d0235e1-dc07-4e4f-a667-8d3f9280e0c4
-2024-10-03 04:09:44,841 - UserService - INFO - User updated successfully - user_id=7d0235e1-dc07-4e4f-a667-8d3f9280e0c4
-2024-10-03 04:09:44,983 - UserService - INFO - User retrieved successfully by email - email=testuser1@example.com
-2024-10-03 04:09:45,121 - UserService - INFO - Retrieved 2 users
-2024-10-03 04:09:45,254 - UserService - INFO - User deleted successfully - user_id=7d0235e1-dc07-4e4f-a667-8d3f9280e0c4
-2024-10-03 04:09:45,320 - UserService - INFO - Retrieved 1 users
+Log file initialized on 2024-10-03 16:58:20.057609
+2024-10-03 16:58:20,057 - UserService - ERROR - Failed to create user - error=User not allowed
