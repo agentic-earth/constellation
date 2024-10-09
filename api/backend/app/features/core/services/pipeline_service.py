@@ -51,7 +51,7 @@ class PipelineService:
         pipeline_data['pipeline_id'] = str(uuid4())
         pipeline_data['created_at'] = datetime.utcnow()
         pipeline_data['updated_at'] = datetime.utcnow()
-        created_pipeline = await self.prisma.pipelines.create(data=pipeline_data)
+        created_pipeline = await self.prisma.Pipeline.create(data=pipeline_data)
         self.logger.log(
             "PipelineService",
             "info",
@@ -61,7 +61,7 @@ class PipelineService:
         )
         return created_pipeline
 
-    async def get_pipeline_by_id(self, pipeline_id: UUID) -> Optional[pipelines]:
+    async def get_pipeline_by_id(self, pipeline_id: UUID) -> Optional[Pipeline]:
         """
         Retrieves a pipeline by its ID.
 
@@ -71,7 +71,7 @@ class PipelineService:
         Returns:
             Optional[pipelines]: The retrieved pipeline, or None if not found.
         """
-        pipeline = await self.prisma.pipelines.find_unique(where={"pipeline_id": str(pipeline_id)})
+        pipeline = await self.prisma.Pipeline.find_unique(where={"pipeline_id": str(pipeline_id)})
         if pipeline:
             self.logger.log(
                 "PipelineService",
@@ -89,7 +89,7 @@ class PipelineService:
             )
         return pipeline
 
-    async def update_pipeline(self, pipeline_id: UUID, update_data: Dict[str, Any]) -> pipelines:
+    async def update_pipeline(self, pipeline_id: UUID, update_data: Dict[str, Any]) -> Pipeline:
         """
         Updates an existing pipeline's information.
 
@@ -101,7 +101,7 @@ class PipelineService:
             pipelines: The updated pipeline.
         """
         update_data['updated_at'] = datetime.utcnow()
-        updated_pipeline = await self.prisma.pipelines.update(
+        updated_pipeline = await self.prisma.Pipeline.update(
             where={"pipeline_id": str(pipeline_id)},
             data=update_data
         )
@@ -142,7 +142,7 @@ class PipelineService:
             )
             return False
 
-    async def list_pipelines(self, filters: Optional[Dict[str, Any]] = None, limit: int = 100, offset: int = 0) -> List[pipelines]:
+    async def list_pipelines(self, filters: Optional[Dict[str, Any]] = None, limit: int = 100, offset: int = 0) -> List[Pipeline]:
         """
         Retrieves a list of pipelines, optionally filtered.
 
@@ -154,7 +154,7 @@ class PipelineService:
         Returns:
             List[pipelines]: A list of pipelines matching the filters.
         """
-        pipelines_list = await self.prisma.pipelines.find_many(
+        pipelines_list = await self.prisma.Pipeline.find_many(
             where=filters or {},
             take=limit,
             skip=offset
@@ -166,7 +166,7 @@ class PipelineService:
         )
         return pipelines_list
 
-    async def assign_block_to_pipeline(self, pipeline_block_data: Dict[str, Any]) -> pipeline_blocks:
+    async def assign_block_to_pipeline(self, pipeline_block_data: Dict[str, Any]) -> PipelineBlock:
         """
         Assigns a block to a pipeline.
 
@@ -174,12 +174,12 @@ class PipelineService:
             pipeline_block_data (Dict[str, Any]): Dictionary containing pipeline block data.
 
         Returns:
-            pipeline_blocks: The created pipeline block association.
+            PipelineBlock: The created pipeline block association.
         """
         pipeline_block_data['pipeline_block_id'] = str(uuid4())
         pipeline_block_data['created_at'] = datetime.utcnow()
         pipeline_block_data['updated_at'] = datetime.utcnow()
-        created_pipeline_block = await self.prisma.pipeline_blocks.create(data=pipeline_block_data)
+        created_pipeline_block = await self.prisma.PipelineBlock.create(data=pipeline_block_data)
         self.logger.log(
             "PipelineService",
             "info",
@@ -200,7 +200,7 @@ class PipelineService:
         Returns:
             bool: True if the block was successfully removed, False otherwise.
         """
-        deleted_pipeline_block = await self.prisma.pipeline_blocks.delete(where={"pipeline_block_id": str(pipeline_block_id)})
+        deleted_pipeline_block = await self.prisma.PipelineBlock.delete(where={"pipeline_block_id": str(pipeline_block_id)})
         if deleted_pipeline_block:
             self.logger.log(
                 "PipelineService",
@@ -218,7 +218,7 @@ class PipelineService:
             )
             return False
 
-    async def assign_edge_to_pipeline(self, pipeline_edge_data: Dict[str, Any]) -> pipeline_edges:
+    async def assign_edge_to_pipeline(self, pipeline_edge_data: Dict[str, Any]) -> PipelineEdge:
         """
         Assigns an edge to a pipeline.
 
@@ -226,12 +226,12 @@ class PipelineService:
             pipeline_edge_data (Dict[str, Any]): Dictionary containing pipeline edge data.
 
         Returns:
-            pipeline_edges: The created pipeline edge association.
+            PipelineEdge: The created pipeline edge association.
         """
         pipeline_edge_data['pipeline_edge_id'] = str(uuid4())
         pipeline_edge_data['created_at'] = datetime.utcnow()
         pipeline_edge_data['updated_at'] = datetime.utcnow()
-        created_pipeline_edge = await self.prisma.pipeline_edges.create(data=pipeline_edge_data)
+        created_pipeline_edge = await self.prisma.PipelineEdge.create(data=pipeline_edge_data)
         self.logger.log(
             "PipelineService",
             "info",
@@ -252,7 +252,7 @@ class PipelineService:
         Returns:
             bool: True if the edge was successfully removed, False otherwise.
         """
-        deleted_pipeline_edge = await self.prisma.pipeline_edges.delete(where={"pipeline_edge_id": str(pipeline_edge_id)})
+        deleted_pipeline_edge = await self.prisma.PipelineEdge.delete(where={"pipeline_edge_id": str(pipeline_edge_id)})
         if deleted_pipeline_edge:
             self.logger.log(
                 "PipelineService",
@@ -270,7 +270,7 @@ class PipelineService:
             )
             return False
 
-    async def get_pipeline_blocks(self, pipeline_id: UUID) -> List[pipeline_blocks]:
+    async def get_pipeline_blocks(self, pipeline_id: UUID) -> List[PipelineBlock]:
         """
         Retrieves all blocks associated with a pipeline.
 
@@ -278,9 +278,9 @@ class PipelineService:
             pipeline_id (UUID): The ID of the pipeline.
 
         Returns:
-            List[pipeline_blocks]: A list of pipeline block associations.
+            List[PipelineBlock]: A list of pipeline block associations.
         """
-        pipeline_blocks_list = await self.prisma.pipeline_blocks.find_many(
+        pipeline_blocks_list = await self.prisma.PipelineBlock.find_many(
             where={"pipeline_id": str(pipeline_id)}
         )
         self.logger.log(
@@ -290,7 +290,7 @@ class PipelineService:
         )
         return pipeline_blocks_list
 
-    async def get_pipeline_edges(self, pipeline_id: UUID) -> List[pipeline_edges]:
+    async def get_pipeline_edges(self, pipeline_id: UUID) -> List[PipelineEdge]:
         """
         Retrieves all edges associated with a pipeline.
 
@@ -298,9 +298,9 @@ class PipelineService:
             pipeline_id (UUID): The ID of the pipeline.
 
         Returns:
-            List[pipeline_edges]: A list of pipeline edge associations.
+            List[PipelineEdge]: A list of pipeline edge associations.
         """
-        pipeline_edges_list = await self.prisma.pipeline_edges.find_many(
+        pipeline_edges_list = await self.prisma.PipelineEdge.find_many(
             where={"pipeline_id": str(pipeline_id)}
         )
         self.logger.log(
