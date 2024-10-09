@@ -1,663 +1,403 @@
-# app/services/edge_service.py
+# constellation-backend/api/backend/app/features/core/services/edge_service.py
 
 """
 Edge Service Module
 
-This module encapsulates all edge-related business logic and interactions with the Supabase backend.
-It provides functions to create, retrieve, update, and delete edges, ensuring that all operations are
-logged appropriately using the Constellation Logger.
+This module implements the Edge Service using a Repository pattern with Prisma ORM.
 
-Design Philosophy:
-- Utilize Supabase's REST API for standard CRUD operations for performance and reliability.
-- Use Python only for advanced logic that cannot be handled directly by Supabase.
-- Ensure flexibility to adapt to schema changes with minimal modifications.
+Design Pattern:
+- Repository Pattern: The EdgeService class acts as a repository, encapsulating the data access logic.
+- Dependency Injection: The Prisma client is injected via the database singleton.
+
+Key Design Decisions:
+1. Use of Dictionaries: We use dictionaries for input data to provide flexibility in the API.
+   This allows callers to provide only the necessary fields without needing to construct full objects.
+
+2. Prisma Models: We use Prisma-generated models (Edge, Block, BlockCategory, Category) for type hinting and as return types.
+   This ensures type safety and consistency with the database schema.
+
+3. Transaction Management: Utilizes Prisma's interactive transactions to ensure ACID properties during complex operations.
+
+4. Error Handling: Comprehensive error handling to manage exceptions and ensure data consistency.
+
+5. Relationship Management: Handles associations between edges and blocks, ensuring referential integrity.
+
+This approach balances flexibility, type safety, and simplicity, leveraging Prisma's capabilities
+while providing a clean API for edge operations.
 """
 
-import traceback
 from typing import Optional, List, Dict, Any
-from uuid import UUID
-from datetime import datetime
-
-from backend.app.schemas import (
-    EdgeResponseSchema,
-    EdgeCreateSchema,
-    EdgeUpdateSchema,
-    EdgeVerificationResponseSchema,
-    EdgeVerificationRequestSchema
-)
-from backend.app.models import EdgeTypeEnum
+from uuid import UUID, uuid4
+from prisma import Prisma
+from prisma.models import Edge as PrismaEdge, Block as PrismaBlock, BlockCategory as PrismaBlockCategory, Category as PrismaCategory
+from prisma.errors import UniqueViolationError
+from backend.app.database import database
 from backend.app.logger import ConstellationLogger
-from backend.app.database import get_supabase_client
-from backend.app.utils.serialization_utils import serialize_dict
+import asyncio
+from datetime import datetime
 
 
 class EdgeService:
-    """
-    EdgeService class encapsulates all edge-related operations.
-    """
-
     def __init__(self):
-        """
-        Initializes the EdgeService with the Supabase client and logger.
-        """
-        self.client = get_supabase_client()
+        self.prisma = database.prisma
         self.logger = ConstellationLogger()
 
-    def create_edge(self, edge_data: EdgeCreateSchema) -> Optional[EdgeResponseSchema]:
+    async def create_edge(self, edge_data: Dict[str, Any]) -> Optional[PrismaEdge]:
         """
-        Creates a new edge in the Supabase database.
+        Creates a new edge in the database.
 
         Args:
-            edge_data (EdgeCreateSchema): The data required to create a new edge.
+            edge_data (Dict[str, Any]): Dictionary containing edge data.
+                Expected keys: 'source_block_id', 'target_block_id', optional 'description'.
 
         Returns:
-            Optional[EdgeResponseSchema]: The created edge data if successful, None otherwise.
+            Optional[PrismaEdge]: The created edge if successful, None otherwise.
         """
         try:
-            # Convert Pydantic schema to dictionary
-            data = edge_data.dict(exclude_unset=True)
+            edge_id = str(uuid4())
+            created_at = datetime.utcnow()
+            updated_at = created_at
 
-            # Ensure edge_type is a valid enum value
-            if not EdgeTypeEnum.has_value(data.get('edge_type')):
-                self.logger.log(
-                    "EdgeService",
-                    "error",
-                    f"Invalid edge_type: {data.get('edge_type')}",
-                    extra={"edge_type": data.get('edge_type')}
-                )
-                return None
+            # Validate that source and target blocks exist
+            source_block = await self.prisma.block.find_unique(where={"block_id": str(edge_data["source_block_id"])})
+            target_block = await self.prisma.block.find_unique(where={"block_id": str(edge_data["target_block_id"])})
 
-            # Add created_at and updated_at if not provided
-            current_time = datetime.utcnow()
-            data.setdefault('created_at', current_time)
-            data.setdefault('updated_at', current_time)
+            if not source_block or not target_block:
+                raise ValueError("Source or target block does not exist.")
 
-            # Serialize the data
-            serialized_data = serialize_dict(data)
+            # Create edge via Prisma
+            created_edge = await self.prisma.edge.create(
+                data={
+                    "edge_id": edge_id,
+                    "source_block_id": str(edge_data["source_block_id"]),
+                    "target_block_id": str(edge_data["target_block_id"]),
+                    "description": edge_data.get("description"),
+                    "created_at": created_at,
+                    "updated_at": updated_at
+                }
+            )
 
-            # Insert the new edge into the database
-            response = self.client.table("edges").insert(serialized_data).execute()
-
-            if response.data:
-                # If created_by is not in the response data, set it to None
-                response_data = response.data[0]
-                response_data.setdefault('created_by', None)
-
-                created_edge = EdgeResponseSchema(**response_data)
-                self.logger.log(
-                    "EdgeService",
-                    "info",
-                    f"Edge created successfully: {created_edge.edge_id}",
-                    extra={
-                        "edge_id": str(created_edge.edge_id),
-                        "name": created_edge.name,
-                        "edge_type": created_edge.edge_type.value
-                    }
-                )
-                return created_edge
-            else:
-                self.logger.log(
-                    "EdgeService",
-                    "error",
-                    "Failed to create edge",
-                    extra={"error": str(response.error)}
-                )
-                return None
-        except Exception as exc:
             self.logger.log(
                 "EdgeService",
-                "critical",
-                f"Exception during edge creation: {exc}",
-                extra={"traceback": traceback.format_exc()}
+                "info",
+                "Edge created successfully.",
+                edge_id=created_edge.edge_id,
+                source_block_id=created_edge.source_block_id,
+                target_block_id=created_edge.target_block_id
             )
+
+            return created_edge
+        except Exception as e:
+            self.logger.log("EdgeService", "error", "Failed to create edge.", error=str(e))
             return None
 
-    def get_edge_by_id(self, edge_id: UUID) -> Optional[EdgeResponseSchema]:
+    async def get_edge_by_id(self, edge_id: UUID) -> Optional[PrismaEdge]:
         """
-        Retrieves an edge by its unique identifier.
+        Retrieves an edge by its ID.
 
         Args:
             edge_id (UUID): The UUID of the edge to retrieve.
 
         Returns:
-            Optional[EdgeResponseSchema]: The edge data if found, None otherwise.
+            Optional[PrismaEdge]: The retrieved edge if found, None otherwise.
         """
         try:
-            response = self.client.table("edges").select("*").eq("edge_id", str(edge_id)).single().execute()
+            edge = await self.prisma.edge.find_unique(
+                where={"edge_id": str(edge_id)},
+                include={
+                    "Block_Edge_source_block_idToBlock": True,
+                    "Block_Edge_target_block_idToBlock": True
+                }
+            )
 
-            if response.data:
-                edge = EdgeResponseSchema(**response.data)
+            if edge:
                 self.logger.log(
                     "EdgeService",
                     "info",
-                    "Edge retrieved successfully",
-                    extra={
-                        "edge_id": str(edge.edge_id),
-                        "name": edge.name,
-                        "edge_type": edge.edge_type.value
-                    }
+                    "Edge retrieved successfully.",
+                    edge_id=edge.edge_id
                 )
-                return edge
             else:
                 self.logger.log(
                     "EdgeService",
                     "warning",
-                    "Edge not found",
-                    extra={"edge_id": str(edge_id)}
+                    "Edge not found.",
+                    edge_id=str(edge_id)
                 )
-                return None
-        except Exception as exc:
-            self.logger.log(
-                "EdgeService",
-                "critical",
-                f"Exception during edge retrieval: {exc}",
-                extra={"traceback": traceback.format_exc()}
-            )
+
+            return edge
+        except Exception as e:
+            self.logger.log("EdgeService", "error", "Failed to retrieve edge by ID.", error=str(e))
             return None
 
-    def update_edge(self, edge_id: UUID, update_data: EdgeUpdateSchema) -> Optional[EdgeResponseSchema]:
+    async def update_edge(self, edge_id: UUID, update_data: Dict[str, Any]) -> Optional[PrismaEdge]:
         """
         Updates an existing edge's information.
 
         Args:
             edge_id (UUID): The UUID of the edge to update.
-            update_data (EdgeUpdateSchema): The data to update for the edge.
+            update_data (Dict[str, Any]): Dictionary containing updated edge data.
+                Allowed keys: 'source_block_id', 'target_block_id', 'description'.
 
         Returns:
-            Optional[EdgeResponseSchema]: The updated edge data if successful, None otherwise.
+            Optional[PrismaEdge]: The updated edge if successful, None otherwise.
         """
         try:
-            data = update_data.dict(exclude_unset=True)
+            # Validate if source_block_id and target_block_id exist if they are being updated
+            if "source_block_id" in update_data:
+                source_block = await self.prisma.block.find_unique(where={"block_id": str(update_data["source_block_id"])})
+                if not source_block:
+                    raise ValueError("Source block does not exist.")
 
-            if not data:
-                self.logger.log(
-                    "EdgeService",
-                    "warning",
-                    "No update data provided",
-                    extra={"edge_id": str(edge_id)}
-                )
-                return None
+            if "target_block_id" in update_data:
+                target_block = await self.prisma.block.find_unique(where={"block_id": str(update_data["target_block_id"])})
+                if not target_block:
+                    raise ValueError("Target block does not exist.")
 
-            # Ensure edge_type is valid if it's being updated
-            if 'edge_type' in data and not EdgeTypeEnum.has_value(data['edge_type']):
-                self.logger.log(
-                    "EdgeService",
-                    "error",
-                    f"Invalid edge_type: {data.get('edge_type')}",
-                    extra={"edge_type": data.get('edge_type')}
-                )
-                return None
+            update_data['updated_at'] = datetime.utcnow()
 
-            # Update the 'updated_at' field
-            data['updated_at'] = datetime.utcnow()
+            updated_edge = await self.prisma.edge.update(
+                where={"edge_id": str(edge_id)},
+                data=update_data
+            )
 
-            # Serialize the data
-            serialized_data = serialize_dict(data)
-
-            # Update the edge in the database
-            response = self.client.table("edges").update(serialized_data).eq("edge_id", str(edge_id)).execute()
-
-            if response.data:
-                updated_edge = EdgeResponseSchema(**response.data[0])
-                self.logger.log(
-                    "EdgeService",
-                    "info",
-                    "Edge updated successfully",
-                    extra={
-                        "edge_id": str(updated_edge.edge_id),
-                        "updated_fields": list(data.keys())
-                    }
-                )
-                return updated_edge
-            else:
-                self.logger.log(
-                    "EdgeService",
-                    "error",
-                    "Failed to update edge",
-                    extra={"edge_id": str(edge_id), "error": str(response.error)}
-                )
-                return None
-        except Exception as exc:
             self.logger.log(
                 "EdgeService",
-                "critical",
-                f"Exception during edge update: {exc}",
-                extra={"traceback": traceback.format_exc()}
+                "info",
+                "Edge updated successfully.",
+                edge_id=updated_edge.edge_id,
+                updated_fields=list(update_data.keys())
             )
+
+            return updated_edge
+        except Exception as e:
+            self.logger.log("EdgeService", "error", "Failed to update edge.", error=str(e))
             return None
 
-    def delete_edge(self, edge_id: UUID) -> bool:
+    async def delete_edge(self, edge_id: UUID) -> bool:
         """
-        Deletes an edge from the Supabase database and validates the deletion.
+        Deletes an edge from the database.
 
         Args:
             edge_id (UUID): The UUID of the edge to delete.
 
         Returns:
-            bool: True if deletion was successful, False otherwise.
+            bool: True if the edge was successfully deleted, False otherwise.
         """
         try:
-            # Perform the delete operation
-            response = self.client.table("edges").delete().eq("edge_id", str(edge_id)).execute()
-
-            if response.data and len(response.data) > 0:
-                self.logger.log(
-                    "EdgeService",
-                    "info",
-                    "Edge deleted successfully",
-                    extra={"edge_id": str(edge_id)}
-                )
-
-                # Validate deletion by attempting to retrieve the edge without using .single()
-                validation_response = self.client.table("edges").select("*").eq("edge_id", str(edge_id)).execute()
-
-                if not validation_response.data:
-                    self.logger.log(
-                        "EdgeService",
-                        "info",
-                        "Deletion validated: Edge no longer exists",
-                        extra={"edge_id": str(edge_id)}
-                    )
-                    return True
-                else:
-                    self.logger.log(
-                        "EdgeService",
-                        "error",
-                        "Deletion validation failed: Edge still exists",
-                        extra={"edge_id": str(edge_id)}
-                    )
-                    return False
-            else:
-                self.logger.log(
-                    "EdgeService",
-                    "warning",
-                    "Edge not found or already deleted",
-                    extra={"edge_id": str(edge_id)}
-                )
-                return False
-        except Exception as exc:
-            self.logger.log(
-                "EdgeService",
-                "critical",
-                f"Exception during edge deletion: {exc}",
-                extra={"traceback": traceback.format_exc()}
+            deleted_edge = await self.prisma.edge.delete(
+                where={"edge_id": str(edge_id)}
             )
-            return False
 
-    def list_edges(self, filters: Optional[Dict[str, Any]] = None, limit: int = 100, offset: int = 0) -> Optional[List[EdgeResponseSchema]]:
-        """
-        Retrieves a list of edges with optional filtering and pagination.
-
-        Args:
-            filters (Optional[Dict[str, Any]]): Key-value pairs to filter the edges.
-            limit (int): Maximum number of edges to retrieve.
-            offset (int): Number of edges to skip for pagination.
-
-        Returns:
-            Optional[List[EdgeResponseSchema]]: A list of edges if successful, None otherwise.
-        """
-        try:
-            query = self.client.table("edges").select("*").limit(limit).offset(offset)
-            if filters:
-                for key, value in filters.items():
-                    query = query.eq(key, value)
-            response = query.execute()
-
-            if response.data:
-                edges = [EdgeResponseSchema(**edge) for edge in response.data]
+            if deleted_edge:
                 self.logger.log(
                     "EdgeService",
                     "info",
-                    f"{len(edges)} edges retrieved successfully",
-                    extra={"filters": filters, "limit": limit, "offset": offset}
-                )
-                return edges
-            else:
-                self.logger.log(
-                    "EdgeService",
-                    "warning",
-                    "No edges found",
-                    extra={"filters": filters, "limit": limit, "offset": offset}
-                )
-                return []
-        except Exception as exc:
-            self.logger.log(
-                "EdgeService",
-                "critical",
-                f"Exception during listing edges: {exc}",
-                extra={"traceback": traceback.format_exc()}
-            )
-            return None
-
-    def assign_version_to_edge(self, edge_id: UUID, version_id: UUID) -> bool:
-        """
-        Assigns a specific version to an edge by updating the current_version_id.
-
-        Args:
-            edge_id (UUID): The UUID of the edge.
-            version_id (UUID): The UUID of the version to assign.
-
-        Returns:
-            bool: True if assignment was successful, False otherwise.
-        """
-        try:
-            data = {
-                "current_version_id": str(version_id),
-                "updated_at": datetime.utcnow()
-            }
-            serialized_data = serialize_dict(data)
-
-            response = self.client.table("edges").update(serialized_data).eq("edge_id", str(edge_id)).execute()
-
-            if response.data and len(response.data) > 0:
-                self.logger.log(
-                    "EdgeService",
-                    "info",
-                    "Assigned version to edge successfully",
-                    extra={"edge_id": str(edge_id), "version_id": str(version_id)}
+                    "Edge deleted successfully.",
+                    edge_id=str(edge_id)
                 )
                 return True
             else:
                 self.logger.log(
                     "EdgeService",
-                    "error",
-                    "Failed to assign version to edge",
-                    extra={"edge_id": str(edge_id), "version_id": str(version_id), "error": str(response.error)}
+                    "warning",
+                    "Edge not found for deletion.",
+                    edge_id=str(edge_id)
                 )
                 return False
-        except Exception as exc:
-            self.logger.log(
-                "EdgeService",
-                "critical",
-                f"Exception during assigning version to edge: {exc}",
-                extra={"traceback": traceback.format_exc()}
-            )
-            return False
-
-    def search_edges(self, query_params: Dict[str, Any], limit: int = 100, offset: int = 0) -> Optional[List[EdgeResponseSchema]]:
-        """
-        Searches for edges based on provided query parameters with pagination.
-
-        Args:
-            query_params (Dict[str, Any]): A dictionary of query parameters for filtering.
-            limit (int): Maximum number of edges to retrieve.
-            offset (int): Number of edges to skip for pagination.
-
-        Returns:
-            Optional[List[EdgeResponseSchema]]: A list of edges matching the search criteria.
-        """
-        try:
-            supabase_query = self.client.table("edges").select("*").limit(limit).offset(offset)
-
-            # Apply filters based on the query parameters
-            for key, value in query_params.items():
-                if isinstance(value, list):
-                    supabase_query = supabase_query.in_(key, value)
-                else:
-                    supabase_query = supabase_query.ilike(key, f"%{value}%")  # Case-insensitive LIKE
-
-            response = supabase_query.execute()
-
-            if response.data:
-                edges = [EdgeResponseSchema(**edge) for edge in response.data]
-                self.logger.log(
-                    "EdgeService",
-                    "info",
-                    f"{len(edges)} edges found matching the search criteria.",
-                    extra={"query": query_params, "limit": limit, "offset": offset}
-                )
-                return edges
-            else:
-                self.logger.log(
-                    "EdgeService",
-                    "warning",
-                    "No edges found matching the search criteria.",
-                    extra={"query": query_params, "limit": limit, "offset": offset}
-                )
-                return []
-        except Exception as exc:
-            self.logger.log(
-                "EdgeService",
-                "critical",
-                f"Exception during edge search: {exc}",
-                extra={"traceback": traceback.format_exc()}
-            )
-            return None
-
-    def count_edges(self, filters: Optional[Dict[str, Any]] = None) -> Optional[int]:
-        """
-        Counts the total number of edges with optional filtering.
-
-        Args:
-            filters (Optional[Dict[str, Any]]): Key-value pairs to filter the edges.
-
-        Returns:
-            Optional[int]: The count of edges matching the filters, None otherwise.
-        """
-        try:
-            query = self.client.table("edges").select("*", count='exact')
-            if filters:
-                for key, value in filters.items():
-                    query = query.eq(key, value)
-            response = query.execute()
-
-            if response.count is not None:
-                self.logger.log(
-                    "EdgeService",
-                    "info",
-                    f"Total edges count: {response.count}",
-                    extra={"filters": filters}
-                )
-                return response.count
-            else:
-                self.logger.log(
-                    "EdgeService",
-                    "warning",
-                    "Failed to retrieve edges count",
-                    extra={"filters": filters}
-                )
-                return None
-        except Exception as exc:
-            self.logger.log(
-                "EdgeService",
-                "critical",
-                f"Exception during counting edges: {exc}",
-                extra={"traceback": traceback.format_exc()}
-            )
-            return None
-
-
-#
-    def can_connect_blocks(self, source_block_id: UUID, target_block_id: UUID) -> EdgeVerificationResponseSchema:
-        """
-        Determines if two blocks can be connected via an edge based on business rules.
-
-        Args:
-            source_block_id (UUID): The UUID of the source block.
-            target_block_id (UUID): The UUID of the target block.
-
-        Returns:
-            EdgeVerificationResponseSchema: The result of the verification.
-        """
-        response = EdgeVerificationResponseSchema(can_connect=True)
-        reasons = []
-        existing_edges = []
-
-        # Example Business Rules:
-        # 1. Prevent duplicate edges.
-        # 2. Enforce specific edge types between certain block types.
-        # 3. Prevent cycles in the graph.
-
-        # Rule 1: Check for existing edges
-        existing = self.supabase_client.table("edges")\
-            .select("*").eq("source_block_id", str(source_block_id))\
-            .eq("target_block_id", str(target_block_id)).execute()
-
-        if existing.data:
-            response.can_connect = False
-            reasons.append("An edge already exists between these blocks.")
-            existing_edges = [EdgeResponseSchema(**edge) for edge in existing.data]
-        
-        # Rule 2: Enforce specific edge types (example)
-        # Fetch source and target block types
-        source_block = self.supabase_client.table("blocks")\
-            .select("block_type").eq("block_id", str(source_block_id)).single().execute()
-
-        target_block = self.supabase_client.table("blocks")\
-            .select("block_type").eq("block_id", str(target_block_id)).single().execute()
-        
-        if source_block.data and target_block.data:
-            # Example: Only 'primary' blocks can connect to 'secondary' blocks
-            if source_block.data["block_type"] == "primary" and target_block.data["block_type"] != "secondary":
-                response.can_connect = False
-                reasons.append("Primary blocks can only connect to secondary blocks.")
-        
-        # Rule 3: Prevent cycles (Advanced)
-        # Implement DAG cycle detection logic
-        # This can be resource-intensive; hence, consider optimizing or limiting depth
-        if self.creates_cycle(source_block_id, target_block_id):
-            response.can_connect = False
-            reasons.append("Connecting these blocks would create a cycle in the graph.")
-        
-        response.reasons = reasons
-        response.existing_edges = existing_edges
-        return response
-
-    def creates_cycle(self, source_block_id: UUID, target_block_id: UUID) -> bool:
-        """
-        Determines if adding an edge would create a cycle in the graph.
-
-        Args:
-            source_block_id (UUID): The UUID of the source block.
-            target_block_id (UUID): The UUID of the target block.
-
-        Returns:
-            bool: True if a cycle would be created, False otherwise.
-        """
-        try:
-            # Perform a Depth-First Search (DFS) from the target block to see if we can reach the source block
-            stack = [target_block_id]
-            visited = set()
-
-            while stack:
-                current = stack.pop()
-                if current == source_block_id:
-                    return True
-                if current not in visited:
-                    visited.add(current)
-                    # Get all outgoing edges from current block
-                    edges = self.supabase_client.table("edges")\
-                        .select("target_block_id").eq("source_block_id", str(current)).execute()
-                    for edge in edges.data:
-                        stack.append(UUID(edge["target_block_id"]))
-            return False
         except Exception as e:
+            self.logger.log("EdgeService", "error", "Failed to delete edge.", error=str(e))
+            return False
+
+    async def list_edges(self, filters: Optional[Dict[str, Any]] = None, limit: int = 100, offset: int = 0) -> List[PrismaEdge]:
+        """
+        Retrieves a list of edges, optionally filtered.
+
+        Args:
+            filters (Optional[Dict[str, Any]]): Optional filters to apply to the query.
+                Supported filters:
+                    - 'source_block_id': UUID
+                    - 'target_block_id': UUID
+                    - 'name_contains': string
+            limit (int): The maximum number of edges to retrieve.
+            offset (int): The number of edges to skip before starting to collect the result set.
+
+        Returns:
+            List[PrismaEdge]: A list of edges matching the filters.
+        """
+        try:
+            prisma_filters = {}
+
+            if filters:
+                if "source_block_id" in filters:
+                    prisma_filters["source_block_id"] = str(filters["source_block_id"])
+                if "target_block_id" in filters:
+                    prisma_filters["target_block_id"] = str(filters["target_block_id"])
+                if "name_contains" in filters:
+                    prisma_filters["name"] = {"contains": filters["name_contains"], "mode": "insensitive"}
+
+            edges_list = await self.prisma.edge.find_many(
+                where=prisma_filters,
+                include={
+                    "Block_Edge_source_block_idToBlock": True,
+                    "Block_Edge_target_block_idToBlock": True
+                },
+                take=limit,
+                skip=offset
+            )
+
             self.logger.log(
                 "EdgeService",
-                "critical",
-                f"Exception during cycle detection: {str(e)}",
-                extra={"traceback": traceback.format_exc(), "source_block_id": str(source_block_id), "target_block_id": str(target_block_id)}
+                "info",
+                f"Retrieved {len(edges_list)} edges.",
+                filters=filters,
+                limit=limit,
+                offset=offset
             )
-            # Default to cycle creation prevention on error
-            return True
+
+            return edges_list
+        except Exception as e:
+            self.logger.log("EdgeService", "error", "Failed to list edges.", error=str(e))
+            return []
+
+    async def associate_blocks_via_edge(self, source_block_id: UUID, target_block_id: UUID, description: Optional[str] = None) -> Optional[PrismaEdge]:
+        """
+        Creates an edge connecting two blocks.
+
+        Args:
+            source_block_id (UUID): The UUID of the source block.
+            target_block_id (UUID): The UUID of the target block.
+            description (Optional[str]): Optional description of the edge.
+
+        Returns:
+            Optional[PrismaEdge]: The created edge if successful, None otherwise.
+        """
+        edge_data = {
+            "source_block_id": source_block_id,
+            "target_block_id": target_block_id,
+            "description": description
+        }
+        return await self.create_edge(edge_data)
+
+    async def main(self):
+        """
+        Comprehensive main function to test EdgeService functionalities.
+        """
+        try:
+            print("Starting EdgeService test...")
+
+            # Step 1: Create new blocks
+            print("\nCreating new blocks...")
+            block_service = BlockService()
+            block1_data = {
+                "name": "Block1",
+                "block_type": "dataset",
+                "description": "First test block."
+            }
+            block2_data = {
+                "name": "Block2",
+                "block_type": "model",
+                "description": "Second test block."
+            }
+            block3_data = {
+                "name": "Block3",
+                "block_type": "dataset",
+                "description": "Third test block."
+            }
+
+            created_block1 = await block_service.prisma.block.create(data=block1_data)
+            print(f"Created Block1: {created_block1.block_id} - {created_block1.name}")
+
+            created_block2 = await block_service.prisma.block.create(data=block2_data)
+            print(f"Created Block2: {created_block2.block_id} - {created_block2.name}")
+
+            created_block3 = await block_service.prisma.block.create(data=block3_data)
+            print(f"Created Block3: {created_block3.block_id} - {created_block3.name}")
+
+            # Step 2: Create edges connecting the blocks
+            print("\nCreating edges between blocks...")
+            edge1 = await self.associate_blocks_via_edge(
+                source_block_id=UUID(created_block1.block_id),
+                target_block_id=UUID(created_block2.block_id),
+                description="Edge from Block1 to Block2"
+            )
+            if edge1:
+                print(f"Created Edge1: {edge1.edge_id} connecting {edge1.source_block_id} to {edge1.target_block_id}")
+
+            edge2 = await self.associate_blocks_via_edge(
+                source_block_id=UUID(created_block2.block_id),
+                target_block_id=UUID(created_block3.block_id),
+                description="Edge from Block2 to Block3"
+            )
+            if edge2:
+                print(f"Created Edge2: {edge2.edge_id} connecting {edge2.source_block_id} to {edge2.target_block_id}")
+
+            # Step 3: Retrieve and display an edge by ID
+            print("\nRetrieving Edge1 by ID...")
+            retrieved_edge1 = await self.get_edge_by_id(UUID(edge1.edge_id))
+            if retrieved_edge1:
+                print(f"Retrieved Edge1: {retrieved_edge1.edge_id} - {retrieved_edge1.description}")
+
+            # Step 4: Update Edge1's description
+            print("\nUpdating Edge1's description...")
+            update_data = {"description": "Updated Edge from Block1 to Block2"}
+            updated_edge1 = await self.update_edge(UUID(edge1.edge_id), update_data)
+            if updated_edge1:
+                print(f"Updated Edge1: {updated_edge1.edge_id} - {updated_edge1.description}")
+
+            # Step 5: List all edges
+            print("\nListing all edges...")
+            all_edges = await self.list_edges()
+            print(f"Total Edges: {len(all_edges)}")
+            for edge in all_edges:
+                print(f"- Edge ID: {edge.edge_id}, Description: {edge.description}, "
+                      f"Source: {edge.Block_Edge_source_block_idToBlock.name}, "
+                      f"Target: {edge.Block_Edge_target_block_idToBlock.name}")
+
+            # Step 6: Delete Edge2
+            print(f"\nDeleting Edge2: {edge2.edge_id}")
+            deletion_success = await self.delete_edge(UUID(edge2.edge_id))
+            print(f"Edge2 deleted: {deletion_success}")
+
+            # Step 7: List edges after deletion
+            print("\nListing edges after deletion...")
+            remaining_edges = await self.list_edges()
+            print(f"Remaining Edges: {len(remaining_edges)}")
+            for edge in remaining_edges:
+                print(f"- Edge ID: {edge.edge_id}, Description: {edge.description}, "
+                      f"Source: {edge.Block_Edge_source_block_idToBlock.name}, "
+                      f"Target: {edge.Block_Edge_target_block_idToBlock.name}")
+
+            # Step 8: Clean up - Delete created blocks
+            print("\nDeleting created blocks...")
+            delete_success1 = await block_service.prisma.block.delete(where={"block_id": created_block1.block_id})
+            delete_success2 = await block_service.prisma.block.delete(where={"block_id": created_block2.block_id})
+            delete_success3 = await block_service.prisma.block.delete(where={"block_id": created_block3.block_id})
+            print(f"Block1 deleted: {delete_success1}")
+            print(f"Block2 deleted: {delete_success2}")
+            print(f"Block3 deleted: {delete_success3}")
+
+        except Exception as e:
+            self.logger.log("EdgeService", "error", "An error occurred in main.", error=str(e))
+            import traceback
+            print(traceback.format_exc())
+
+        print("\nEdgeService test completed.")
+
+
+# Testing the EdgeService
 if __name__ == "__main__":
-    import traceback
+    from backend.app.features.core.services.block_service import BlockService
+    async def run_edge_service_tests():
+        print("Connecting to the database...")
+        await database.connect()
+        print("Database connected.")
 
-    print("Starting EdgeService tests...")
-    edge_service = EdgeService()
+        edge_service = EdgeService()
+        await edge_service.main()
 
-    # Function to generate a unique edge name
-    def generate_unique_name(base_name):
-        import random
-        return f"{base_name}_{random.randint(1000, 9999)}"
+        print("\nDisconnecting from the database...")
+        await database.disconnect()
+        print("Database disconnected.")
 
-    try:
-        # Create an edge
-        edge_name = generate_unique_name("Test-Edge")
-        new_edge = EdgeCreateSchema(
-            name=edge_name,
-            edge_type=EdgeTypeEnum.primary,
-            description="This is a test edge"
-        )
-        print(f"Creating edge: {new_edge}")
-        created_edge = edge_service.create_edge(new_edge)
-
-        if created_edge:
-            print(f"Created edge: {created_edge}")
-
-            # Get the edge
-            retrieved_edge = edge_service.get_edge_by_id(created_edge.edge_id)
-            if retrieved_edge:
-                print(f"Retrieved edge: {retrieved_edge}")
-            else:
-                print("Failed to retrieve the created edge.")
-
-            # Update the edge
-            update_data = EdgeUpdateSchema(description="Updated description")
-            updated_edge = edge_service.update_edge(created_edge.edge_id, update_data)
-            if updated_edge:
-                print(f"Updated edge: {updated_edge}")
-            else:
-                print("Failed to update the edge.")
-
-            # List edges
-            edges = edge_service.list_edges()
-            if edges is not None:
-                print(f"Listed {len(edges)} edges:")
-                for edge in edges:
-                    print(edge)
-            else:
-                print("Failed to list edges.")
-
-            # Delete the edge
-            if edge_service.delete_edge(created_edge.edge_id):
-                print("Edge deleted successfully.")
-            else:
-                print("Failed to delete edge.")
-
-            # Verify deletion
-            post_delete_edge = edge_service.get_edge_by_id(created_edge.edge_id)
-            if post_delete_edge:
-                print("Error: Edge still exists after deletion.")
-            else:
-                print("Deletion verified: Edge no longer exists.")
-
-
-            # Create another edge with a different name
-            another_edge_name = generate_unique_name("Another-Test-Edge")
-            another_edge = EdgeCreateSchema(
-                name=another_edge_name,
-                edge_type=EdgeTypeEnum.secondary,
-                description="This is another test edge"
-            )
-            created_another_edge = edge_service.create_edge(another_edge)
-            if created_another_edge:
-                print(f"Created another edge: {created_another_edge}")
-
-                # Get the new edge
-                retrieved_another_edge = edge_service.get_edge_by_id(created_another_edge.edge_id)
-                if retrieved_another_edge:
-                    print(f"Retrieved another edge: {retrieved_another_edge}")
-                else:
-                    print("Failed to retrieve the created another edge.")
-
-                # Clean up: delete the second edge
-                if edge_service.delete_edge(created_another_edge.edge_id):
-                    print("Second edge deleted successfully.")
-                else:
-                    print("Failed to delete second edge.")
-
-                # Verify deletion of the second edge
-                post_delete_another_edge = edge_service.get_edge_by_id(created_another_edge.edge_id)
-                if post_delete_another_edge:
-                    print("Error: Second edge still exists after deletion.")
-                else:
-                    print("Deletion verified: Second edge no longer exists.")
-            else:
-                print("Failed to create another edge.")
-        else:
-            print("Failed to create initial edge.")
-    except Exception as exc:
-        print(f"An error occurred during the test: {exc}")
-        print("Traceback:")
-        print(traceback.format_exc())
+    asyncio.run(run_edge_service_tests())

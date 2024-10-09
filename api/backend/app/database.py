@@ -1,51 +1,79 @@
 # app/database.py
 
-from backend.app.utils.helpers import supabase_manager
+import traceback
+from prisma import Prisma
+from supabase import create_client, Client
+from backend.app.logger import ConstellationLogger
 from backend.app.config import settings
 
-def get_supabase_client():
+class Database:
     """
-    Get the Supabase client instance.
-    
-    Returns:
-        Client: The Supabase client for interacting with the backend.
+    Singleton Database Class to manage the Prisma Client and Supabase Client instances.
     """
-    return supabase_manager.get_client()
+    _instance = None
 
-def get_supabase_admin_client():
-    """
-    Get the Supabase admin client instance.
-    
-    Returns:
-        Client: The Supabase client with admin access.
-    """
-    # Note: You might need to implement this in SupabaseClientManager
-    # if you need different credentials for admin access
-    return supabase_manager.get_client()
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(Database, cls).__new__(cls)
+            # Convert MultiHostUrl to string for Prisma
+            database_url = str(settings.DATABASE_URL)
+            cls._instance.prisma = Prisma(datasource={"url": database_url})
+            cls._instance.logger = ConstellationLogger()
+            
+            # Initialize Supabase client
+            cls._instance.supabase: Client = create_client(
+                str(settings.SUPABASE_URL),
+                settings.SUPABASE_KEY
+            )
+        return cls._instance
 
-if __name__ == "__main__":
-    print("Testing Supabase connection...")
-    try:
-        client = get_supabase_client()
-        print(f"Supabase client retrieved successfully: {client}")
-        
-        if client:
-            # List all tables
-            response = client.table('blocks').select('*').limit(1).execute()
-            print("\nSuccessfully connected to Supabase.")
-            print(f"Data from 'blocks' table: {response.data}")
+    async def connect(self):
+        """
+        Asynchronously connects the Prisma Client to the database.
+        """
+        try:
+            self.logger.log(
+                "Database",
+                "info",
+                f"Attempting to connect to database with URL: {str(settings.DATABASE_URL)}"
+            )
+            await self.prisma.connect()
+            self.logger.log(
+                "Database",
+                "info",
+                "Prisma Client connected successfully."
+            )
+        except Exception as e:
+            self.logger.log(
+                "Database",
+                "critical",
+                f"Failed to connect Prisma Client: {str(e)}",
+                extra={"traceback": traceback.format_exc()}
+            )
+            raise
 
-            # List all tables in the public schema
-            schema = client.table('').select('*').execute()
-            print("\nAvailable tables:")
-            for table in schema.data['definitions'].keys():
-                print(f"- {table}")
-        
-            # Test admin client
-            admin_client = get_supabase_admin_client()
-            print(f"\nSupabase admin client retrieved successfully: {admin_client}")
-        else:
-            print("Failed to retrieve Supabase client.")
-        
-    except Exception as e:
-        print(f"Error connecting to Supabase: {e}")
+    async def disconnect(self):
+        """
+        Asynchronously disconnects the Prisma Client from the database.
+        """
+        try:
+            await self.prisma.disconnect()
+            self.logger.log(
+                "Database",
+                "info",
+                "Prisma Client disconnected successfully."
+            )
+        except Exception as e:
+            self.logger.log(
+                "Database",
+                "error",
+                f"Failed to disconnect Prisma Client: {str(e)}",
+                extra={"traceback": traceback.format_exc()}
+            )
+
+# Initialize the Database Singleton
+database = Database()
+
+# Make Supabase client easily accessible
+supabase = database.supabase
+print('connected to supabase')

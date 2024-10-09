@@ -1,321 +1,348 @@
-# app/services/user_service.py
+# constellation-backend/api/backend/app/features/core/services/user_service.py
 
-"""
-User Service Module
-
-This module encapsulates all user-related business logic and interactions with the Supabase backend.
-It provides functions to create, retrieve, update, and delete users, ensuring that all operations are
-logged appropriately using the Constellation Logger.
-
-Design Philosophy:
-- Utilize Supabase's REST API for standard CRUD operations for performance and reliability.
-- Use Python only for advanced logic that cannot be handled directly by Supabase.
-- Ensure flexibility to adapt to schema changes with minimal modifications.
-"""
-
-from typing import Optional, List, Dict, Any
+import uuid
+from typing import Optional, Dict, Any, List
 from uuid import UUID
-from backend.app.models import User
-from backend.app.schemas import UserCreateSchema, UserUpdateSchema, UserResponseSchema
-from backend.app.logger import ConstellationLogger
-from backend.app.utils.helpers import SupabaseClientManager
-from backend.app.schemas import UserResponseSchema
 from datetime import datetime
+import asyncio
 
+from prisma.models import Profile as PrismaUser
+from backend.app.database import supabase, database
+from backend.app.logger import ConstellationLogger
 
 class UserService:
-    """
-    UserService class encapsulates all user-related operations.
-    """
-
     def __init__(self):
-        """
-        Initializes the UserService with the Supabase client and logger.
-        """
-        self.supabase_manager = SupabaseClientManager()
+        self.prisma = database.prisma
         self.logger = ConstellationLogger()
+        self.supabase = supabase  # Supabase client
 
-    def create_user(self, user_data: UserCreateSchema) -> Optional[UserResponseSchema]:
+    async def create_user(self, user_data: Dict[str, Any]) -> Optional[PrismaUser]:
         """
-        Creates a new user in the Supabase database.
-
-        Args:
-            user_data (UserCreateSchema): The data required to create a new user.
-
-        Returns:
-            Optional[UserResponseSchema]: The created user data if successful, None otherwise.
+        Creates a new user using Supabase Auth and stores additional user data in the database.
         """
         try:
-            # Convert Pydantic schema to dictionary
-            data = user_data.dict()
-            # Note: Password hashing should be handled before passing to this method
-            response = self.supabase_manager.client.table("users").insert(data).execute()
+            # Extract required fields
+            email = user_data.get('email')
+            password = user_data.get('password')
+            username = user_data.get('username')
+            
+            if not email or not password or not username:
+                raise ValueError("Email, username, and password are required to create a user")
+            
+            # Create user in Supabase Auth
+            # Create user using Supabase Admin API
+            auth_response = await self.supabase.auth.admin.create_user({
+                "email": email,
+                "password": password,
+                "user_metadata": {"username": username},
+                "email_confirm": True  # Automatically confirm email for testing
+            })
 
-            if response.status_code in [200, 201] and response.data:
-                created_user = UserResponseSchema(**response.data[0])
-                self.logger.log(
-                    "UserService",
-                    "info",
-                    "User created successfully",
-                    user_id=created_user.user_id,
-                    username=created_user.username,
-                    email=created_user.email
-                )
-                return created_user
-            else:
-                self.logger.log(
-                    "UserService",
-                    "error",
-                    "Failed to create user",
-                    status_code=response.status_code,
-                    error=response.error
-                )
+            if auth_response.get("error"):
+                self.logger.log("UserService", "error", "Supabase Auth sign up failed", error=auth_response["error"])
                 return None
-        except Exception as e:
+
+            user = auth_response.get("user")
+            if not user:
+                self.logger.log("UserService", "error", "No user returned from Supabase Auth sign up")
+                return None
+
+            # Assign auth_uid from Supabase user ID
+            auth_uid = user.get("id") or str(uuid.uuid4())
+            user_data['auth_uid'] = auth_uid
+            user_data['username'] = username
+            user_data['email'] = email
+            user_data['role'] = user_data.get('role', 'user')  # Default role
+            user_data['created_at'] = datetime.utcnow()
+            user_data['updated_at'] = datetime.utcnow()
+            
+            # Remove password from user_data to avoid storing it in Prisma
+            user_data.pop('password', None)
+
+            # Store additional user data in the database
+            created_user = await self.prisma.profile.create(data=user_data)
             self.logger.log(
                 "UserService",
-                "critical",
-                f"Exception during user creation: {e}"
+                "info",
+                "User created successfully",
+                auth_uid=created_user.auth_uid
             )
+            return created_user
+
+        except Exception as e:
+            self.logger.log("UserService", "error", "Failed to create user", error=str(e))
+            # Optional: Rollback Supabase Auth user creation if Prisma fails
+            if 'user' in locals() and user:
+                await self.supabase.auth.admin.delete_user(user.id)
+                self.logger.log("UserService", "info", "Rolled back Supabase Auth user creation")
             return None
-
-    def get_user_by_id(self, user_id: UUID) -> Optional[UserResponseSchema]:
+        
+    async def get_user_by_id(self, auth_uid: UUID) -> Optional[PrismaUser]:
         """
-        Retrieves a user by their unique identifier.
-
-        Args:
-            user_id (UUID): The UUID of the user to retrieve.
-
-        Returns:
-            Optional[UserResponseSchema]: The user data if found, None otherwise.
+        Retrieves a user by their auth_uid.
         """
         try:
-            response = self.supabase_manager.client.table("users").select("*").eq("user_id", str(user_id)).single().execute()
-
-            if response.status_code == 200 and response.data:
-                user = UserResponseSchema(**response.data)
+            user = await self.prisma.profile.find_unique(where={"auth_uid": str(auth_uid)})
+            if user:
                 self.logger.log(
                     "UserService",
                     "info",
                     "User retrieved successfully",
-                    user_id=user.user_id,
-                    username=user.username,
-                    email=user.email
+                    auth_uid=user.auth_uid
                 )
-                return user
             else:
                 self.logger.log(
                     "UserService",
                     "warning",
-                    "User not found",
-                    user_id=user_id,
-                    status_code=response.status_code
+                    "User not found with provided auth_uid",
+                    auth_uid=str(auth_uid)
                 )
-                return None
+            return user
         except Exception as e:
-            self.logger.log(
-                "UserService",
-                "critical",
-                f"Exception during user retrieval: {e}"
-            )
+            self.logger.log("UserService", "error", "Failed to retrieve user by ID", error=str(e))
             return None
 
-    def update_user(self, user_id: UUID, update_data: UserUpdateSchema) -> Optional[UserResponseSchema]:
-        """
-        Updates an existing user's information.
-
-        Args:
-            user_id (UUID): The UUID of the user to update.
-            update_data (UserUpdateSchema): The data to update for the user.
-
-        Returns:
-            Optional[UserResponseSchema]: The updated user data if successful, None otherwise.
-        """
-        try:
-            data = update_data.dict(exclude_unset=True)
-            response = self.supabase_manager.client.table("users").update(data).eq("user_id", str(user_id)).execute()
-
-            if response.status_code == 200 and response.data:
-                updated_user = UserResponseSchema(**response.data[0])
-                self.logger.log(
-                    "UserService",
-                    "info",
-                    "User updated successfully",
-                    user_id=updated_user.user_id,
-                    updated_fields=list(data.keys())
-                )
-                return updated_user
-            else:
-                self.logger.log(
-                    "UserService",
-                    "error",
-                    "Failed to update user",
-                    user_id=user_id,
-                    status_code=response.status_code,
-                    error=response.error
-                )
-                return None
-        except Exception as e:
-            self.logger.log(
-                "UserService",
-                "critical",
-                f"Exception during user update: {e}"
-            )
-            return None
-
-    def delete_user(self, user_id: UUID) -> bool:
-        """
-        Deletes a user from the Supabase database.
-
-        Args:
-            user_id (UUID): The UUID of the user to delete.
-
-        Returns:
-            bool: True if deletion was successful, False otherwise.
-        """
-        try:
-            response = self.supabase_manager.client.table("users").delete().eq("user_id", str(user_id)).execute()
-
-            if response.status_code == 200 and response.count > 0:
-                self.logger.log(
-                    "UserService",
-                    "info",
-                    "User deleted successfully",
-                    user_id=user_id
-                )
-                return True
-            else:
-                self.logger.log(
-                    "UserService",
-                    "warning",
-                    "User not found or already deleted",
-                    user_id=user_id,
-                    status_code=response.status_code
-                )
-                return False
-        except Exception as e:
-            self.logger.log(
-                "UserService",
-                "critical",
-                f"Exception during user deletion: {e}"
-            )
-            return False
-
-    def list_users(self, filters: Optional[Dict[str, Any]] = None) -> Optional[List[UserResponseSchema]]:
-        """
-        Retrieves a list of users with optional filtering.
-
-        Args:
-            filters (Optional[Dict[str, Any]]): Key-value pairs to filter the users.
-
-        Returns:
-            Optional[List[UserResponseSchema]]: A list of users if successful, None otherwise.
-        """
-        try:
-            query = self.supabase_manager.client.table("users").select("*")
-            if filters:
-                for key, value in filters.items():
-                    query = query.eq(key, value)
-            response = query.execute()
-
-            if response.status_code == 200 and response.data:
-                users = [UserResponseSchema(**user) for user in response.data]
-                self.logger.log(
-                    "UserService",
-                    "info",
-                    f"{len(users)} users retrieved successfully",
-                    filters=filters
-                )
-                return users
-            else:
-                self.logger.log(
-                    "UserService",
-                    "warning",
-                    "No users found",
-                    filters=filters,
-                    status_code=response.status_code
-                )
-                return []
-        except Exception as e:
-            self.logger.log(
-                "UserService",
-                "critical",
-                f"Exception during listing users: {e}"
-            )
-            return None
-
-    def authenticate_user(self, email: str, password: str) -> Optional[UserResponseSchema]:
-        """
-        Authenticates a user using their email and password.
-
-        Args:
-            email (str): The user's email.
-            password (str): The user's password.
-
-        Returns:
-            Optional[UserResponseSchema]: The authenticated user's data if successful, None otherwise.
-        """
-        try:
-            # Note: Supabase handles authentication via its auth API.
-            # This method assumes that password hashing and verification are handled externally.
-            # For demonstration, we'll perform a basic check.
-            response = self.supabase_manager.client.auth.sign_in(email=email, password=password)
-
-            if response.status_code == 200 and response.user:
-                user = self.get_user_by_id(UUID(response.user.id))
-                self.logger.log(
-                    "UserService",
-                    "info",
-                    "User authenticated successfully",
-                    user_id=user.user_id,
-                    email=user.email
-                )
-                return user
-            else:
-                self.logger.log(
-                    "UserService",
-                    "warning",
-                    "Authentication failed",
-                    email=email,
-                    status_code=response.status_code,
-                    error=response.error
-                )
-                return None
-        except Exception as e:
-            self.logger.log(
-                "UserService",
-                "critical",
-                f"Exception during user authentication: {e}"
-            )
-            return None
-
-    def get_user_by_email(self, email: str) -> Optional[User]:
+    async def get_user_by_email(self, email: str) -> Optional[PrismaUser]:
         """
         Retrieves a user by their email.
         """
         try:
-            response = self.supabase_manager.client.table("users").select("*").eq("email", email).single().execute()
-            if response.status_code == 200 and response.data:
-                user = User(**response.data)
+            user = await self.prisma.profile.find_unique(where={"email": email})
+            if user:
                 self.logger.log(
                     "UserService",
                     "info",
-                    "User retrieved successfully by email",
-                    email=user.email
+                    "User retrieved successfully",
+                    auth_uid=user.auth_uid
                 )
-                return user
             else:
                 self.logger.log(
                     "UserService",
                     "warning",
-                    "User not found by email",
+                    "User not found with provided email",
                     email=email
                 )
-                return None
+            return user
         except Exception as e:
+            self.logger.log("UserService", "error", "Failed to retrieve user by email", error=str(e))
+            return None
+
+    async def get_user_by_username(self, username: str) -> Optional[PrismaUser]:
+        """
+        Retrieves a user by their username.
+        """
+        try:
+            user = await self.prisma.profile.find_unique(where={"username": username})
+            if user:
+                self.logger.log(
+                    "UserService",
+                    "info",
+                    "User retrieved successfully",
+                    auth_uid=user.auth_uid
+                )
+            else:
+                self.logger.log(
+                    "UserService",
+                    "warning",
+                    "User not found with provided username",
+                    username=username
+                )
+            return user
+        except Exception as e:
+            self.logger.log("UserService", "error", "Failed to retrieve user by username", error=str(e))
+            return None
+
+    async def update_user(self, auth_uid: UUID, update_data: Dict[str, Any]) -> Optional[PrismaUser]:
+        """
+        Updates user information in the database.
+        """
+        try:
+            update_data['updated_at'] = datetime.utcnow()
+            updated_user = await self.prisma.profile.update(
+                where={"auth_uid": str(auth_uid)},
+                data=update_data
+            )
             self.logger.log(
                 "UserService",
-                "critical",
-                f"Exception during user retrieval by email: {e}"
+                "info",
+                "User updated successfully",
+                auth_uid=updated_user.auth_uid
             )
+            return updated_user
+        except Exception as e:
+            self.logger.log("UserService", "error", "Failed to update user", error=str(e))
             return None
+
+    async def delete_user(self, auth_uid: UUID) -> bool:
+        """
+        Deletes a user from Supabase Auth and the database.
+        """
+        try:
+            # Delete user from Supabase Auth
+            auth_response = await self.supabase.auth.admin.delete_user(str(auth_uid))
+            if auth_response.get("error"):
+                self.logger.log("UserService", "error", "Supabase Auth delete failed", error=auth_response["error"])
+                return False
+
+            # Delete user data from the database
+            await self.prisma.profile.delete(where={"auth_uid": str(auth_uid)})
+            self.logger.log(
+                "UserService",
+                "info",
+                "User deleted successfully",
+                auth_uid=str(auth_uid)
+            )
+            return True
+        except Exception as e:
+            self.logger.log("UserService", "error", "Failed to delete user", error=str(e))
+            return False
+
+    async def list_users(self, limit: int = 50, page: int = 1) -> List[PrismaUser]:
+        """
+        Lists users with pagination.
+        """
+        try:
+            skip = (page - 1) * limit
+            users = await self.prisma.profile.find_many(take=limit, skip=skip)
+            self.logger.log(
+                "UserService",
+                "info",
+                f"Listed {len(users)} users",
+                limit=limit,
+                page=page
+            )
+            return users
+        except Exception as e:
+            self.logger.log("UserService", "error", "Failed to list users", error=str(e))
+            return []
+    
+    # Additional methods for MFA, password reset, etc., can be added here
+
+    async def get_user_by_username_and_email(self, username: Optional[str] = None, email: Optional[str] = None, auth_uid: Optional[UUID] = None) -> Optional[PrismaUser]:
+        """
+        Retrieves a user based on provided parameters. This method allows fetching by username, email, or auth_uid.
+
+        Args:
+            username (Optional[str]): The username of the user to retrieve.
+            email (Optional[str]): The email address of the user to retrieve.
+            auth_uid (Optional[UUID]): The auth_uid of the user to retrieve.
+
+        Returns:
+            Optional[PrismaUser]: The retrieved user, or None if not found.
+        """
+        try:
+            where_clause = {}
+            if auth_uid:
+                where_clause["auth_uid"] = str(auth_uid)
+            elif email:
+                where_clause["email"] = email
+            elif username:
+                where_clause["username"] = username
+            else:
+                self.logger.log("UserService", "warning", "No criteria provided for user retrieval")
+                return None
+
+            user = await self.prisma.profile.find_unique(where=where_clause)
+            if user:
+                self.logger.log(
+                    "UserService",
+                    "info",
+                    "User retrieved successfully",
+                    auth_uid=user.auth_uid
+                )
+            else:
+                self.logger.log(
+                    "UserService",
+                    "warning",
+                    "User not found with provided criteria",
+                    criteria=where_clause
+                )
+            return user
+        except Exception as e:
+            self.logger.log("UserService", "error", f"Failed to retrieve user: {str(e)}")
+            return None
+
+
+async def main():
+    """
+    Main function to demonstrate and test the UserService functionality.
+    """
+    print("Starting UserService test...")
+
+    print("Connecting to the database...")
+    await database.connect()
+    print("Database connected successfully.")
+
+    user_service = UserService()
+
+    try:
+        # Create a new user
+        print("\nCreating a new user...")
+        new_user_data = {
+            "username": "testuser1",
+            "email": "testuser1@example.com",
+            "password": "secure_password",  # Note: Ensure password is handled securely
+            "role": "user"
+        }
+        created_user = await user_service.create_user(new_user_data)
+        print(f"Created user: {created_user}")
+
+        if created_user:
+            # Get user by ID
+            print(f"\nRetrieving user with auth_uid: {created_user.auth_uid}")
+            retrieved_user = await user_service.get_user_by_id(UUID(created_user.auth_uid))
+            print(f"Retrieved user: {retrieved_user}")
+
+            # Get user by Email
+            print(f"\nRetrieving user with email: {created_user.email}")
+            user_by_email = await user_service.get_user_by_email(created_user.email)
+            print(f"Retrieved user by email: {user_by_email}")
+
+            # Get user by Username
+            print(f"\nRetrieving user with username: {created_user.username}")
+            user_by_username = await user_service.get_user_by_username(created_user.username)
+            print(f"Retrieved user by username: {user_by_username}")
+
+            # Alternatively, use the generalized method
+            print("\nRetrieving user using generalized method by username...")
+            user_general = await user_service.get_user_by_username_and_email(username=created_user.username)
+            print(f"Retrieved user using generalized method: {user_general}")
+
+            # Update user
+            print(f"\nUpdating user with auth_uid: {created_user.auth_uid}")
+            update_data = {"username": "updated_testuser"}
+            updated_user = await user_service.update_user(UUID(created_user.auth_uid), update_data)
+            print(f"Updated user: {updated_user}")
+
+            # List users
+            print("\nListing all users...")
+            all_users = await user_service.list_users()
+            print(f"Total users: {len(all_users)}")
+            for user in all_users:
+                print(f"- Auth UID: {user.auth_uid}, Username: {user.username}, Email: {user.email}")
+
+            # Delete user
+            print(f"\nDeleting user with auth_uid: {created_user.auth_uid}")
+            deleted = await user_service.delete_user(UUID(created_user.auth_uid))
+            print(f"User deleted: {deleted}")
+
+        # List users after operations
+        print("\nListing all users after operations...")
+        remaining_users = await user_service.list_users()
+        print(f"Remaining users: {len(remaining_users)}")
+        for user in remaining_users:
+            print(f"- Auth UID: {user.auth_uid}, Username: {user.username}, Email: {user.email}")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        import traceback
+        print(traceback.format_exc())
+
+    finally:
+        print("\nDisconnecting from the database...")
+        await database.disconnect()
+        print("Database disconnected.")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
