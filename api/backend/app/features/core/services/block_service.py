@@ -1,3 +1,5 @@
+# constellation-backend/api/backend/app/features/core/services/block_service.py
+
 """
 Block Service Module
 
@@ -11,67 +13,102 @@ Key Design Decisions:
 1. Use of Dictionaries: We use dictionaries for input data to provide flexibility in the API.
    This allows callers to provide only the necessary fields without needing to construct full objects.
 
-2. Prisma Models: We use Prisma-generated models (PrismaBlock) for type hinting and as return types.
+2. Prisma Models: We use Prisma-generated models (Block) for type hinting and as return types.
    This ensures type safety and consistency with the database schema.
 
-3. No Request/Response Models: We directly use dictionaries for input and Prisma models for output.
-   This simplifies the API and reduces redundancy, as Prisma models already provide necessary structure.
+3. Raw SQL for Unsupported Types: The `vector` field is managed using raw SQL queries since Prisma does not support it.
 
-4. JSON Handling: We manually convert the 'metadata' and 'taxonomy' fields to and from JSON strings.
-   This ensures compatibility with Prisma's JSON field type.
-
-5. Error Handling: Exceptions are allowed to propagate, to be handled by the caller.
+4. Error Handling: Exceptions are allowed to propagate, to be handled by the caller.
 
 This approach balances flexibility, type safety, and simplicity, leveraging Prisma's capabilities
 while providing a clean API for block operations.
 """
-
+import re
 from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime
-import json
+import asyncio
 
-from prisma.models import blocks as PrismaBlock
+from prisma.errors import UniqueViolationError
+from prisma.models import Block as PrismaBlock
+from prisma import Prisma
 from backend.app.database import database
-from backend.app.features.core.services.taxonomy_service import TaxonomyService
+from backend.app.logger import ConstellationLogger
 
 class BlockService:
     def __init__(self):
         self.prisma = database.prisma
-        self.taxonomy_service = TaxonomyService()
+        self.logger = ConstellationLogger()
 
-    async def create_block(self, block_data: Dict[str, Any]) -> Optional[PrismaBlock]:
+    async def create_block(self, block_data: Dict[str, Any], vector: Optional[List[float]] = None) -> Optional[PrismaBlock]:
         """
-        Create a new block.
+        Creates a new block in the database or retrieves it if it already exists.
 
         Args:
             block_data (Dict[str, Any]): Dictionary containing block data.
+            vector (Optional[List[float]]): Optional vector representation for the block.
 
         Returns:
-            Optional[PrismaBlock]: The created block, or None if creation failed.
+            Optional[PrismaBlock]: The created or existing block.
         """
-        create_data = {
-            "block_id": str(uuid4()),
-            "name": block_data["name"],
-            "block_type": block_data["block_type"],
-            "description": block_data.get("description"),
-            "created_by": str(block_data["created_by"]),
-            "metadata": json.dumps(block_data.get("metadata", {})),
-            "taxonomy": json.dumps(block_data.get("taxonomy", {})),
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow(),
-        }
+        block_data['block_id'] = str(uuid4())
+        block_data['created_at'] = datetime.utcnow()
+        block_data['updated_at'] = datetime.utcnow()
+        try:
+            # Remove 'vector' from block_data since it's unsupported by Prisma
+            block_vector = block_data.pop('vector', None)
 
-        block = await self.prisma.blocks.create(data=create_data)
-        
-        if block_data.get("taxonomy"):
-            await self.taxonomy_service.create_taxonomy_for_block(UUID(block.block_id), block_data["taxonomy"])
-        
-        return block
+            # Create block via Prisma
+            created_block = await self.prisma.block.create(data=block_data)
+            self.logger.log(
+                "BlockService",
+                "info",
+                "Block created successfully.",
+                block_id=created_block.block_id,
+                block_name=created_block.name
+            )
+        except UniqueViolationError:
+            # Block with this name already exists, retrieve it
+            existing_block = await self.get_block_by_name(block_data['name'])
+            if existing_block:
+                self.logger.log(
+                    "BlockService",
+                    "info",
+                    "Block already exists, retrieved existing block.",
+                    block_id=existing_block.block_id,
+                    block_name=existing_block.name
+                )
+                return existing_block
+            else:
+                # This shouldn't happen, but handle it just in case
+                raise ValueError(f"Failed to create or retrieve block with name: {block_data['name']}")
+        except Exception as e:
+            self.logger.log("BlockService", "error", "Failed to create block", error=str(e))
+            return None
+
+        if vector:
+            # Associate vector using raw SQL
+            vector_success = await self.set_block_vector(created_block.block_id, vector)
+            if vector_success:
+                self.logger.log(
+                    "BlockService",
+                    "info",
+                    "Vector associated with block successfully.",
+                    block_id=created_block.block_id
+                )
+            else:
+                self.logger.log(
+                    "BlockService",
+                    "warning",
+                    "Failed to associate vector with block.",
+                    block_id=created_block.block_id
+                )
+
+        return created_block
 
     async def get_block_by_id(self, block_id: UUID) -> Optional[PrismaBlock]:
         """
-        Retrieve a block by its ID.
+        Retrieves a block by its ID.
 
         Args:
             block_id (UUID): The ID of the block to retrieve.
@@ -79,103 +116,271 @@ class BlockService:
         Returns:
             Optional[PrismaBlock]: The retrieved block, or None if not found.
         """
-        return await self.prisma.blocks.find_unique(
-            where={"block_id": str(block_id)},
-            include={"block_categories": {"include": {"categories": True}}}
-        )
+        try:
+            block = await self.prisma.block.find_unique(where={"block_id": str(block_id)})
 
-    async def update_block(self, block_id: UUID, update_data: Dict[str, Any]) -> Optional[PrismaBlock]:
+            if block:
+                self.logger.log(
+                    "BlockService",
+                    "info",
+                    "Block retrieved successfully.",
+                    block_id=block.block_id,
+                    block_name=block.name
+                )
+            else:
+                self.logger.log(
+                    "BlockService",
+                    "warning",
+                    "Block not found.",
+                    block_id=str(block_id)
+                )
+
+            return block
+        except Exception as e:
+            self.logger.log("BlockService", "error", "Failed to retrieve block by ID", error=str(e))
+            return None
+
+    async def get_block_by_name(self, name: str) -> Optional[PrismaBlock]:
         """
-        Update an existing block.
+        Retrieves a block by its name.
+
+        Args:
+            name (str): The name of the block to retrieve.
+
+        Returns:
+            Optional[PrismaBlock]: The retrieved block, or None if not found.
+        """
+        try:
+            block = await self.prisma.block.find_unique(where={"name": name})
+
+            if block:
+                self.logger.log(
+                    "BlockService",
+                    "info",
+                    "Block retrieved successfully by name.",
+                    block_id=block.block_id,
+                    block_name=block.name
+                )
+            else:
+                self.logger.log(
+                    "BlockService",
+                    "warning",
+                    "Block not found by name.",
+                    block_name=name
+                )
+
+            return block
+        except Exception as e:
+            self.logger.log("BlockService", "error", "Failed to retrieve block by name", error=str(e))
+            return None
+
+    async def update_block(self, block_id: UUID, update_data: Dict[str, Any], vector: Optional[List[float]] = None) -> Optional[PrismaBlock]:
+        """
+        Updates a block's details.
 
         Args:
             block_id (UUID): The ID of the block to update.
-            update_data (Dict[str, Any]): Dictionary containing updated block data.
+            update_data (Dict[str, Any]): Dictionary containing fields to update.
+            vector (Optional[List[float]]): Optional vector data to update.
 
         Returns:
-            Optional[PrismaBlock]: The updated block, or None if update failed.
+            Optional[PrismaBlock]: The updated block.
         """
-        update_dict = {
-            "name": update_data.get("name"),
-            "block_type": update_data.get("block_type"),
-            "description": update_data.get("description"),
-            "updated_by": update_data.get("updated_by"),
-            "metadata": json.dumps(update_data.get("metadata", {})),
-            "taxonomy": json.dumps(update_data.get("taxonomy", {})),
-            "updated_at": datetime.utcnow(),
-        }
-        update_dict = {k: v for k, v in update_dict.items() if v is not None}
+        try:
+            update_data['updated_at'] = datetime.utcnow()
 
-        block = await self.prisma.blocks.update(
-            where={"block_id": str(block_id)},
-            data=update_dict,
-            include={"block_categories": {"include": {"categories": True}}}
-        )
-        
-        if update_data.get("taxonomy"):
-            await self.prisma.block_categories.delete_many(where={"block_id": str(block_id)})
-            await self.taxonomy_service.create_taxonomy_for_block(block_id, update_data["taxonomy"])
-        
-        return block
+            # Remove 'vector' from update_data since it's unsupported by Prisma
+            update_vector = update_data.pop('vector', None)
+
+            # Update block via Prisma
+            updated_block = await self.prisma.block.update(
+                where={"block_id": str(block_id)},
+                data=update_data
+            )
+
+            self.logger.log(
+                "BlockService",
+                "info",
+                "Block updated successfully.",
+                block_id=updated_block.block_id,
+                updated_fields=list(update_data.keys())
+            )
+        except Exception as e:
+            self.logger.log("BlockService", "error", "Failed to update block", error=str(e))
+            return None
+
+        if vector:
+            # Update vector using raw SQL
+            vector_success = await self.set_block_vector(updated_block.block_id, vector)
+            if vector_success:
+                self.logger.log(
+                    "BlockService",
+                    "info",
+                    "Vector updated successfully.",
+                    block_id=updated_block.block_id
+                )
+            else:
+                self.logger.log(
+                    "BlockService",
+                    "warning",
+                    "Failed to update vector.",
+                    block_id=updated_block.block_id
+                )
+
+        return updated_block
 
     async def delete_block(self, block_id: UUID) -> bool:
         """
-        Delete a block.
+        Deletes a block from the database.
 
         Args:
             block_id (UUID): The ID of the block to delete.
 
         Returns:
-            bool: True if the block was successfully deleted, False otherwise.
+            bool: True if deletion was successful, False otherwise.
         """
-        deleted_block = await self.prisma.blocks.delete(where={"block_id": str(block_id)})
-        return deleted_block is not None
+        try:
+            await self.prisma.block.delete(where={"block_id": str(block_id)})
 
-    async def get_blocks_by_ids(self, block_ids: List[UUID]) -> List[PrismaBlock]:
+            self.logger.log(
+                "BlockService",
+                "info",
+                "Block deleted successfully.",
+                block_id=str(block_id)
+            )
+
+            return True
+        except Exception as e:
+            self.logger.log("BlockService", "error", "Failed to delete block", error=str(e))
+            return False
+
+    async def set_block_vector(self, block_id: str, vector: List[float]) -> bool:
         """
-        Retrieve multiple blocks by their IDs.
+        Associates or updates a vector representation for a block using raw SQL.
 
         Args:
-            block_ids (List[UUID]): List of block IDs to retrieve.
+            block_id (str): The ID of the block.
+            vector (List[float]): The vector data.
 
         Returns:
-            List[PrismaBlock]: List of retrieved blocks.
+            bool: True if operation was successful, False otherwise.
         """
-        return await self.prisma.blocks.find_many(
-            where={"block_id": {"in": [str(bid) for bid in block_ids]}},
-            include={"block_categories": {"include": {"categories": True}}}
-        )
+        try:
+            # Convert the vector list to a PostgreSQL array string
+            vector_str = ','.join(map(str, vector))
 
-    async def list_all_blocks(self) -> List[PrismaBlock]:
-        """
-        List all blocks.
+            # Execute raw SQL to update the 'vector' field
+            raw_query = """
+                UPDATE "Block"
+                SET vector = ARRAY[{vector}]::vector, updated_at = NOW()
+                WHERE block_id = '{block_id}';
+            """.format(vector=vector_str, block_id=block_id)
 
-        Returns:
-            List[PrismaBlock]: List of all blocks.
-        """
-        return await self.prisma.blocks.find_many(
-            include={"block_categories": {"include": {"categories": True}}}
-        )
+            await self.prisma.execute_raw(raw_query)
 
-    async def search_blocks_by_taxonomy(self, taxonomy_query: Dict[str, Any]) -> List[PrismaBlock]:
+            return True
+        except Exception as e:
+            self.logger.log("BlockService", "error", "Failed to set block vector", error=str(e))
+            return False
+
+    async def get_block_vector(self, block_id: str) -> Optional[List[float]]:
         """
-        Search blocks by taxonomy.
+        Retrieves the vector representation of a block.
 
         Args:
-            taxonomy_query (Dict[str, Any]): Dictionary containing taxonomy search criteria.
+            block_id (str): The ID of the block.
 
         Returns:
-            List[PrismaBlock]: List of blocks matching the taxonomy criteria.
+            Optional[List[float]]: The vector representation, or None if not found.
         """
-        block_ids = await self.taxonomy_service.search_blocks_by_taxonomy_query(taxonomy_query)
-        if not block_ids:
+        try:
+            # Use Prisma's raw query to fetch the vector
+            query = f"""
+                SELECT vector::text AS vector_text
+                FROM "Block"
+                WHERE block_id = '{block_id}';
+            """
+            result = await self.prisma.query_raw(query)
+            
+            if result and result[0]['vector_text']:
+                # Parse the PostgreSQL array string into a list of floats
+                vector_text = result[0]['vector_text']
+                # Use regex to extract all float values
+                vector_values = re.findall(r'-?\d+(?:\.\d+)?', vector_text)
+                # Convert each value to float
+                return [float(value) for value in vector_values]
+            return None
+        except Exception as e:
+            self.logger.log("BlockService", "error", f"Failed to retrieve block vector - error={str(e)}")
+            return None
+
+    async def search_blocks_by_vector_similarity(self, query_vector: List[float], top_k: int = 5) -> List[Dict[str, Any]]:
+        """
+        Performs a vector similarity search on blocks.
+
+        Args:
+            query_vector (List[float]): The query vector.
+            top_k (int): The number of top similar blocks to return.
+
+        Returns:
+            List[Dict[str, Any]]: List of similar blocks with their similarity scores.
+        """
+        try:
+            vector_str = ','.join(map(str, query_vector))
+            query = f"""
+                SELECT b.block_id, b.name, b.block_type, b.description, 
+                       1 - (b.vector <=> ARRAY[{vector_str}]::vector) as similarity
+                FROM "Block" b
+                WHERE b.vector IS NOT NULL
+                ORDER BY similarity DESC
+                LIMIT {top_k};
+            """
+            results = await self.prisma.query_raw(query)
+            
+            return [
+                {
+                    "block_id": str(row['block_id']),
+                    "name": row['name'],
+                    "block_type": row['block_type'],
+                    "description": row['description'],
+                    "similarity": float(row['similarity'])
+                }
+                for row in results
+            ]
+        except Exception as e:
+            self.logger.log("BlockService", "error", "Failed to perform vector similarity search", error=str(e))
             return []
-        return await self.prisma.blocks.find_many(
-            where={"block_id": {"in": [str(bid) for bid in block_ids]}},
-            include={"block_categories": {"include": {"categories": True}}}
-        )
-        
 
+    async def get_all_vectors(self) -> List[List[float]]:
+        """
+        Retrieves all vector representations for blocks using raw SQL.
+
+        Returns:
+            List[List[float]]: A list of all vector representations.
+        """
+        try:
+            raw_query = """
+                SELECT block_id, vector
+                FROM "Block"
+                WHERE vector IS NOT NULL;
+            """
+
+            results = await self.prisma.execute_raw(raw_query)
+
+            vectors = [row['vector'] for row in results]
+
+            self.logger.log(
+                "BlockService",
+                "info",
+                f"Retrieved {len(vectors)} vectors for blocks."
+            )
+
+            return vectors
+        except Exception as e:
+            self.logger.log("BlockService", "error", "Failed to retrieve all vectors", error=str(e))
+            return []
+
+ 
 async def main():
     """
     Main function to demonstrate and test the BlockService functionality.
@@ -188,65 +393,81 @@ async def main():
 
     block_service = BlockService()
 
-    # Use this user ID for testing
-    test_user_id = "11111111-1111-1111-1111-111111111111"
-
     try:
-        # Create a new block
-        print("\nCreating a new block...")
+        # Step 1: Create a new block without vector
+        print("\nCreating a new block without vector...")
         new_block_data = {
-            "name": "Test Block",
-            "block_type": "text",
-            "description": "This is a test block",
-            "created_by": test_user_id,
-            "metadata": {"key": "value"},
-            "taxonomy": {"category": "test"}
+            "name": "TestBlock1",
+            "block_type": "dataset",
+            "description": "This is a test block without vector."
         }
         created_block = await block_service.create_block(new_block_data)
-        print(f"Created block: {created_block}")
-
         if created_block:
-            # Get the created block
-            print(f"\nRetrieving block with ID: {created_block.block_id}")
-            retrieved_block = await block_service.get_block_by_id(UUID(created_block.block_id))
+            print(f"Created block: {created_block}")
+        else:
+            print("Failed to create block 'TestBlock1'.")
+
+        # Step 2: Create a new block with vector
+        print("\nCreating a new block with vector...")
+        new_block_with_vector_data = {
+            "name": "TestBlock2",
+            "block_type": "model",
+            "description": "This is a test block with vector."
+        }
+        test_vector = [0.1, 0.2, 0.3, 0.4, 0.5]  # Example vector
+        created_block_with_vector = await block_service.create_block(new_block_with_vector_data, vector=test_vector)
+        if created_block_with_vector:
+            print(f"Created block with vector: {created_block_with_vector}")
+        else:
+            print("Failed to create block 'TestBlock2'.")
+
+        if created_block_with_vector:
+            block_id = created_block_with_vector.block_id
+
+            # Step 3: Retrieve block by ID
+            print(f"\nRetrieving block with ID: {block_id}")
+            retrieved_block = await block_service.get_block_by_id(UUID(block_id))
             print(f"Retrieved block: {retrieved_block}")
 
-            # Update the block
-            print(f"\nUpdating block with ID: {created_block.block_id}")
-            update_data = {
-                "name": "Updated Test Block",
-                "description": "This is an updated test block",
-                "updated_by": test_user_id,
-                "metadata": {"new_key": "new_value"},
-                "taxonomy": {"new_category": "updated_test"}
-            }
-            updated_block = await block_service.update_block(UUID(created_block.block_id), update_data)
+            # Step 4: Retrieve block by Name
+            print(f"\nRetrieving block with name: {created_block_with_vector.name}")
+            block_by_name = await block_service.get_block_by_name(created_block_with_vector.name)
+            print(f"Retrieved block by name: {block_by_name}")
+
+            # Step 5: Update block
+            print(f"\nUpdating block with ID: {block_id}")
+            update_data = {"description": "Updated description for TestBlock2."}
+            updated_block = await block_service.update_block(UUID(block_id), update_data)
             print(f"Updated block: {updated_block}")
 
-            # List all blocks
-            print("\nListing all blocks...")
-            all_blocks = await block_service.list_all_blocks()
-            print(f"Total blocks: {len(all_blocks)}")
-            for block in all_blocks:
-                print(f"- Block ID: {block.block_id}, Name: {block.name}")
+            # Step 6: Associate a new vector to the block
+            print(f"\nAssociating a new vector to block with ID: {block_id}")
+            new_vector = [0.5, 0.4, 0.3, 0.2, 0.1]
+            vector_success = await block_service.set_block_vector(block_id, new_vector)
+            print(f"Vector associated: {vector_success}")
 
-            # Search blocks by taxonomy
-            print("\nSearching blocks by taxonomy...")
-            taxonomy_query = {"new_category": "updated_test"}
-            found_blocks = await block_service.search_blocks_by_taxonomy(taxonomy_query)
-            print(f"Found {len(found_blocks)} blocks matching the taxonomy query")
+            # Step 7: Retrieve block vector
+            print(f"\nRetrieving vector for block with ID: {block_id}")
+            block_vector = await block_service.get_block_vector(block_id)
+            print(f"Retrieved vector: {block_vector}")
 
-            # Delete the block
-            print(f"\nDeleting block with ID: {created_block.block_id}")
-            deleted = await block_service.delete_block(UUID(created_block.block_id))
+            # Step 8: Perform a vector similarity search
+            print("\nPerforming vector similarity search...")
+            query_vector = [0.1, 0.2, 0.3, 0.4, 0.5]
+            similar_blocks = await block_service.search_blocks_by_vector_similarity(query_vector, top_k=5)
+            print(f"Similar blocks: {similar_blocks}")
+
+            # Step 9: Delete block
+            print(f"\nDeleting block with ID: {block_id}")
+            deleted = await block_service.delete_block(UUID(block_id))
             print(f"Block deleted: {deleted}")
 
-        # List all blocks after operations
-        print("\nListing all blocks after operations...")
-        remaining_blocks = await block_service.list_all_blocks()
-        print(f"Remaining blocks: {len(remaining_blocks)}")
-        for block in remaining_blocks:
-            print(f"- Block ID: {block.block_id}, Name: {block.name}")
+        # Step 10: List all blocks
+        print("\nListing all blocks...")
+        all_blocks = await block_service.prisma.block.find_many()
+        print(f"Total blocks: {len(all_blocks)}")
+        for block in all_blocks:
+            print(f"- Block ID: {block.block_id}, Name: {block.name}, Type: {block.block_type}, Description: {block.description}")
 
     except Exception as e:
         print(f"An error occurred: {e}")
