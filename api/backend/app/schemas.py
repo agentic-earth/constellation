@@ -143,3 +143,31 @@ class AuditLogSchema(BaseModel):
         orm_mode = True
 
 
+# -------------------
+# Audit Log Schemas
+# -------------------
+
+class AuditLogCreateSchema(BaseModel):
+    user_id: UUID = Field(..., description="UUID of the user performing the action.")
+    action_type: ActionTypeEnum = Field(..., description="Type of action performed.")
+    entity_type: AuditEntityTypeEnum = Field(..., description="Type of entity being acted upon.")
+    entity_id: UUID = Field(..., description="UUID of the entity.")
+    details: Dict[str, Any] = Field(..., description="Additional details about the action.")
+
+    class Config:
+        orm_mode = True
+
+
+class AuditLogResponseSchema(AuditLogSchema):
+    pass
+
+
+class AuditLogUpdateSchema(BaseModel):
+    user_id: Optional[UUID] = Field(None, description="UUID of the user performing the action.")
+    action_type: Optional[ActionTypeEnum] = Field(None, description="Type of action performed.")
+    entity_type: Optional[AuditEntityTypeEnum] = Field(None, description="Type of entity being acted upon.")
+    entity_id: Optional[UUID] = Field(None, description="UUID of the entity.")
+    details: Optional[Dict[str, Any]] = Field(None, description="Additional details about the action.")
+
+    class Config:
+        orm_mode = True
