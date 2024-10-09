@@ -1,0 +1,4 @@
+Log file initialized on 2024-10-09 22:33:58.537679
+2024-10-09 22:33:58,537 - PipelineService - ERROR - Error creating pipeline. - error=User does not exist.
+2024-10-09 22:33:58,680 - PipelineService - INFO - Pipelines searched successfully. - search_params={'name': 'Updated'} - pipelines_found=0
+2024-10-09 22:33:58,820 - PipelineService - INFO - Pipelines listed successfully. - limit=10 - offset=0 - pipelines_found=0

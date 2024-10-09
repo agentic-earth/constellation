@@ -15,15 +15,6 @@ model AlembicVersion {
   version_num String @id @db.VarChar(32)
 }
 
-model ApiKey {
-  api_key_id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  user_id           String   @db.Uuid
-  encrypted_api_key String
-  created_at        DateTime @default(now()) @db.Timestamptz(6)
-  expires_at        DateTime @db.Timestamptz(6)
-  is_active         Boolean  @default(true)
-  Profile           Profile  @relation(fields: [user_id], references: [auth_uid], onDelete: Cascade, onUpdate: NoAction, map: "fk_api_key_user")
-}
 
 model AuditLog {
   log_id      String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
@@ -172,14 +163,27 @@ model PipelineEdge {
 }
 
 model Profile {
-  auth_uid   String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  username   String     @unique @db.VarChar(255)
-  email      String     @unique @db.VarChar(255)
-  role       String     @default("user") @db.VarChar(50)
-  created_at DateTime   @default(now()) @db.Timestamptz(6)
-  updated_at DateTime   @default(now()) @db.Timestamptz(6)
-  ApiKey     ApiKey[]
-  Pipeline   Pipeline[]
+  id          String      @id @default(uuid()) @db.Uuid
+  userId      String      @unique
+  username    String      @unique @db.VarChar(255)
+  email       String      @unique @db.VarChar(255)
+  role        String      @default("user") @db.VarChar(50)
+  created_at  DateTime    @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime    @default(now()) @db.Timestamptz(6)
+  ApiKey      ApiKey[]
+  Pipeline    Pipeline[]
+
+  @@map("profiles")
+}
+
+model ApiKey {
+  api_key_id        String  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id           String  @db.Uuid
+  encrypted_api_key String
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  expires_at        DateTime @db.Timestamptz(6)
+  is_active         Boolean @default(true)
+  Profile           Profile @relation(fields: [user_id], references: [userId], onDelete: Cascade, onUpdate: NoAction, map: "fk_api_key_user")
 }
 
 enum ActionTypeEnum {
