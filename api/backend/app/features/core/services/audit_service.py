@@ -5,26 +5,16 @@ This module implements the Audit Service using a Repository pattern with Prisma 
 
 Design Pattern:
 - Repository Pattern: The AuditService class acts as a repository, encapsulating the data access logic.
-- Dependency Injection: The Prisma client is injected via the database singleton.
+- Dependency Injection: The Prisma client is injected as an argument into each method.
 
 Key Design Decisions:
-1. Use of Dictionaries: We use dictionaries for input data to provide flexibility in the API.
-   This allows callers to provide only the necessary fields without needing to construct full objects.
-
-2. Prisma Models: We use Prisma-generated models (AuditLog) for type hinting and as return types.
-   This ensures type safety and consistency with the database schema.
-
+1. Pass Prisma Client: Each method receives the Prisma client as an argument, promoting better testability and decoupling.
+2. Use Timezone-Aware Datetimes: Replaced `utcnow` with `datetime.now(timezone.utc)` to handle timezone-aware objects.
 3. Enum Handling: Utilizes Python Enums to mirror Prisma enums for `action_type` and `entity_type`.
-   This enhances type safety and prevents invalid enum values.
-
-4. Transaction Management: Utilizes Prisma's interactive transactions to ensure ACID properties during complex operations.
-
-5. JSON Handling: Directly handles JSON fields using Python dictionaries, leveraging Prisma's native JSON support.
-
-This approach balances flexibility, type safety, and simplicity, leveraging Prisma's capabilities
-while providing a clean API for audit log operations.
+4. Main Function for Testing: Added a main function to demonstrate and test the AuditService functionalities.
 """
-
+import asyncio
+import traceback
 from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
@@ -36,7 +26,6 @@ from prisma.enums import ActionTypeEnum as PrismaActionTypeEnum, AuditEntityType
 from prisma.models import AuditLog as PrismaAuditLog
 from prisma.errors import UniqueViolationError, PrismaError
 
-from backend.app.database import database
 from backend.app.logger import ConstellationLogger
 
 
@@ -59,25 +48,48 @@ class AuditService:
                     - 'details': Dict[str, Any] (optional)
 
         Returns:
-            PrismaAuditLog: The created audit log entry.
+            Optional[PrismaAuditLog]: The created audit log entry if successful, None otherwise.
         """
-        # Validate required fields
-        required_fields = ["user_id", "action_type", "entity_type", "entity_id"]
-        for field in required_fields:
-            if field not in audit_data:
-                raise ValueError(f"Missing required field: {field}")
+        try:
+            # Validate required fields
+            required_fields = {"user_id", "action_type", "entity_type", "entity_id"}
+            for field in required_fields:
+                if field not in audit_data:
+                    self.logger.log(
+                        "AuditService",
+                        "error",
+                        "Missing required field in audit_data.",
+                        extra={"audit_data": audit_data},
+                    )
+                    return None
 
-        # Ensure enums are valid
-        if audit_data["action_type"] not in PrismaActionTypeEnum.__members__:
-            raise ValueError(f"Invalid action_type: {audit_data['action_type']}")
+            # Ensure enums are valid
+            if audit_data["action_type"] not in PrismaActionTypeEnum.__members__:
+                self.logger.log(
+                    "AuditService",
+                    "error",
+                    f"Invalid action_type: {audit_data['action_type']}",
+                )
+                return None
 
-        if audit_data["entity_type"] not in PrismaAuditEntityTypeEnum.__members__:
-            raise ValueError(f"Invalid entity_type: {audit_data['entity_type']}")
+            if audit_data["entity_type"] not in PrismaAuditEntityTypeEnum.__members__:
+                self.logger.log(
+                    "AuditService",
+                    "error",
+                    f"Invalid entity_type: {audit_data['entity_type']}",
+                )
+                return None
 
-        # Validate 'details' field
-        details = audit_data.get("details")
-        if details is not None and not isinstance(details, dict):
-            raise ValueError("`details` must be a dictionary representing JSON data.")
+            # Validate and sanitize 'details' field
+            details = audit_data.get("details")
+            if details is not None and not isinstance(details, dict):
+                self.logger.log(
+                    "AuditService",
+                    "error",
+                    "`details` must be a dictionary representing JSON data.",
+                    extra={"details": details},
+                )
+                return None
 
         # Prepare data for creation
         create_data = {
@@ -95,17 +107,17 @@ class AuditService:
             data=create_data
         )
 
-        self.logger.log(
-            "AuditService",
-            "info",
-            "Audit log created successfully.",
-            log_id=created_log.log_id,
-            action_type=created_log.action_type,
-            entity_type=created_log.entity_type,
-            entity_id=created_log.entity_id
-        )
+            self.logger.log(
+                "AuditService",
+                "info",
+                "Audit log created successfully.",
+                log_id=created_log.log_id,
+                action_type=created_log.action_type,
+                entity_type=created_log.entity_type,
+                entity_id=created_log.entity_id
+            )
 
-        return created_log
+            return created_log
 
     async def get_audit_log_by_id(self, tx: Prisma, log_id: UUID) -> Optional[PrismaAuditLog]:
         """
@@ -116,26 +128,26 @@ class AuditService:
             log_id (UUID): The UUID of the audit log to retrieve.
 
         Returns:
-            Optional[PrismaAuditLog]: The retrieved audit log entry, or None if not found.
+            Optional[PrismaAuditLog]: The audit log data if found, None otherwise.
         """
         audit_log = await tx.auditlog.find_unique(
             where={"log_id": str(log_id)}
         )
 
-        if audit_log:
-            self.logger.log(
-                "AuditService",
-                "info",
-                "Audit log retrieved successfully.",
-                log_id=audit_log.log_id
-            )
-        else:
-            self.logger.log(
-                "AuditService",
-                "warning",
-                "Audit log not found.",
-                log_id=str(log_id)
-            )
+            if audit_log:
+                self.logger.log(
+                    "AuditService",
+                    "info",
+                    "Audit log retrieved successfully.",
+                    log_id=audit_log.log_id
+                )
+            else:
+                self.logger.log(
+                    "AuditService",
+                    "warning",
+                    "Audit log not found.",
+                    log_id=str(log_id)
+                )
 
         return audit_log
 
@@ -157,21 +169,32 @@ class AuditService:
         Returns:
             List[PrismaAuditLog]: A list of audit log entries matching the filters.
         """
-        prisma_filters = {}
+        try:
+            prisma_filters = {}
 
-        if filters:
-            if "user_id" in filters:
-                prisma_filters["user_id"] = filters["user_id"]
-            if "action_type" in filters:
-                if filters["action_type"] not in PrismaActionTypeEnum.__members__:
-                    raise ValueError(f"Invalid action_type filter: {filters['action_type']}")
-                prisma_filters["action_type"] = PrismaActionTypeEnum[filters["action_type"]]
-            if "entity_type" in filters:
-                if filters["entity_type"] not in PrismaAuditEntityTypeEnum.__members__:
-                    raise ValueError(f"Invalid entity_type filter: {filters['entity_type']}")
-                prisma_filters["entity_type"] = PrismaAuditEntityTypeEnum[filters["entity_type"]]
-            if "entity_id" in filters:
-                prisma_filters["entity_id"] = filters["entity_id"]
+            if filters:
+                if "user_id" in filters:
+                    prisma_filters["user_id"] = filters["user_id"]
+                if "action_type" in filters:
+                    if filters["action_type"] not in PrismaActionTypeEnum.__members__:
+                        self.logger.log(
+                            "AuditService",
+                            "error",
+                            f"Invalid action_type filter: {filters['action_type']}"
+                        )
+                        return []
+                    prisma_filters["action_type"] = PrismaActionTypeEnum[filters["action_type"]]
+                if "entity_type" in filters:
+                    if filters["entity_type"] not in PrismaAuditEntityTypeEnum.__members__:
+                        self.logger.log(
+                            "AuditService",
+                            "error",
+                            f"Invalid entity_type filter: {filters['entity_type']}"
+                        )
+                        return []
+                    prisma_filters["entity_type"] = PrismaAuditEntityTypeEnum[filters["entity_type"]]
+                if "entity_id" in filters:
+                    prisma_filters["entity_id"] = filters["entity_id"]
 
         audit_logs = await tx.auditlog.find_many(
             where=prisma_filters,
@@ -180,16 +203,24 @@ class AuditService:
             order={"timestamp": "desc"}
         )
 
-        self.logger.log(
-            "AuditService",
-            "info",
-            f"Retrieved {len(audit_logs)} audit logs.",
-            filters=filters,
-            limit=limit,
-            offset=offset
-        )
+            self.logger.log(
+                "AuditService",
+                "info",
+                f"Retrieved {len(audit_logs)} audit logs.",
+                filters=filters,
+                limit=limit,
+                offset=offset
+            )
 
-        return audit_logs
+            return audit_logs
+        except Exception as e:
+            self.logger.log(
+                "AuditService",
+                "error",
+                "Failed to list audit logs.",
+                error=str(e)
+            )
+            return []
 
     async def update_audit_log(self, tx: Prisma, log_id: UUID, update_data: Dict[str, Any]) -> PrismaAuditLog:
         """
@@ -202,22 +233,33 @@ class AuditService:
                 Allowed keys: 'action_type', 'entity_type', 'entity_id', 'details'.
 
         Returns:
-            PrismaAuditLog: The updated audit log entry.
+            Optional[PrismaAuditLog]: The updated audit log entry if successful, None otherwise.
         """
-        # Prevent updating the primary key
-        if "log_id" in update_data:
-            del update_data["log_id"]
+        try:
+            # Prevent updating the primary key
+            if "log_id" in update_data:
+                del update_data["log_id"]
 
-        # Validate enums if they are being updated
-        if "action_type" in update_data:
-            if update_data["action_type"] not in PrismaActionTypeEnum.__members__:
-                raise ValueError(f"Invalid action_type: {update_data['action_type']}")
-            update_data["action_type"] = PrismaActionTypeEnum[update_data["action_type"]]
+            # Validate enums if they are being updated
+            if "action_type" in update_data:
+                if update_data["action_type"] not in PrismaActionTypeEnum.__members__:
+                    self.logger.log(
+                        "AuditService",
+                        "error",
+                        f"Invalid action_type: {update_data['action_type']}"
+                    )
+                    return None
+                update_data["action_type"] = PrismaActionTypeEnum[update_data["action_type"]]
 
-        if "entity_type" in update_data:
-            if update_data["entity_type"] not in PrismaAuditEntityTypeEnum.__members__:
-                raise ValueError(f"Invalid entity_type: {update_data['entity_type']}")
-            update_data["entity_type"] = PrismaAuditEntityTypeEnum[update_data["entity_type"]]
+            if "entity_type" in update_data:
+                if update_data["entity_type"] not in PrismaAuditEntityTypeEnum.__members__:
+                    self.logger.log(
+                        "AuditService",
+                        "error",
+                        f"Invalid entity_type: {update_data['entity_type']}"
+                    )
+                    return None
+                update_data["entity_type"] = PrismaAuditEntityTypeEnum[update_data["entity_type"]]
 
         # Validate 'details' field
         if "details" in update_data:
@@ -226,23 +268,23 @@ class AuditService:
                 raise ValueError("`details` must be a dictionary representing JSON data.")
             update_data["details"] = json.dumps(details)  # Will default to '{}'::jsonb if set to default
 
-        # Update timestamp
-        update_data["timestamp"] = datetime.now(timezone.utc)
+            # Update timestamp
+            update_data["timestamp"] = datetime.now(timezone.utc)
 
         updated_log = await tx.auditlog.update(
             where={"log_id": str(log_id)},
             data=update_data
         )
 
-        self.logger.log(
-            "AuditService",
-            "info",
-            "Audit log updated successfully.",
-            log_id=updated_log.log_id,
-            updated_fields=list(update_data.keys())
-        )
+            self.logger.log(
+                "AuditService",
+                "info",
+                "Audit log updated successfully.",
+                log_id=updated_log.log_id,
+                updated_fields=list(update_data.keys())
+            )
 
-        return updated_log
+            return updated_log
 
     async def delete_audit_log(self, tx: Prisma, log_id: UUID) -> bool:
         """
@@ -259,20 +301,27 @@ class AuditService:
             where={"log_id": str(log_id)}
         )
 
-        if deleted_log:
+            if deleted_log:
+                self.logger.log(
+                    "AuditService",
+                    "info",
+                    "Audit log deleted successfully.",
+                    log_id=str(log_id)
+                )
+                return True
+            else:
+                self.logger.log(
+                    "AuditService",
+                    "warning",
+                    "Audit log not found for deletion.",
+                    log_id=str(log_id)
+                )
+                return False
+        except Exception as e:
             self.logger.log(
                 "AuditService",
-                "info",
-                "Audit log deleted successfully.",
-                log_id=str(log_id)
-            )
-            return True
-        else:
-            self.logger.log(
-                "AuditService",
-                "warning",
-                "Audit log not found for deletion.",
-                log_id=str(log_id)
+                "error",
+                f"Failed to delete audit log: {str(e)}"
             )
             return False
 
@@ -281,7 +330,14 @@ class AuditService:
         Comprehensive main function to test AuditService functionalities.
         Demonstrates creating audit logs, retrieving logs, updating logs, and deleting logs.
         """
-        print("Starting AuditService test...")
+        try:
+            # Initialize Prisma client
+            prisma = Prisma()
+            await prisma.connect()
+            print("Connected to the database.")
+
+            # Initialize AuditService
+            audit_service = AuditService()
 
         async with database.prisma.tx() as tx:
             # Step 1: Create a new audit log
@@ -347,21 +403,24 @@ class AuditService:
             for log in audit_logs_after_deletion:
                 print(f"- Log ID: {log.log_id}, Action: {log.action_type}, Entity: {log.entity_type}, Details: {log.details}")
 
-        print("\nAuditService test completed.")
+        except Exception as e:
+            self.logger.log("AuditService", "error", "An error occurred in main.", error=str(e))
+            print(f"An error occurred: {e}")
+        finally:
+            print("\nDisconnecting from the database...")
+            await prisma.disconnect()
+            print("Database disconnected.")
 
+# -------------------
+# Testing Utility
+# -------------------
 
-# Testing the AuditService
+async def run_audit_service_tests():
+    """
+    Function to run AuditService tests.
+    """
+    audit_service = AuditService()
+    await audit_service.main()
+
 if __name__ == "__main__":
-    async def run_audit_service_tests():
-        print("Connecting to the database...")
-        await database.connect()
-        print("Database connected.")
-
-        audit_service = AuditService()
-        await audit_service.main()
-
-        print("\nDisconnecting from the database...")
-        await database.disconnect()
-        print("Database disconnected.")
-
     asyncio.run(run_audit_service_tests())
