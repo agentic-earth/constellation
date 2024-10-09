@@ -24,7 +24,6 @@ class LLMService:
     def make_llm_request(self, prompt: str) -> str:
         # Step 1: Initialize a document store (in-memory for this example)
         document_store = InMemoryDocumentStore(embedding_similarity_function="cosine")
-        # Step 3: Add some documents to the document store
 
         # Step 2: Add some documents to the document store
         documents = [
