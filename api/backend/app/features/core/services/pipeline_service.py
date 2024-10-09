@@ -28,7 +28,7 @@ from uuid import UUID, uuid4
 from datetime import datetime
 import asyncio
 
-from prisma.models import pipelines, pipeline_blocks, pipeline_edges
+from prisma.models import Pipeline, PipelineBlock, PipelineEdge
 from backend.app.database import database
 from backend.app.logger import ConstellationLogger
 
@@ -38,7 +38,7 @@ class PipelineService:
         self.prisma = database.prisma
         self.logger = ConstellationLogger()
 
-    async def create_pipeline(self, pipeline_data: Dict[str, Any]) -> pipelines:
+    async def create_pipeline(self, pipeline_data: Dict[str, Any]) -> Pipeline:
         """
         Creates a new pipeline in the database.
 

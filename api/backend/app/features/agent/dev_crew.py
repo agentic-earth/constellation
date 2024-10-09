@@ -16,8 +16,10 @@ Design Philosophy:
 """
 
 import sys
-import os
+sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api")
+sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api/backend")
 
+import os
 from backend.app.logger import ConstellationLogger
 
 # Add the parent directory of 'backend' to the Python path
@@ -53,15 +55,6 @@ def create_dev_crew(github_repo_url: str):
 
 
 if __name__ == "__main__":
-    os.environ['OPENAI_API_KEY'] = 'sk-WCt96z3T6pan0cwlSVtv_X7hXqEdVP04VfbVNzGiJpT3BlbkFJ8vYD3dakbsZYU3w9hYOfZS_n35PEdDJDuYCQ92Q4gA'
-
-    SUPABASE_URL='https://xxikoihjvqzqjjzbjboj.supabase.co'
-    SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4aWtvaWhqdnF6cWpqemJqYm9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIzMTk1NDksImV4cCI6MjAzNzg5NTU0OX0.2LyR_GmXdn_eaJXN70kRs0KROb9JvDJHeW9VhgcfER8'
-    SUPABASE_SERVICE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4aWtvaWhqdnF6cWpqemJqYm9qIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcyMjMxOTU0OSwiZXhwIjoyMDM3ODk1NTQ5fQ.ti4Yb_T_SRGxvcYeJe3T3SmlNKEOjAg-jmHsFB_Cr6w'
-    os.environ['SUPABASE_URL'] = SUPABASE_URL
-    os.environ['SUPABASE_KEY'] = SUPABASE_KEY
-    os.environ['SUPABASE_SERVICE_KEY'] = SUPABASE_SERVICE_KEY
-
     crew = create_dev_crew('https://github.com/MaartenGr/BERTopic')
     result = crew.kickoff()
     print(result)
