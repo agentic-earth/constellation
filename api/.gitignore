@@ -2,3 +2,8 @@
 __pycache__/
 *.py[cod]
 dist/
+
+# Ignore the logs and database
+logs/
+db/
+*.log
