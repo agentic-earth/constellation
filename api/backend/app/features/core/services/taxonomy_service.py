@@ -311,7 +311,7 @@ class TaxonomyService:
 
             # Create or get general taxonomy categories
             for category in general_taxonomy.get("categories", []):
-                existing_category = await self.prisma.category.find_unique(
+                existing_category = await se.category.find_unique(
                     where={"name_parent_id": {"name": category["name"], "parent_id": None}}
                 )
                 if existing_category:

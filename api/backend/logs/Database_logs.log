@@ -1,3 +1,4 @@
-Log file initialized on 2024-10-03 22:02:22.232350
-2024-10-03 22:02:22,232 - Database - INFO - Attempting to connect to database with URL: DATABASE_URL
-2024-10-03 22:02:22,674 - Database - INFO - Prisma Client connected successfully.
+Log file initialized on 2024-10-09 21:25:37.705842
+2024-10-09 21:25:37,706 - Database - INFO - Attempting to connect to database with URL: DATABASE_URL
+2024-10-09 21:25:38,144 - Database - INFO - Prisma Client connected successfully.
+2024-10-09 21:25:39,209 - Database - INFO - Prisma Client disconnected successfully.
