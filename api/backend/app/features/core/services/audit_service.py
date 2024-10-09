@@ -15,6 +15,7 @@ Key Design Decisions:
 """
 import asyncio
 import traceback
+import json
 from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
@@ -96,7 +97,7 @@ class AuditService:
                 "entity_type": PrismaAuditEntityTypeEnum[audit_data["entity_type"]],
                 "entity_id": audit_data["entity_id"],
                 "timestamp": datetime.now(timezone.utc),
-                "details": details or {}  # Ensure this is a dict
+                "details": json.dumps(details)  # Ensure this is a dict
             }
 
             # Create the audit log
@@ -291,7 +292,7 @@ class AuditService:
 
             # Update timestamp
             update_data["timestamp"] = datetime.now(timezone.utc)
-
+            update_data["details"] = json.dumps(update_data["details"])
             updated_log = await prisma.auditlog.update(
                 where={"log_id": str(log_id)},
                 data=update_data
