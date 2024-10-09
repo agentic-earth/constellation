@@ -4,6 +4,7 @@ from pydantic import BaseModel, EmailStr, Field, validator
 from typing import Optional
 from uuid import UUID
 
+
 # Custom schema for user creation with password validation
 class UserCreateInput(BaseModel):
     username: str = Field(..., description="Unique username for the user.")
