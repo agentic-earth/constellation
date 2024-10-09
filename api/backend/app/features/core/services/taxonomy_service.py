@@ -1,443 +1,611 @@
-# app/services/taxonomy_service.py
+# constellation-backend/api/backend/app/features/core/services/taxonomy_service.py
 
 """
 Taxonomy Service Module
 
-This module encapsulates all taxonomy-related business logic and interactions with the Supabase backend.
-It provides functions to create, retrieve, update, and delete taxonomy categories, ensuring that all operations are
-maintained consistently across the database.
+This module implements the Taxonomy Service using a Repository pattern with Prisma ORM.
 
-Design Philosophy:
-- Maintain independence from other services to uphold clear separation of concerns.
-- Utilize Supabase's REST API for standard CRUD operations for performance and reliability.
-- Handle complex taxonomy parsing and hierarchical management within Python.
-- Ensure flexibility to adapt to taxonomy changes with minimal modifications.
+Design Pattern:
+- Repository Pattern: The TaxonomyService class acts as a repository, encapsulating the data access logic.
+- Dependency Injection: The Prisma client is injected via the database singleton.
+
+Key Design Decisions:
+1. Use of Dictionaries: We use dictionaries for input data to provide flexibility in the API.
+   This allows callers to provide only the necessary fields without needing to construct full objects.
+
+2. Prisma Models: We use Prisma-generated models (Category, BlockCategory, Block) for type hinting and as return types.
+   This ensures type safety and consistency with the database schema.
+
+3. Nested Taxonomy Handling: The service automatically parses nested taxonomy objects into categories, enabling deep taxonomy associations.
+
+4. Transaction Management: Utilizes Prisma's interactive transactions to ensure ACID properties during complex operations.
+
+5. Error Handling: Comprehensive error handling to manage exceptions and ensure data consistency.
+
+This approach balances flexibility, type safety, and simplicity, leveraging Prisma's capabilities
+while providing a clean API for taxonomy operations.
 """
 
-import traceback
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from uuid import UUID, uuid4
+from prisma import Prisma
+from prisma.models import Category as PrismaCategory, BlockCategory as PrismaBlockCategory, Block as PrismaBlock
+from prisma.errors import UniqueViolationError
+from backend.app.database import database
+from backend.app.logger import ConstellationLogger
+import asyncio
 from datetime import datetime
 
-from backend.app.taxonomy import Taxonomy, GeneralTaxonomy, EarthObservationModelTaxonomy, WeatherClimateModelTaxonomy, DatasetTaxonomy
-from backend.app.logger import ConstellationLogger
-from backend.app.database import get_supabase_client
-from backend.app.utils.serialization_utils import serialize_dict
-
-
 class TaxonomyService:
-    """
-    TaxonomyService handles all taxonomy-related operations, including parsing taxonomy JSON,
-    managing taxonomy categories, associating categories with blocks, and facilitating taxonomy-based searches.
-    """
-
     def __init__(self):
-        """
-        Initializes the TaxonomyService with the Supabase client and logger.
-        """
-        self.client = get_supabase_client()
+        self.prisma = database.prisma
         self.logger = ConstellationLogger()
 
-    def create_or_get_category(self, name: str, parent_id: Optional[UUID] = None) -> Optional[UUID]:
+    async def create_category(self, category_data: Dict[str, Any], transaction: Optional[Prisma] = None) -> Optional[PrismaCategory]:
         """
-        Creates a new category or retrieves an existing one based on name and parent_id.
+        Creates a new category, optionally with a parent category.
 
         Args:
-            name (str): Name of the category.
-            parent_id (Optional[UUID]): UUID of the parent category, if any.
+            category_data (Dict[str, Any]): Data for creating the category.
+                Expected keys: 'name', optional 'parent_id'.
+            transaction (Optional[Prisma]): Prisma transaction instance.
 
         Returns:
-            Optional[UUID]: The UUID of the created or existing category.
+            Optional[PrismaCategory]: The created category if successful, None otherwise.
         """
         try:
-            # Query to find existing category
-            query = self.client.table("categories").select("category_id").eq("name", name)
-            if parent_id:
-                query = query.eq("parent_id", str(parent_id))
-            response = query.execute()
-
-            if response.data:
-                category_id = UUID(response.data[0]['category_id'])
-                self.logger.log(
-                    "TaxonomyService",
-                    "info",
-                    f"Existing category found: {name} (ID: {category_id})",
-                    extra={"category_name": name, "category_id": str(category_id)}
-                )
-                return category_id
-
-            # If not found, create a new category
-            new_category_id = uuid4()
-            current_time = datetime.utcnow()
-
-            category_data = {
-                "category_id": str(new_category_id),
-                "name": name,
-                "parent_id": str(parent_id) if parent_id else None,
-                "created_at": current_time.isoformat(),
-                "updated_at": current_time.isoformat()
-            }
-
-            insert_response = self.client.table("categories").insert(serialize_dict(category_data)).execute()
-
-            if insert_response.error:
-                self.logger.log(
-                    "TaxonomyService",
-                    "error",
-                    f"Failed to create category: {name}",
-                    extra={"error": insert_response.error.message}
-                )
-                return None
-
+            prisma_instance = transaction or self.prisma
+            created_category = await prisma_instance.category.create(
+                data={
+                    "name": category_data["name"],
+                    "parent_id": str(category_data["parent_id"]) if category_data.get("parent_id") else None
+                }
+            )
             self.logger.log(
                 "TaxonomyService",
                 "info",
-                f"Category created: {name} (ID: {new_category_id})",
-                extra={"category_name": name, "category_id": str(new_category_id)}
+                "Category created successfully",
+                category_id=created_category.category_id,
+                category_name=created_category.name
             )
-            return new_category_id
-
+            return created_category
+        except UniqueViolationError:
+            # Category with this name and parent_id already exists, retrieve it
+            existing_category = await self.get_category_by_name_and_parent(
+                category_data["name"],
+                category_data.get("parent_id")
+            )
+            if existing_category:
+                self.logger.log(
+                    "TaxonomyService",
+                    "info",
+                    "Category already exists, retrieved existing category.",
+                    category_id=existing_category.category_id,
+                    category_name=existing_category.name
+                )
+                return existing_category
+            else:
+                raise ValueError(f"Failed to create or retrieve category with name: {category_data['name']}")
         except Exception as e:
-            self.logger.log(
-                "TaxonomyService",
-                "critical",
-                f"Exception in create_or_get_category: {str(e)}",
-                extra={"traceback": traceback.format_exc()}
-            )
+            self.logger.log("TaxonomyService", "error", "Failed to create category", error=str(e))
             return None
 
-    def process_taxonomy(self, taxonomy: Dict[str, Any], parent_id: Optional[UUID] = None) -> List[UUID]:
+    async def get_category_by_id(self, category_id: UUID, transaction: Optional[Prisma] = None) -> Optional[PrismaCategory]:
         """
-        Processes nested taxonomy and ensures all categories exist in the database.
+        Retrieves a category by its ID, including its children.
 
         Args:
-            taxonomy (Dict[str, Any]): Nested taxonomy dictionary.
-            parent_id (Optional[UUID]): UUID of the parent category, if any.
+            category_id (UUID): The UUID of the category to retrieve.
+            transaction (Optional[Prisma]): Prisma transaction instance.
 
         Returns:
-            List[UUID]: List of category UUIDs associated with the block.
+            Optional[PrismaCategory]: The retrieved category if found, None otherwise.
         """
-        category_ids = []
-        for key, value in taxonomy.items():
-            category_id = self.create_or_get_category(name=key, parent_id=parent_id)
-            if category_id:
-                category_ids.append(category_id)
-                if isinstance(value, dict):
-                    sub_category_ids = self.process_taxonomy(taxonomy=value, parent_id=category_id)
-                    category_ids.extend(sub_category_ids)
+        try:
+            prisma_instance = transaction or self.prisma
+            category = await prisma_instance.category.find_unique(
+                where={"category_id": str(category_id)},
+                include={"children": True}
+            )
+            if category:
+                self.logger.log(
+                    "TaxonomyService",
+                    "info",
+                    "Category retrieved successfully",
+                    category_id=category.category_id,
+                    category_name=category.name
+                )
             else:
                 self.logger.log(
                     "TaxonomyService",
                     "warning",
-                    f"Failed to process category: {key}",
-                    extra={"category_name": key, "parent_id": parent_id}
+                    "Category not found",
+                    category_id=str(category_id)
                 )
-        return category_ids
+            return category
+        except Exception as e:
+            self.logger.log("TaxonomyService", "error", "Failed to retrieve category by ID", error=str(e))
+            return None
 
-    def associate_block_with_categories(self, block_id: UUID, category_ids: List[UUID]) -> bool:
+    async def get_category_by_name_and_parent(self, name: str, parent_id: Optional[UUID]) -> Optional[PrismaCategory]:
         """
-        Associates a block with multiple taxonomy categories.
+        Retrieves a category by its name and parent_id.
 
         Args:
-            block_id (UUID): UUID of the block.
-            category_ids (List[UUID]): List of category UUIDs to associate with the block.
+            name (str): The name of the category.
+            parent_id (Optional[UUID]): The UUID of the parent category, if any.
 
         Returns:
-            bool: True if associations are successful, False otherwise.
+            Optional[PrismaCategory]: The retrieved category if found, None otherwise.
         """
         try:
-            current_time = datetime.utcnow()
-            associations = [
-                {
-                    "block_category_id": str(uuid4()),
-                    "block_id": str(block_id),
-                    "category_id": str(category_id),
-                    "created_at": current_time.isoformat()
-                }
-                for category_id in category_ids
-            ]
+            category = await self.prisma.category.find_unique(
+                where={"name_parent_id": {"name": name, "parent_id": str(parent_id) if parent_id else None}}
+            )
+            return category
+        except Exception as e:
+            self.logger.log("TaxonomyService", "error", "Failed to retrieve category by name and parent_id", error=str(e))
+            return None
 
-            insert_response = self.client.table("block_categories").insert(serialize_dict(associations)).execute()
+    async def update_category(self, category_id: UUID, update_data: Dict[str, Any], transaction: Optional[Prisma] = None) -> Optional[PrismaCategory]:
+        """
+        Updates an existing category's details.
 
-            if insert_response.error:
-                self.logger.log(
-                    "TaxonomyService",
-                    "error",
-                    "Failed to associate block with categories",
-                    extra={"block_id": str(block_id), "error": insert_response.error.message}
-                )
-                return False
+        Args:
+            category_id (UUID): The UUID of the category to update.
+            update_data (Dict[str, Any]): Data to update. Allowed keys: 'name', 'parent_id'.
+            transaction (Optional[Prisma]): Prisma transaction instance.
 
+        Returns:
+            Optional[PrismaCategory]: The updated category if successful, None otherwise.
+        """
+        try:
+            prisma_instance = transaction or self.prisma
+            data_to_update = {}
+            if "name" in update_data:
+                data_to_update["name"] = update_data["name"]
+            if "parent_id" in update_data:
+                data_to_update["parent_id"] = str(update_data["parent_id"]) if update_data["parent_id"] else None
+
+            updated_category = await prisma_instance.category.update(
+                where={"category_id": str(category_id)},
+                data=data_to_update
+            )
             self.logger.log(
                 "TaxonomyService",
                 "info",
-                f"Block {block_id} associated with categories: {category_ids}",
-                extra={"block_id": str(block_id), "category_ids": [str(cid) for cid in category_ids]}
+                "Category updated successfully",
+                category_id=updated_category.category_id,
+                updated_fields=list(data_to_update.keys())
+            )
+            return updated_category
+        except Exception as e:
+            self.logger.log("TaxonomyService", "error", "Failed to update category", error=str(e))
+            return None
+
+    async def delete_category(self, category_id: UUID, transaction: Optional[Prisma] = None) -> bool:
+        """
+        Deletes a category by its ID.
+
+        Args:
+            category_id (UUID): The UUID of the category to delete.
+            transaction (Optional[Prisma]): Prisma transaction instance.
+
+        Returns:
+            bool: True if deletion was successful, False otherwise.
+        """
+        try:
+            prisma_instance = transaction or self.prisma
+            await prisma_instance.category.delete(
+                where={"category_id": str(category_id)}
+            )
+            self.logger.log(
+                "TaxonomyService",
+                "info",
+                "Category deleted successfully",
+                category_id=str(category_id)
             )
             return True
-
         except Exception as e:
-            self.logger.log(
-                "TaxonomyService",
-                "critical",
-                f"Exception in associate_block_with_categories: {str(e)}",
-                extra={"traceback": traceback.format_exc()}
-            )
+            self.logger.log("TaxonomyService", "error", "Failed to delete category", error=str(e))
             return False
 
-    def create_taxonomy_for_block(self, block_id: UUID, taxonomy: Taxonomy) -> bool:
+    async def associate_block_with_categories(self, block_id: UUID, category_ids: List[UUID], transaction: Optional[Prisma] = None) -> bool:
         """
-        Creates taxonomy categories and associates them with a block.
+        Associates a block with multiple categories.
 
         Args:
-            block_id (UUID): UUID of the block.
-            taxonomy (Taxonomy): Taxonomy data structured according to Pydantic models.
+            block_id (UUID): The UUID of the block.
+            category_ids (List[UUID]): A list of category UUIDs to associate with the block.
+            transaction (Optional[Prisma]): Prisma transaction instance.
 
         Returns:
-            bool: True if successful, False otherwise.
+            bool: True if associations were successful, False otherwise.
         """
         try:
-            taxonomy_dict = taxonomy.dict(exclude_unset=True)
+            prisma_instance = transaction or self.prisma
+            block_categories_data = [
+                {"block_id": str(block_id), "category_id": str(cat_id)}
+                for cat_id in category_ids
+            ]
+            await prisma_instance.block_category.create_many(
+                data=block_categories_data,
+                skip_duplicates=True  # Prevent errors if association already exists
+            )
+            self.logger.log(
+                "TaxonomyService",
+                "info",
+                "Block associated with categories successfully",
+                block_id=str(block_id),
+                category_ids=[str(cat_id) for cat_id in category_ids]
+            )
+            return True
+        except Exception as e:
+            self.logger.log("TaxonomyService", "error", "Failed to associate block with categories", error=str(e))
+            return False
 
-            # Process general taxonomy
-            general_taxonomy = taxonomy_dict.get('general', {})
-            general_categories = self.process_taxonomy(taxonomy=general_taxonomy)
+    async def dissociate_block_from_categories(self, block_id: UUID, category_ids: List[UUID], transaction: Optional[Prisma] = None) -> bool:
+        """
+        Dissociates a block from multiple categories.
 
-            # Process specific taxonomy based on paper type
-            specific_taxonomy = taxonomy_dict.get('specific')
-            if specific_taxonomy:
-                # Determine taxonomy type
-                paper_type = general_taxonomy.get('paper_type')
-                if paper_type == "Earth Observation Model":
-                    specific_taxonomy = specific_taxonomy.get('earth_observation', {})
-                elif paper_type == "Weather/Climate Model":
-                    specific_taxonomy = specific_taxonomy.get('weather_climate', {})
-                elif paper_type == "Dataset":
-                    specific_taxonomy = specific_taxonomy.get('dataset', {})
+        Args:
+            block_id (UUID): The UUID of the block.
+            category_ids (List[UUID]): A list of category UUIDs to dissociate from the block.
+            transaction (Optional[Prisma]): Prisma transaction instance.
+
+        Returns:
+            bool: True if dissociations were successful, False otherwise.
+        """
+        try:
+            prisma_instance = transaction or self.prisma
+            for cat_id in category_ids:
+                await prisma_instance.block_category.delete_many(
+                    where={
+                        "block_id": str(block_id),
+                        "category_id": str(cat_id)
+                    }
+                )
+            self.logger.log(
+                "TaxonomyService",
+                "info",
+                "Block dissociated from categories successfully",
+                block_id=str(block_id),
+                category_ids=[str(cat_id) for cat_id in category_ids]
+            )
+            return True
+        except Exception as e:
+            self.logger.log("TaxonomyService", "error", "Failed to dissociate block from categories", error=str(e))
+            return False
+
+    async def create_taxonomy_for_block(self, block_id: UUID, taxonomy_data: Dict[str, Any], transaction: Prisma) -> bool:
+        """
+        Creates taxonomy categories and associates them with a block within a transaction.
+
+        Args:
+            block_id (UUID): The UUID of the block.
+            taxonomy_data (Dict[str, Any]): Nested taxonomy data.
+                Expected structure:
+                {
+                    "general": {
+                        "name": "Category Name",
+                        "parent_id": Optional[UUID],
+                        ...
+                    },
+                    "specific": {
+                        "name": "Subcategory Name",
+                        "parent_id": UUID of the general category,
+                        ...
+                    },
+                    ...
+                }
+            transaction (Prisma): Prisma transaction instance.
+
+        Returns:
+            bool: True if taxonomy creation and association were successful, False otherwise.
+        """
+        try:
+            general_taxonomy = taxonomy_data.get("general")
+            specific_taxonomy = taxonomy_data.get("specific")
+
+            category_ids = []
+
+            # Create or get general taxonomy categories
+            for category in general_taxonomy.get("categories", []):
+                existing_category = await self.prisma.category.find_unique(
+                    where={"name_parent_id": {"name": category["name"], "parent_id": None}}
+                )
+                if existing_category:
+                    category_ids.append(UUID(existing_category.category_id))
                 else:
-                    specific_taxonomy = {}
+                    created_category = await self.create_category(
+                        {"name": category["name"]},
+                        transaction=transaction
+                    )
+                    if created_category:
+                        category_ids.append(UUID(created_category.category_id))
+                    else:
+                        raise ValueError("Failed to create general taxonomy category.")
 
-                specific_categories = self.process_taxonomy(taxonomy=specific_taxonomy)
-                general_categories.extend(specific_categories)
+            # Create or get specific taxonomy categories
+            for category in specific_taxonomy.get("categories", []):
+                parent_name = category.get("parent_name")
+                # Find the parent category by name where parent_id is None
+                parent_category = await self.prisma.category.find_unique(
+                    where={"name_parent_id": {"name": parent_name, "parent_id": None}}
+                )
+                if not parent_category:
+                    raise ValueError(f"Parent category '{parent_name}' does not exist.")
 
-            # Associate block with all processed categories
-            success = self.associate_block_with_categories(block_id=block_id, category_ids=general_categories)
-            return success
+                existing_category = await self.prisma.category.find_unique(
+                    where={"name_parent_id": {"name": category["name"], "parent_id": str(parent_category.category_id)}}
+                )
+                if existing_category:
+                    category_ids.append(UUID(existing_category.category_id))
+                else:
+                    created_category = await self.create_category(
+                        {"name": category["name"], "parent_id": UUID(parent_category.category_id)},
+                        transaction=transaction
+                    )
+                    if created_category:
+                        category_ids.append(UUID(created_category.category_id))
+                    else:
+                        raise ValueError("Failed to create specific taxonomy category.")
 
-        except Exception as e:
-            self.logger.log(
-                "TaxonomyService",
-                "critical",
-                f"Exception in create_taxonomy_for_block: {str(e)}",
-                extra={"traceback": traceback.format_exc()}
+            # Associate block with all categories
+            association_success = await self.associate_block_with_categories(
+                block_id,
+                category_ids,
+                transaction=transaction
             )
+            if not association_success:
+                raise ValueError("Failed to associate block with taxonomy categories.")
+
+            return True
+        except Exception as e:
+            self.logger.log("TaxonomyService", "error", "Failed to create taxonomy for block", error=str(e))
             return False
 
-    def search_blocks_by_taxonomy(self, taxonomy_filters: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
+    async def search_blocks(self, search_filters: Dict[str, Any]) -> Optional[List[PrismaBlock]]:
         """
-        Searches for blocks that match the given taxonomy filters.
+        Searches for blocks based on taxonomy filters.
 
         Args:
-            taxonomy_filters (Dict[str, Any]): Filters based on taxonomy categories.
+            search_filters (Dict[str, Any]): Filters including 'category_names' and 'block_types'.
 
         Returns:
-            Optional[List[Dict[str, Any]]]: List of blocks matching the filters, or None if an error occurs.
+            Optional[List[PrismaBlock]]: List of blocks matching the search criteria, or None if an error occurs.
         """
         try:
-            # Flatten taxonomy filters to handle nested structures
-            flattened_filters = self.flatten_taxonomy(taxonomy_filters)
+            category_names = search_filters.get("category_names", [])
+            block_types = search_filters.get("block_types", [])
 
-            # Extract category names from flattened filters
-            category_names = list(flattened_filters.keys())
-            if not category_names:
-                self.logger.log(
-                    "TaxonomyService",
-                    "warning",
-                    "No valid taxonomy filters provided.",
-                    extra={"taxonomy_filters": taxonomy_filters}
+            query_filters = {}
+
+            if block_types:
+                query_filters["block_type"] = {"in": block_types}
+
+            if category_names:
+                # Fetch category_ids for the given names
+                categories = await self.prisma.category.find_many(
+                    where={
+                        "name": {"in": category_names}
+                    },
+                    select={"category_id": True}
                 )
-                return []
+                category_ids = [cat.category_id for cat in categories]
+                query_filters["block_categories"] = {
+                    "some": {
+                        "category_id": {"in": category_ids}
+                    }
+                }
 
-            # Retrieve category_ids matching the filter names
-            response = self.client.table("categories").select("category_id").in_("name", category_names).execute()
-
-            if response.error:
-                self.logger.log(
-                    "TaxonomyService",
-                    "error",
-                    "Failed to retrieve category IDs for search",
-                    extra={"error": response.error.message}
-                )
-                return None
-
-            category_ids = [UUID(cat['category_id']) for cat in response.data]
-
-            if not category_ids:
-                self.logger.log(
-                    "TaxonomyService",
-                    "info",
-                    "No categories found matching the filters",
-                    extra={"taxonomy_filters": taxonomy_filters}
-                )
-                return []
-
-            # Retrieve block_ids associated with these category_ids
-            response = self.client.table("block_categories").select("block_id").in_("category_id", [str(cid) for cid in category_ids]).execute()
-
-            if response.error:
-                self.logger.log(
-                    "TaxonomyService",
-                    "error",
-                    "Failed to retrieve block IDs for search",
-                    extra={"error": response.error.message}
-                )
-                return None
-
-            block_ids = list(set([UUID(block['block_id']) for block in response.data]))
-
-            if not block_ids:
-                self.logger.log(
-                    "TaxonomyService",
-                    "info",
-                    "No blocks found matching the taxonomy filters",
-                    extra={"taxonomy_filters": taxonomy_filters}
-                )
-                return []
-
-            # Retrieve block details
-            response = self.client.table("blocks").select("*").in_("block_id", [str(bid) for bid in block_ids]).execute()
-
-            if response.error:
-                self.logger.log(
-                    "TaxonomyService",
-                    "error",
-                    "Failed to retrieve blocks for search",
-                    extra={"error": response.error.message}
-                )
-                return None
+            blocks = await self.prisma.block.find_many(
+                where=query_filters,
+                include={"block_categories": True}
+            )
 
             self.logger.log(
                 "TaxonomyService",
                 "info",
-                f"Found {len(response.data)} blocks matching the taxonomy filters",
-                extra={"taxonomy_filters": taxonomy_filters}
+                "Blocks retrieved successfully based on search filters",
+                filters=search_filters,
+                count=len(blocks)
             )
-            return response.data
-
+            return blocks
         except Exception as e:
-            self.logger.log(
-                "TaxonomyService",
-                "critical",
-                f"Exception in search_blocks_by_taxonomy: {str(e)}",
-                extra={"traceback": traceback.format_exc()}
-            )
+            self.logger.log("TaxonomyService", "error", "Failed to search blocks", error=str(e))
             return None
 
-    def flatten_taxonomy(self, taxonomy: Dict[str, Any], parent_key: str = '', sep: str = '.') -> Dict[str, Any]:
+    async def get_all_categories(self) -> Optional[List[PrismaCategory]]:
         """
-        Flattens a nested taxonomy dictionary.
-
-        Args:
-            taxonomy (Dict[str, Any]): Nested taxonomy.
-            parent_key (str): Base key string.
-            sep (str): Separator between keys.
+        Retrieves all categories, including their hierarchical relationships.
 
         Returns:
-            Dict[str, Any]: Flattened taxonomy.
-        """
-        items = {}
-        for k, v in taxonomy.items():
-            new_key = f"{parent_key}{sep}{k}" if parent_key else k
-            if isinstance(v, dict):
-                items.update(self.flatten_taxonomy(v, new_key, sep=sep))
-            else:
-                items[new_key] = v
-        return items
-
-    def get_taxonomy_for_block(self, block_id: UUID) -> Optional[Dict[str, Any]]:
-        """
-        Retrieves the taxonomy associated with a specific block.
-
-        Args:
-            block_id (UUID): UUID of the block.
-
-        Returns:
-            Optional[Dict[str, Any]]: Nested taxonomy dictionary if found, None otherwise.
+            Optional[List[PrismaCategory]]: List of all categories with their children, or None if an error occurs.
         """
         try:
-            # Retrieve associated category_ids
-            response = self.client.table("block_categories").select("category_id").eq("block_id", str(block_id)).execute()
-
-            if response.error:
-                self.logger.log(
-                    "TaxonomyService",
-                    "error",
-                    "Failed to retrieve category IDs for block.",
-                    extra={"block_id": str(block_id), "error": response.error.message}
-                )
-                return None
-
-            category_ids = [UUID(cat['category_id']) for cat in response.data]
-            if not category_ids:
-                self.logger.log(
-                    "TaxonomyService",
-                    "info",
-                    f"No taxonomy associated with block {block_id}.",
-                    extra={"block_id": str(block_id)}
-                )
-                return None
-
-            # Retrieve category details
-            response = self.client.table("categories").select("category_id", "name", "parent_id").in_("category_id", [str(cid) for cid in category_ids]).execute()
-
-            if response.error:
-                self.logger.log(
-                    "TaxonomyService",
-                    "error",
-                    "Failed to retrieve category details for block.",
-                    extra={"block_id": str(block_id), "error": response.error.message}
-                )
-                return None
-
-            categories = response.data
-            taxonomy_tree = self.build_taxonomy_tree(categories)
-
+            categories = await self.prisma.category.find_many(
+                include={"children": True}
+            )
             self.logger.log(
                 "TaxonomyService",
                 "info",
-                f"Taxonomy retrieved for block {block_id}.",
-                extra={"block_id": str(block_id)}
+                f"Retrieved {len(categories)} categories."
             )
-            return taxonomy_tree
-
+            return categories
         except Exception as e:
-            self.logger.log(
-                "TaxonomyService",
-                "critical",
-                f"Exception in get_taxonomy_for_block: {str(e)}",
-                extra={"traceback": traceback.format_exc()}
-            )
+            self.logger.log("TaxonomyService", "error", "Failed to retrieve all categories", error=str(e))
             return None
 
-    def build_taxonomy_tree(self, categories: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def get_block_categories(self, block_id: UUID) -> Optional[List[PrismaBlockCategory]]:
         """
-        Builds a nested taxonomy tree from a flat list of categories.
+        Retrieves all category associations for a given block.
 
         Args:
-            categories (List[Dict[str, Any]]): List of category dictionaries.
+            block_id (UUID): The UUID of the block.
 
         Returns:
-            Dict[str, Any]: Nested taxonomy dictionary.
+            Optional[List[PrismaBlockCategory]]: List of BlockCategory associations, or None if an error occurs.
         """
-        taxonomy_dict = {}
-        category_map = {UUID(cat['category_id']): cat for cat in categories}
+        try:
+            block_categories = await self.prisma.block_category.find_many(
+                where={"block_id": str(block_id)},
+                include={"category": True}
+            )
+            self.logger.log(
+                "TaxonomyService",
+                "info",
+                f"Retrieved {len(block_categories)} category associations for block {block_id}."
+            )
+            return block_categories
+        except Exception as e:
+            self.logger.log("TaxonomyService", "error", "Failed to retrieve block categories", error=str(e))
+            return None
 
-        for cat_id, cat in category_map.items():
-            parent_id = UUID(cat['parent_id']) if cat['parent_id'] else None
-            if parent_id and parent_id in category_map:
-                parent = taxonomy_dict.setdefault(category_map[parent_id]['name'], {})
-                parent[cat['name']] = {}
+    async def main(self):
+        """
+        Comprehensive main function to test TaxonomyService functionalities.
+        """
+        try:
+            print("Starting TaxonomyService test...")
+
+            # Example data for testing
+            general_taxonomy_data = {
+                "categories": [
+                    {"name": "Climate Data"},
+                    {"name": "Remote Sensing"}
+                ]
+            }
+
+            specific_taxonomy_data = {
+                "categories": [
+                    {"name": "Climate Models", "parent_name": "Climate Data"},
+                    {"name": "Satellite Imagery", "parent_name": "Remote Sensing"}
+                ]
+            }
+
+            taxonomy_data = {
+                "general": general_taxonomy_data,
+                "specific": specific_taxonomy_data
+            }
+
+            # Step 1: Create a new block
+            print("\nCreating a new block...")
+            block_service = BlockService()
+            new_block_data = {
+                "name": "Block1",
+                "block_type": "dataset",
+                "description": "A sample block for taxonomy testing."
+            }
+            created_block = await block_service.prisma.block.create(data=new_block_data)
+            print(f"Created Block: {created_block.block_id} - {created_block.name}")
+
+            # Step 2: Create taxonomy and associate with block within a transaction
+            print("\nCreating taxonomy and associating with block...")
+            taxonomy_service = self
+            async with self.prisma.transaction() as tx:
+                taxonomy_success = await taxonomy_service.create_taxonomy_for_block(
+                    block_id=UUID(created_block.block_id),
+                    taxonomy_data=taxonomy_data,
+                    transaction=tx
+                )
+                if taxonomy_success:
+                    print("Taxonomy created and associated successfully.")
+                else:
+                    print("Failed to create and associate taxonomy.")
+
+            # Step 3: Retrieve block's categories
+            print("\nRetrieving block's categories...")
+            block_categories = await taxonomy_service.get_block_categories(UUID(created_block.block_id))
+            if block_categories:
+                for bc in block_categories:
+                    print(f"- Category ID: {bc.category.category_id}, Name: {bc.category.name}")
             else:
-                taxonomy_dict[cat['name']] = {}
+                print("No categories associated with the block.")
 
-        return taxonomy_dict
+            # Step 4: Update a category's name
+            print("\nUpdating a category's name...")
+            if block_categories:
+                category_to_update = block_categories[0].category
+                updated_category = await taxonomy_service.update_category(
+                    UUID(category_to_update.category_id),
+                    {"name": "Climate Information"}
+                )
+                if updated_category:
+                    print(f"Updated Category: {updated_category.category_id} - {updated_category.name}")
+                else:
+                    print("Failed to update category.")
+
+            # Step 5: Search for blocks with specific taxonomy
+            print("\nSearching for blocks with category 'Climate Information' and block type 'dataset'...")
+            search_filters = {
+                "category_names": ["Climate Information"],
+                "block_types": ["dataset"]
+            }
+            matching_blocks = await taxonomy_service.search_blocks(search_filters)
+            if matching_blocks:
+                for blk in matching_blocks:
+                    print(f"- Block ID: {blk.block_id}, Name: {blk.name}, Type: {blk.block_type}")
+            else:
+                print("No matching blocks found.")
+
+            # Step 6: Dissociate a category from the block
+            print("\nDissociating a category from the block...")
+            if block_categories:
+                category_to_dissociate = block_categories[0].category
+                dissociate_success = await taxonomy_service.dissociate_block_from_categories(
+                    UUID(created_block.block_id),
+                    [UUID(category_to_dissociate.category_id)]
+                )
+                if dissociate_success:
+                    print("Category dissociated successfully.")
+                else:
+                    print("Failed to dissociate category.")
+
+            # Step 7: Delete the block
+            print("\nDeleting the block...")
+            deletion_success = await taxonomy_service.prisma.block.delete(
+                where={"block_id": created_block.block_id}
+            )
+            if deletion_success:
+                print(f"Block {created_block.block_id} deleted successfully.")
+            else:
+                print("Failed to delete block.")
+
+            # Step 8: List all categories
+            print("\nListing all categories...")
+            all_categories = await taxonomy_service.get_all_categories()
+            if all_categories:
+                for cat in all_categories:
+                    parent_id = cat.parent_id if cat.parent_id else "None"
+                    print(f"- Category ID: {cat.category_id}, Name: {cat.name}, Parent ID: {parent_id}")
+            else:
+                print("No categories found.")
+
+        except Exception as e:
+            self.logger.log("TaxonomyService", "error", "An error occurred in main", error=str(e))
+            import traceback
+            print(traceback.format_exc())
+
+        print("\nTaxonomyService test completed.")
+
+# Testing the TaxonomyService
+if __name__ == "__main__":
+    from backend.app.database import database
+    from backend.app.logger import ConstellationLogger
+    #block service
+    from backend.app.features.core.services.block_service import BlockService
+    
+    async def run_taxonomy_service_tests():
+        print("Connecting to the database...")
+        await database.connect()
+        print("Database connected.")
+
+        taxonomy_service = TaxonomyService()
+        await taxonomy_service.main()
+
+        print("\nDisconnecting from the database...")
+        await database.disconnect()
+        print("Database disconnected.")
+
+    asyncio.run(run_taxonomy_service_tests())

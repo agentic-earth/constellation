@@ -1,669 +1,379 @@
-# app/controllers/block_controller.py
+# app/features/core/controllers/block_controller.py
 
 """
 Block Controller Module
 
 This module defines the BlockController class responsible for managing block-related operations.
-It orchestrates interactions between BlockService, TaxonomyService, and VectorEmbeddingService to
-perform operations that involve blocks, taxonomy, and vector embeddings. Additionally, it handles
-search functionalities based on taxonomy filters and vector similarity.
+It orchestrates interactions between BlockService, TaxonomyService, and AuditService to
+perform operations that involve blocks and taxonomy. Additionally, it handles
+search functionalities based on taxonomy filters.
 
 Responsibilities:
-- Coordinating between BlockService, TaxonomyService, and VectorEmbeddingService to perform complex workflows.
-- Handling CRUD operations for blocks, including optional taxonomy and vector embeddings.
-- Managing similarity searches with optional taxonomy filters.
-- Ensuring transactional integrity and robust error handling.
-- Managing audit logs through AuditService.
-
-Design Philosophy:
-- Maintain high cohesion by focusing solely on block-related orchestration.
-- Promote loose coupling by interacting with services through well-defined interfaces.
-- Ensure robustness through comprehensive error handling and logging.
+- Create, retrieve, update, and delete blocks.
+- Manage taxonomy associations for blocks.
+- Perform search operations based on taxonomy filters.
+- Handle audit logging for all block operations.
+- Ensure transactional safety and data consistency.
 """
 
-import traceback
-from typing import List, Optional, Dict, Any
+from prisma import Prisma
 from uuid import UUID
-
-from fastapi import HTTPException, status
-
+from typing import Optional, List, Dict, Any
 from backend.app.features.core.services.block_service import BlockService
 from backend.app.features.core.services.taxonomy_service import TaxonomyService
-from backend.app.features.core.services.vector_embedding_service import (
-    VectorEmbeddingService,
-)
-from backend.app.features.core.services.audit_service import (
-    AuditService,
-)  # Assuming AuditService exists
-from backend.app.schemas import (
-    BlockCreateSchema,
-    BlockUpdateSchema,
-    BlockResponseSchema,
-    VectorRepresentationSchema,
-    VectorRepresentationCreateSchema,
-    VectorRepresentationResponseSchema,
-)
-from backend.app.taxonomy import SearchQuery, SearchResult
-from backend.app.logger import ConstellationLogger
+from backend.app.features.core.services.audit_service import AuditService
+from backend.app.database import database
+from backend.app.utils.serialization_utils import align_dict_with_model  # Ensure this import is present
+import asyncio
 
 
 class BlockController:
-    """
-    BlockController manages all block-related operations, coordinating between BlockService,
-    TaxonomyService, and VectorEmbeddingService to perform CRUD operations, manage taxonomy,
-    handle vector embeddings, and execute similarity searches.
-    """
+    def __init__(self, prisma: Prisma):
+        self.prisma = prisma
+        self.block_service = BlockService(prisma)
+        self.taxonomy_service = TaxonomyService(prisma)
+        self.audit_service = AuditService(prisma)
 
-    def __init__(self):
+    async def create_block(self, block_data: Dict[str, Any], user_id: UUID) -> Optional[Dict[str, Any]]:
         """
-        Initializes the BlockController with instances of BlockService, TaxonomyService,
-        VectorEmbeddingService, and AuditService, along with the ConstellationLogger for
-        logging purposes.
-        """
-        self.block_service = BlockService()
-        self.taxonomy_service = TaxonomyService()
-        self.vector_embedding_service = VectorEmbeddingService()
-        self.audit_service = AuditService()
-        self.logger = ConstellationLogger()
-
-    # -------------------
-    # Block CRUD Operations
-    # -------------------
-
-    def create_block(
-        self, block_data: BlockCreateSchema
-    ) -> Optional[BlockResponseSchema]:
-        """
-        Creates a new block along with its optional taxonomy.
+        Creates a new block along with its taxonomy and audit log within a transaction.
 
         Args:
-            block_data (BlockCreateSchema): The data required to create a new block, including optional taxonomy and metadata.
+            block_data (Dict[str, Any]): Data for creating the block.
+            user_id (UUID): ID of the user performing the operation.
 
         Returns:
-            Optional[BlockResponseSchema]: The created block data if successful, None otherwise.
+            Optional[Dict[str, Any]]: The created block data if successful, None otherwise.
         """
-        try:
-            # Step 1: Create Block
-            block = self.block_service.create_block(block_data)
-            if not block:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Block creation failed.",
-                )
+        async with self.prisma.tx() as transaction:
+            try:
+                block_data['created_by'] = str(user_id)
+                block_data.pop('metadata', None)  # Removed 'metadata' as it's not in Prisma schema
 
-            # Step 2: Associate Taxonomy (if provided)
-            if block_data.taxonomy:
-                taxonomy_success = self.taxonomy_service.create_taxonomy_for_block(
-                    block_id=block.block_id, taxonomy=block_data.taxonomy
-                )
-                if not taxonomy_success:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Invalid taxonomy data.",
+                # Step 1: Create Block
+                created_block = await self.block_service.create_block(block_data, transaction)
+                if not created_block:
+                    raise ValueError("Failed to create block.")
+
+                # Step 2: Create Taxonomy and associate with Block
+                if "taxonomy" in block_data:
+                    taxonomy_success = await self.taxonomy_service.create_taxonomy_for_block(
+                        UUID(created_block["block_id"]),
+                        block_data["taxonomy"],
+                        transaction=transaction
                     )
-                    # Optionally, handle rollback of block creation
+                    if not taxonomy_success:
+                        raise ValueError("Failed to create taxonomy for block.")
 
-            # Step 3: Create Vector Embedding (if metadata provided)
+                # Step 3: Audit Logging
+                audit_log = {
+                    "user_id": str(user_id),
+                    "action_type": "CREATE",
+                    "entity_type": "block",  # Should be lowercase as per Prisma enum
+                    "entity_id": str(created_block["block_id"]),
+                    "details": {"block_name": block_data["name"]}
+                    # Removed 'users' field
+                }
+                # Align the audit_log without relation fields
+                aligned_audit_log = align_dict_with_model(audit_log, PrismaAuditLog)
+                await self.audit_service.create_audit_log(aligned_audit_log, transaction=transaction)
 
-            # Step 4: Log the creation in Audit Logs
-            audit_log = {
-                "user_id": block_data.created_by,  # Assuming `created_by` exists in BlockCreateSchema
-                "action_type": "CREATE",
-                "entity_type": "block",
-                "entity_id": str(block.block_id),
-                "details": f"Block '{block.name}' created with taxonomy and vector embedding.",
-            }
-            self.audit_service.create_audit_log(audit_log)
+                return created_block
 
-            self.logger.log(
-                "BlockController",
-                "info",
-                "Block created successfully with taxonomy and vector embedding.",
-                extra={"block_id": str(block.block_id)},
-            )
-            return block
+            except Exception as e:
+                print(f"An error occurred during block creation: {e}")
+                import traceback
+                print(traceback.format_exc())
+                return None
 
-        except HTTPException as he:
-            # Existing exception handling
-            self.logger.log(
-                "BlockController",
-                "error",
-                f"HTTPException during block creation: {he.detail}",
-                extra={"status_code": he.status_code, "detail": he.detail},
-            )
-            raise he
-        except Exception as e:
-            # Existing exception handling
-            self.logger.log(
-                "BlockController",
-                "critical",
-                f"Exception during block creation: {str(e)}",
-                extra={"traceback": traceback.format_exc()},
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Internal Server Error.",
-            )
-
-    def get_block_by_id(self, block_id: UUID) -> Optional[BlockResponseSchema]:
+    async def get_block_by_id(self, block_id: UUID, user_id: UUID) -> Optional[Dict[str, Any]]:
         """
-        Retrieves a block by its unique identifier, including its taxonomy and vector embedding.
+        Retrieves a block by its ID.
 
         Args:
-            block_id (UUID): The UUID of the block to retrieve.
+            block_id (UUID): UUID of the block to retrieve.
+            user_id (UUID): UUID of the user performing the operation.
 
         Returns:
-            Optional[BlockResponseSchema]: The block data if found, None otherwise.
+            Optional[Dict[str, Any]]: The retrieved block data if found, None otherwise.
         """
         try:
-            # Step 1: Retrieve Block
-            block = self.block_service.get_block_by_id(block_id)
-            if not block:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, detail="Block not found."
-                )
-
-            # Step 2: Retrieve Taxonomy
-            taxonomy = self.taxonomy_service.get_taxonomy_for_block(
-                block_id=block.block_id
-            )
-            if taxonomy:
-                block.taxonomy = taxonomy
+            block = await self.block_service.get_block_by_id(block_id)
+            if block:
+                return block
             else:
-                self.logger.log(
-                    "BlockController",
-                    "warning",
-                    f"No taxonomy found for block {block.block_id}.",
-                    extra={"block_id": str(block.block_id)},
-                )
-
-            # Step 3: Retrieve Vector Embedding
-            vector_embedding = self.vector_embedding_service.get_vector_embedding(
-                block_id=block.block_id
-            )
-            if vector_embedding:
-                block.vector_embedding = vector_embedding.dict()
-            else:
-                self.logger.log(
-                    "BlockController",
-                    "warning",
-                    f"No vector embedding found for block {block.block_id}.",
-                    extra={"block_id": str(block.block_id)},
-                )
-
-            # Step 4: Log the retrieval in Audit Logs
-            audit_log = {
-                "user_id": None,  # Replace with actual user ID if available
-                "action_type": "READ",
-                "entity_type": "block",
-                "entity_id": str(block.block_id),
-                "details": f"Block '{block.name}' retrieved.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            self.logger.log(
-                "BlockController",
-                "info",
-                "Block retrieved successfully.",
-                extra={"block_id": str(block.block_id)},
-            )
-            return block
-
-        except HTTPException as he:
-            self.logger.log(
-                "BlockController",
-                "error",
-                f"HTTPException during block retrieval: {he.detail}",
-                extra={"status_code": he.status_code, "detail": he.detail},
-            )
-            raise he
+                print(f"Block with ID {block_id} not found.")
+                return None
         except Exception as e:
-            self.logger.log(
-                "BlockController",
-                "critical",
-                f"Exception during block retrieval: {str(e)}",
-                extra={"traceback": traceback.format_exc()},
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Internal Server Error.",
-            )
+            print(f"An error occurred during block retrieval: {e}")
+            import traceback
+            print(traceback.format_exc())
+            return None
 
-    def update_block(
-        self, block_id: UUID, update_data: BlockUpdateSchema
-    ) -> Optional[BlockResponseSchema]:
+    async def update_block(self, block_id: UUID, update_data: Dict[str, Any], user_id: UUID) -> Optional[Dict[str, Any]]:
         """
-        Updates an existing block's information, including optional taxonomy and vector embedding.
+        Updates an existing block's details and taxonomy within a transaction.
 
         Args:
-            block_id (UUID): The UUID of the block to update.
-            update_data (BlockUpdateSchema): The data to update for the block, including optional taxonomy and metadata.
+            block_id (UUID): UUID of the block to update.
+            update_data (Dict[str, Any]): Data to update the block.
+            user_id (UUID): UUID of the user performing the update.
 
         Returns:
-            Optional[BlockResponseSchema]: The updated block data if successful, None otherwise.
+            Optional[Dict[str, Any]]: The updated block data if successful, None otherwise.
         """
-        try:
-            # Step 1: Update Block Details
-            block = self.block_service.update_block(block_id, update_data)
-            if not block:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Block update failed.",
-                )
+        async with self.prisma.tx() as transaction:
+            try:
+                update_data.pop('metadata', None)  # Removed 'metadata' as it's not in Prisma schema
 
-            # Step 2: Update Taxonomy Associations (if taxonomy provided)
-            if update_data.taxonomy:
-                taxonomy_success = self.taxonomy_service.create_taxonomy_for_block(
-                    block_id=block.block_id, taxonomy=update_data.taxonomy
-                )
-                if not taxonomy_success:
-                    self.logger.log(
-                        "BlockController",
-                        "warning",
-                        f"Block {block.block_id} updated without taxonomy associations.",
-                        extra={"block_id": str(block.block_id)},
+                # Step 1: Update Block
+                updated_block = await self.block_service.update_block(block_id, update_data, transaction)
+                if not updated_block:
+                    raise ValueError("Failed to update block.")
+
+                # Step 2: Update Taxonomy if provided
+                if "taxonomy" in update_data:
+                    taxonomy_success = await self.taxonomy_service.create_taxonomy_for_block(
+                        block_id,
+                        update_data["taxonomy"],
+                        transaction=transaction
                     )
-                    # Optionally, handle accordingly
+                    if not taxonomy_success:
+                        raise ValueError("Failed to update taxonomy for block.")
 
-            # Step 4: Log the update in Audit Logs
-            audit_log = {
-                "user_id": update_data.updated_by,  # Assuming `updated_by` exists in BlockUpdateSchema
-                "action_type": "UPDATE",
-                "entity_type": "block",
-                "entity_id": str(block.block_id),
-                "details": f"Block '{block.name}' updated with fields: {list(update_data.dict().keys())}.",
-            }
-            self.audit_service.create_audit_log(audit_log)
+                # Step 3: Audit Logging
+                audit_log = {
+                    "user_id": str(user_id),
+                    "action_type": "UPDATE",
+                    "entity_type": "block",  # Should be lowercase as per Prisma enum
+                    "entity_id": str(block_id),
+                    "details": {"updated_fields": update_data}
+                    # Removed 'users' field
+                }
+                # Align the audit_log without relation fields
+                aligned_audit_log = align_dict_with_model(audit_log, PrismaAuditLog)
+                await self.audit_service.create_audit_log(aligned_audit_log, transaction=transaction)
 
-            self.logger.log(
-                "BlockController",
-                "info",
-                "Block updated successfully.",
-                extra={"block_id": str(block.block_id)},
-            )
-            return block
+                return updated_block
 
-        except HTTPException as he:
-            self.logger.log(
-                "BlockController",
-                "error",
-                f"HTTPException during block update: {he.detail}",
-                extra={"status_code": he.status_code, "detail": he.detail},
-            )
-            raise he
-        except Exception as e:
-            self.logger.log(
-                "BlockController",
-                "critical",
-                f"Exception during block update: {str(e)}",
-                extra={"traceback": traceback.format_exc()},
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Internal Server Error.",
-            )
+            except Exception as e:
+                print(f"An error occurred during block update: {e}")
+                import traceback
+                print(traceback.format_exc())
+                return None
 
-    def delete_block(self, block_id: UUID) -> bool:
+    async def delete_block(self, block_id: UUID, user_id: UUID) -> bool:
         """
-        Deletes a block along with its associated taxonomy and vector embedding.
+        Deletes a block along with its taxonomy associations and audit log within a transaction.
 
         Args:
-            block_id (UUID): The UUID of the block to delete.
+            block_id (UUID): UUID of the block to delete.
+            user_id (UUID): UUID of the user performing the deletion.
 
         Returns:
             bool: True if deletion was successful, False otherwise.
         """
-        try:
-            # Use keyword arguments
-            self.vector_embedding_service.delete_vector_embedding(block_id=block_id)
-            self.taxonomy_service.delete_taxonomy_for_block(block_id=block_id)
-            deleted = self.block_service.delete_block(block_id=block_id)
-            if not deleted:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Block deletion failed.",
-                )
+        async with self.prisma.tx() as transaction:
+            try:
+                # Step 1: Delete Block
+                deletion_success = await self.block_service.delete_block(block_id, transaction)
+                if not deletion_success:
+                    raise ValueError("Failed to delete block.")
 
-            # Step 4: Log the deletion in Audit Logs
-            audit_log = {
-                "user_id": None,  # Replace with actual user ID if available
-                "action_type": "DELETE",
-                "entity_type": "block",
-                "entity_id": str(block_id),
-                "details": f"Block with ID '{block_id}' deleted along with its taxonomy and vector embedding.",
-            }
-            self.audit_service.create_audit_log(audit_log)
+                # Step 2: Audit Logging
+                audit_log = {
+                    "user_id": str(user_id),
+                    "action_type": "DELETE",
+                    "entity_type": "block",  # Should be lowercase as per Prisma enum
+                    "entity_id": str(block_id),
+                    "details": {"block_id": str(block_id)}
+                    # Removed 'users' field
+                }
+                # Align the audit_log without relation fields
+                aligned_audit_log = align_dict_with_model(audit_log, PrismaAuditLog)
+                await self.audit_service.create_audit_log(aligned_audit_log, transaction=transaction)
 
-            self.logger.log(
-                "BlockController",
-                "info",
-                "Block deleted successfully along with taxonomy and vector embedding.",
-                extra={"block_id": str(block_id)},
-            )
-            return True
+                return True
+            except Exception as e:
+                print(f"An error occurred during block deletion: {e}")
+                import traceback
+                print(traceback.format_exc())
+                return False
 
-        except HTTPException as he:
-            self.logger.log(
-                "BlockController",
-                "error",
-                f"HTTPException during block deletion: {he.detail}",
-                extra={"status_code": he.status_code, "detail": he.detail},
-            )
-            raise he
-        except Exception as e:
-            self.logger.log(
-                "BlockController",
-                "critical",
-                f"Exception during block deletion: {str(e)}",
-                extra={"traceback": traceback.format_exc(), "block_id": str(block_id)},
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Internal Server Error.",
-            )
-
-    # -------------------
-    # Vector Embedding CRUD Operations
-    # -------------------
-
-    def update_vector_embedding(
-        self, block_id: UUID, update_data: VectorRepresentationCreateSchema
-    ) -> bool:
-        try:
-            updated = self.vector_embedding_service.update_vector_embedding(
-                block_id, update_data
-            )
-            if not updated:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Vector embedding update failed.",
-                )
-
-            # Log the update in Audit Logs
-            audit_log = {
-                "user_id": None,  # Replace with actual user ID if available
-                "action_type": "UPDATE",
-                "entity_type": "vector_embedding",
-                "entity_id": str(block_id),
-                "details": f"Vector embedding updated for block '{block_id}'.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            self.logger.log(
-                "BlockController",
-                "info",
-                "Vector embedding updated successfully.",
-                extra={"block_id": str(block_id)},
-            )
-            return True
-
-        except HTTPException as he:
-            self.logger.log(
-                "BlockController",
-                "error",
-                f"HTTPException during vector embedding update: {he.detail}",
-                extra={"status_code": he.status_code, "detail": he.detail},
-            )
-            raise he
-        except Exception as e:
-            self.logger.log(
-                "BlockController",
-                "critical",
-                f"Exception during vector embedding update: {str(e)}",
-                extra={"traceback": traceback.format_exc(), "block_id": str(block_id)},
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Internal Server Error.",
-            )
-
-    def get_vector_embedding(
-        self, block_id: UUID
-    ) -> Optional[VectorRepresentationSchema]:
+    async def search_blocks(self, search_filters: Dict[str, Any], user_id: UUID) -> Optional[List[Dict[str, Any]]]:
         """
-        Retrieves the vector embedding associated with a specific block.
+        Searches for blocks based on taxonomy filters.
 
         Args:
-            block_id (UUID): UUID of the block.
+            search_filters (Dict[str, Any]): Filters including 'category_names' and 'block_types'.
+            user_id (UUID): UUID of the user performing the search.
 
         Returns:
-            Optional[VectorRepresentationSchema]: The vector embedding schema if found, None otherwise.
+            Optional[List[Dict[str, Any]]]: List of blocks matching the search criteria, or None if an error occurs.
         """
         try:
-            vector_embedding = self.vector_embedding_service.get_vector_embedding(
-                block_id
-            )
-            if not vector_embedding:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Vector embedding not found for the block.",
-                )
-
-            # Log the retrieval in Audit Logs
-            audit_log = {
-                "user_id": None,  # Replace with actual user ID if available
-                "action_type": "READ",
-                "entity_type": "vector_embedding",
-                "entity_id": str(vector_embedding.vector_id),
-                "details": f"Vector embedding retrieved for block '{block_id}'.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            self.logger.log(
-                "BlockController",
-                "info",
-                "Vector embedding retrieved successfully.",
-                extra={
-                    "block_id": str(block_id),
-                    "vector_id": str(vector_embedding.vector_id),
-                },
-            )
-            return vector_embedding
-
-        except HTTPException as he:
-            self.logger.log(
-                "BlockController",
-                "error",
-                f"HTTPException during vector embedding retrieval: {he.detail}",
-                extra={"status_code": he.status_code, "detail": he.detail},
-            )
-            raise he
+            blocks = await self.taxonomy_service.search_blocks(search_filters)
+            if blocks is not None:
+                return blocks
+            else:
+                print("No blocks found matching the search criteria.")
+                return []
         except Exception as e:
-            self.logger.log(
-                "BlockController",
-                "critical",
-                f"Exception during vector embedding retrieval: {str(e)}",
-                extra={"traceback": traceback.format_exc(), "block_id": str(block_id)},
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Internal Server Error.",
-            )
+            print(f"An error occurred during block search: {e}")
+            import traceback
+            print(traceback.format_exc())
+            return None
 
-    def create_vector_embedding(
-        self, vector_data: VectorRepresentationCreateSchema
-    ) -> Optional[VectorRepresentationResponseSchema]:
-        try:
-            vector_embedding = self.vector_embedding_service.create_vector_embedding(
-                vector_data
-            )
-            if vector_embedding is None:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Vector embedding creation failed.",
-                )
-
-            # Log the creation in Audit Logs
-            audit_log = {
-                "user_id": None,  # Replace with actual user ID if available
-                "action_type": "CREATE",
-                "entity_type": "vector_embedding",
-                "entity_id": str(vector_embedding.vector_id),
-                "details": f"Vector embedding created for {vector_data.entity_type} '{vector_data.entity_id}'.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            self.logger.log(
-                "BlockController",
-                "info",
-                "Vector embedding created successfully.",
-                extra={
-                    "entity_id": str(vector_data.entity_id),
-                    "entity_type": vector_data.entity_type,
-                },
-            )
-            return vector_embedding
-
-        except HTTPException as he:
-            self.logger.log(
-                "BlockController",
-                "error",
-                f"HTTPException during vector embedding creation: {he.detail}",
-                extra={"status_code": he.status_code, "detail": he.detail},
-            )
-            raise he
-        except Exception as e:
-            self.logger.log(
-                "BlockController",
-                "critical",
-                f"Exception during vector embedding creation: {str(e)}",
-                extra={
-                    "traceback": traceback.format_exc(),
-                    "entity_id": str(vector_data.entity_id),
-                },
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Internal Server Error.",
-            )
-
-    def delete_vector_embedding(self, block_id: UUID) -> bool:
+    async def perform_search(self, search_filters: Dict[str, Any], user_id: UUID) -> Optional[List[Dict[str, Any]]]:
         """
-        Deletes the vector embedding associated with a specific block.
+        Wrapper method to perform search and handle audit logging.
 
         Args:
-            block_id (UUID): UUID of the block.
+            search_filters (Dict[str, Any]): Filters for searching blocks.
+            user_id (UUID): UUID of the user performing the search.
 
         Returns:
-            bool: True if deletion was successful, False otherwise.
+            Optional[List[Dict[str, Any]]]: List of matching blocks, or None if an error occurs.
         """
         try:
-            deletion_success = self.vector_embedding_service.delete_vector_embedding(
-                block_id
-            )
-            if not deletion_success:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Vector embedding deletion failed.",
-                )
-
-            # Log the deletion in Audit Logs
-            audit_log = {
-                "user_id": None,  # Replace with actual user ID if available
-                "action_type": "DELETE",
-                "entity_type": "vector_embedding",
-                "entity_id": str(block_id),  # Assuming entity_id refers to block_id
-                "details": f"Vector embedding deleted for block '{block_id}'.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            self.logger.log(
-                "BlockController",
-                "info",
-                "Vector embedding deleted successfully.",
-                extra={"block_id": str(block_id)},
-            )
-            return True
-
-        except HTTPException as he:
-            self.logger.log(
-                "BlockController",
-                "error",
-                f"HTTPException during vector embedding deletion: {he.detail}",
-                extra={"status_code": he.status_code, "detail": he.detail},
-            )
-            raise he
+            search_results = await self.search_blocks(search_filters, user_id)
+            if search_results is not None:
+                # Audit Logging for Search
+                audit_log = {
+                    "user_id": str(user_id),
+                    "action_type": "READ",  # Use 'READ' for searches
+                    "entity_type": "block",  # If 'block_search' is not in enum, use 'block'
+                    "entity_id": "SEARCH",  # Consider revising if needed
+                    "details": {
+                        "search_filters": search_filters,
+                        "results_count": len(search_results)
+                    }
+                    # Removed 'users' field
+                }
+                # Align the audit_log without relation fields
+                await self.audit_service.create_audit_log(audit_log)
+                return search_results
+            else:
+                return None
         except Exception as e:
-            self.logger.log(
-                "BlockController",
-                "critical",
-                f"Exception during vector embedding deletion: {str(e)}",
-                extra={"traceback": traceback.format_exc(), "block_id": str(block_id)},
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Internal Server Error.",
-            )
+            print(f"An error occurred during perform_search: {e}")
+            import traceback
+            print(traceback.format_exc())
+            return None
 
-    # -------------------
-    # Similarity Search Operation
-    # -------------------
+# -------------------
+# Testing Utility
+# -------------------
 
-    def perform_similarity_search(
-        self,
-        query_text: str,
-        taxonomy_filters: Optional[Dict[str, Any]] = None,
-        top_k: int = 10,
-    ) -> Optional[List[BlockResponseSchema]]:
-        """
-        Performs a similarity search over blocks based on the provided query text and optional taxonomy filters.
+async def main():
+    """
+    Main function to test the BlockController functionality with correct schemas and taxonomies.
+    """
+    print("Starting BlockController test...")
+    await database.prisma.connect()
+    print("Connected to database.")
+    controller = BlockController(database.prisma)
 
-        Args:
-            query_text (str): The text query to generate the embedding vector for similarity search.
-            taxonomy_filters (Optional[Dict[str, Any]]): Taxonomy constraints to filter the blocks before similarity search.
-            top_k (int): Number of top similar blocks to retrieve.
+    user_id = UUID('12345678-1234-5678-1234-567812345678')  # Example user ID
+    print(f"Using test user ID: {user_id}")
 
-        Returns:
-            Optional[List[BlockResponseSchema]]: List of blocks matching the similarity search criteria.
-        """
-        try:
-            similar_blocks = self.vector_embedding_service.search_similar_blocks(
-                query_text, taxonomy_filters, top_k
-            )
-            if similar_blocks is None:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Similarity search failed.",
-                )
-
-            # Log the search in Audit Logs
-            audit_log = {
-                "user_id": None,  # Replace with actual user ID if available
-                "action_type": "SEARCH",
-                "entity_type": "block",
-                "entity_id": None,
-                "details": f"Similarity search performed with query: '{query_text}' and taxonomy filters: {taxonomy_filters}.",
+    # Step 1: Create a new block (Earth Observation Model)
+    print("\nStep 1: Creating a new Earth Observation Model block...")
+    create_schema = {
+        "name": "EarthObservationModelExample",
+        "block_type": "model",  # Ensure this matches the enum in Prisma
+        "description": "An example Earth Observation model for testing.",
+        # "created_by": user_id,  # This is added in the create_block method
+        "taxonomy": {
+            "general": {
+                "categories": [
+                    {"name": "Climate Data"},
+                    {"name": "Geospatial Analysis"}
+                ]
+            },
+            "specific": {
+                "categories": [
+                    {"name": "Satellite Imagery", "parent_name": "Climate Data"},
+                    {"name": "Data Processing", "parent_name": "Geospatial Analysis"}
+                ]
             }
-            self.audit_service.create_audit_log(audit_log)
+        }
+        # "metadata": {  # Removed as it's not part of the Prisma schema
+        #     "vector": [0.1] * 512  # Example 512-dimensional vector
+        # }
+    }
+    created_block = await controller.create_block(create_schema, user_id)
+    if created_block:
+        print(f"Block Created: {created_block['block_id']}")
+    else:
+        print("Block creation failed.")
 
-            self.logger.log(
-                "BlockController",
-                "info",
-                f"Similarity search completed with {len(similar_blocks)} results.",
-                extra={
-                    "query_text": query_text,
-                    "taxonomy_filters": taxonomy_filters,
-                    "top_k": top_k,
+    # Step 2: Retrieve the created block
+    if created_block:
+        print("\nStep 2: Retrieving the created block...")
+        retrieved_block = await controller.get_block_by_id(created_block['block_id'], user_id)
+        if retrieved_block:
+            print(f"Block Retrieved: {retrieved_block['block_id']}, Name: {retrieved_block['name']}")
+            print(f"Taxonomy: {retrieved_block['taxonomy']}")
+        else:
+            print("Block retrieval failed.")
+
+    # Step 3: Update the block's name and taxonomy (to Weather/Climate Model)
+    if created_block:
+        print("\nStep 3: Updating the block to a Weather/Climate Model...")
+        update_schema = {
+            "name": "UpdatedWeatherClimateModelExample",
+            "taxonomy": {
+                "general": {
+                    "categories": [
+                        {"name": "Climate Data"},
+                        {"name": "Meteorological Analysis"}
+                    ]
                 },
-            )
-            return similar_blocks
+                "specific": {
+                    "categories": [
+                        {"name": "Climate Modeling", "parent_name": "Climate Data"},
+                        {"name": "Weather Forecasting", "parent_name": "Meteorological Analysis"}
+                    ]
+                }
+            }
+            # "metadata": {  # Removed as it's not part of the Prisma schema
+            #     "vector": [0.2] * 512
+            # }
+        }
+        updated_block = await controller.update_block(created_block['block_id'], update_schema, user_id)
+        if updated_block:
+            print(f"Block Updated: {updated_block['block_id']}, New Name: {updated_block['name']}")
+            print(f"Updated Taxonomy: {updated_block['taxonomy']}")
+        else:
+            print("Block update failed.")
 
-        except HTTPException as he:
-            self.logger.log(
-                "BlockController",
-                "error",
-                f"HTTPException during similarity search: {he.detail}",
-                extra={"status_code": he.status_code, "detail": he.detail},
-            )
-            raise he
-        except Exception as e:
-            self.logger.log(
-                "BlockController",
-                "critical",
-                f"Exception during similarity search: {str(e)}",
-                extra={"traceback": traceback.format_exc()},
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Internal Server Error.",
-            )
+    # Step 4: Perform a search based on taxonomy filters
+    print("\nStep 4: Performing a search for blocks with 'Climate Data' category and block type 'model'...")
+    search_filters = {
+        "category_names": ["Climate Data"],
+        "block_types": ["model"]
+    }
+    search_results = await controller.perform_search(search_filters, user_id)
+    if search_results:
+        print(f"Found {len(search_results)} block(s):")
+        for blk in search_results:
+            print(f"- Block ID: {blk['block_id']}, Name: {blk['name']}, Type: {blk['block_type']}")
+    else:
+        print("No blocks found matching the search criteria.")
+
+    # Step 5: Delete the block
+    if created_block:
+        print("\nStep 5: Deleting the created block...")
+        deletion_success = await controller.delete_block(created_block['block_id'], user_id)
+        if deletion_success:
+            print(f"Block Deleted: {created_block['block_id']}")
+        else:
+            print("Block deletion failed.")
+
+    print("\nDisconnecting from database...")
+    await database.prisma.disconnect()
+    print("Test completed.")
+
+if __name__ == "__main__":
+    asyncio.run(main())

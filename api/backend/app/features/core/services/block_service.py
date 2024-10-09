@@ -1,449 +1,483 @@
-# app/services/block_service.py
+# constellation-backend/api/backend/app/features/core/services/block_service.py
 
 """
 Block Service Module
 
-This module defines the BlockService class responsible for managing all block-related operations.
-It provides methods to create, retrieve, update, and delete blocks within the Supabase backend.
-Additionally, it interacts with the TaxonomyService and VectorEmbeddingService to handle associated
-taxonomy categories and vector embeddings, ensuring a cohesive and maintainable architecture.
+This module implements the Block Service using a Repository pattern with Prisma ORM.
 
-Design Philosophy:
-- Maintain independence from other services to uphold clear separation of concerns.
-- Utilize Supabase's pg-vector for efficient vector storage and similarity querying.
-- Ensure transactional integrity between block operations and associated taxonomy/vector embeddings.
-- Implement robust error handling and comprehensive logging for production readiness.
+Design Pattern:
+- Repository Pattern: The BlockService class acts as a repository, encapsulating the data access logic.
+- Dependency Injection: The Prisma client is injected via the database singleton.
+
+Key Design Decisions:
+1. Use of Dictionaries: We use dictionaries for input data to provide flexibility in the API.
+   This allows callers to provide only the necessary fields without needing to construct full objects.
+
+2. Prisma Models: We use Prisma-generated models (Block) for type hinting and as return types.
+   This ensures type safety and consistency with the database schema.
+
+3. Raw SQL for Unsupported Types: The `vector` field is managed using raw SQL queries since Prisma does not support it.
+
+4. Error Handling: Exceptions are allowed to propagate, to be handled by the caller.
+
+This approach balances flexibility, type safety, and simplicity, leveraging Prisma's capabilities
+while providing a clean API for block operations.
 """
-
+import re
 from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime
+import asyncio
 
-from pydantic import BaseModel, ValidationError
-
-from supabase import Client
-from postgrest import APIError as PostgrestError
-
-from backend.app.schemas import (
-    BlockCreateSchema,
-    BlockUpdateSchema,
-    BlockResponseSchema,
-    VectorRepresentationSchema
-)
-
+from prisma.errors import UniqueViolationError
+from prisma.models import Block as PrismaBlock
+from prisma import Prisma
+from backend.app.database import database
 from backend.app.logger import ConstellationLogger
-from backend.app.database import get_supabase_client
-from backend.app.utils.serialization_utils import serialize_dict
-
 
 class BlockService:
-    """
-    BlockService handles all block-related operations, including CRUD (Create, Read, Update, Delete)
-    functionalities. It interacts directly with the Supabase backend to manage block data and ensures
-    data integrity and consistency throughout operations.
-    """
-
     def __init__(self):
-        """
-        Initializes the BlockService with the Supabase client and ConstellationLogger for logging purposes.
-        """
-        self.supabase_client: Client = get_supabase_client()
+        self.prisma = database.prisma
         self.logger = ConstellationLogger()
 
-    def create_block(self, block_data: BlockCreateSchema) -> Optional[BlockResponseSchema]:
+    async def create_block(self, block_data: Dict[str, Any], vector: Optional[List[float]] = None) -> Optional[PrismaBlock]:
         """
-        Creates a new block in the Supabase `blocks` table.
+        Creates a new block in the database or retrieves it if it already exists.
 
         Args:
-            block_data (BlockCreateSchema): The data required to create a new block.
+            block_data (Dict[str, Any]): Dictionary containing block data.
+            vector (Optional[List[float]]): Optional vector representation for the block.
 
         Returns:
-            Optional[BlockResponseSchema]: The created block data if successful, None otherwise.
+            Optional[PrismaBlock]: The created or existing block.
         """
+        block_data['block_id'] = str(uuid4())
+        block_data['created_at'] = datetime.utcnow()
+        block_data['updated_at'] = datetime.utcnow()
         try:
-            # Generate UUID for the new block if not provided
-            if not block_data.block_id:
-                block_id = uuid4()
-            else:
-                block_id = block_data.block_id
+            # Remove 'vector' from block_data since it's unsupported by Prisma
+            block_vector = block_data.pop('vector', None)
 
-            # Prepare block data with timestamps
-            current_time = datetime.utcnow()
-            block_dict = block_data.dict(exclude_unset=True)
-            block_dict.update({
-                "block_id": str(block_id),
-                "created_at": current_time.isoformat(),
-                "updated_at": current_time.isoformat(),
-                "current_version_id": None  # To be set when creating the first version
-            })
-
-            # Insert the new block into Supabase
-            response = self.supabase_client.table("blocks").insert(serialize_dict(block_dict)).execute()
-
-            if response.error:
-                self.logger.log(
-                    "BlockService",
-                    "error",
-                    "Failed to create block in Supabase.",
-                    extra={"error": response.error.message, "block_data": block_dict}
-                )
-                return None
-
-            # Construct the BlockResponseSchema
-            created_block = BlockResponseSchema(
-                block_id=UUID(block_dict["block_id"]),
-                name=block_dict["name"],
-                block_type=block_dict["block_type"],
-                description=block_dict.get("description", ""),
-                created_at=current_time,
-                updated_at=current_time,
-                current_version_id=None,  # To be updated by the caller if necessary
-                taxonomy=None,
-                vector_embedding=None
-            )
-
+            # Create block via Prisma
+            created_block = await self.prisma.block.create(data=block_data)
             self.logger.log(
                 "BlockService",
                 "info",
                 "Block created successfully.",
-                extra={"block_id": str(created_block.block_id)}
+                block_id=created_block.block_id,
+                block_name=created_block.name
             )
-            return created_block
-
-        except ValidationError as ve:
-            self.logger.log(
-                "BlockService",
-                "error",
-                "Validation error during block creation.",
-                extra={"error": ve.errors(), "block_data": block_data.dict()}
-            )
-            return None
+        except UniqueViolationError:
+            # Block with this name already exists, retrieve it
+            existing_block = await self.get_block_by_name(block_data['name'])
+            if existing_block:
+                self.logger.log(
+                    "BlockService",
+                    "info",
+                    "Block already exists, retrieved existing block.",
+                    block_id=existing_block.block_id,
+                    block_name=existing_block.name
+                )
+                return existing_block
+            else:
+                # This shouldn't happen, but handle it just in case
+                raise ValueError(f"Failed to create or retrieve block with name: {block_data['name']}")
         except Exception as e:
-            self.logger.log(
-                "BlockService",
-                "critical",
-                f"Exception during block creation: {str(e)}",
-                extra={"traceback": traceback.format_exc(), "block_data": block_data.dict()}
-            )
+            self.logger.log("BlockService", "error", "Failed to create block", error=str(e))
             return None
 
-    def get_block_by_id(self, block_id: UUID) -> Optional[BlockResponseSchema]:
+        if vector:
+            # Associate vector using raw SQL
+            vector_success = await self.set_block_vector(created_block.block_id, vector)
+            if vector_success:
+                self.logger.log(
+                    "BlockService",
+                    "info",
+                    "Vector associated with block successfully.",
+                    block_id=created_block.block_id
+                )
+            else:
+                self.logger.log(
+                    "BlockService",
+                    "warning",
+                    "Failed to associate vector with block.",
+                    block_id=created_block.block_id
+                )
+
+        return created_block
+
+    async def get_block_by_id(self, block_id: UUID) -> Optional[PrismaBlock]:
         """
-        Retrieves a block by its unique identifier from the Supabase `blocks` table.
+        Retrieves a block by its ID.
 
         Args:
-            block_id (UUID): The UUID of the block to retrieve.
+            block_id (UUID): The ID of the block to retrieve.
 
         Returns:
-            Optional[BlockResponseSchema]: The block data if found, None otherwise.
+            Optional[PrismaBlock]: The retrieved block, or None if not found.
         """
         try:
-            response = self.supabase_client.table("blocks").select("*").eq("block_id", str(block_id)).single().execute()
+            block = await self.prisma.block.find_unique(where={"block_id": str(block_id)})
 
-            if response.error:
-                if "No rows found" in response.error.message:
-                    self.logger.log(
-                        "BlockService",
-                        "warning",
-                        "Block not found.",
-                        extra={"block_id": str(block_id)}
-                    )
-                else:
-                    self.logger.log(
-                        "BlockService",
-                        "error",
-                        "Failed to retrieve block from Supabase.",
-                        extra={"error": response.error.message, "block_id": str(block_id)}
-                    )
-                return None
+            if block:
+                self.logger.log(
+                    "BlockService",
+                    "info",
+                    "Block retrieved successfully.",
+                    block_id=block.block_id,
+                    block_name=block.name
+                )
+            else:
+                self.logger.log(
+                    "BlockService",
+                    "warning",
+                    "Block not found.",
+                    block_id=str(block_id)
+                )
 
-            block_data = response.data
+            return block
+        except Exception as e:
+            self.logger.log("BlockService", "error", "Failed to retrieve block by ID", error=str(e))
+            return None
 
-            # Construct the BlockResponseSchema
-            retrieved_block = BlockResponseSchema(
-                block_id=UUID(block_data["block_id"]),
-                name=block_data["name"],
-                block_type=block_data["block_type"],
-                description=block_data.get("description", ""),
-                created_at=block_data["created_at"],
-                updated_at=block_data["updated_at"],
-                current_version_id=UUID(block_data["current_version_id"]) if block_data.get("current_version_id") else None,
-                taxonomy=None,
-                vector_embedding=None
+    async def get_block_by_name(self, name: str) -> Optional[PrismaBlock]:
+        """
+        Retrieves a block by its name.
+
+        Args:
+            name (str): The name of the block to retrieve.
+
+        Returns:
+            Optional[PrismaBlock]: The retrieved block, or None if not found.
+        """
+        try:
+            block = await self.prisma.block.find_unique(where={"name": name})
+
+            if block:
+                self.logger.log(
+                    "BlockService",
+                    "info",
+                    "Block retrieved successfully by name.",
+                    block_id=block.block_id,
+                    block_name=block.name
+                )
+            else:
+                self.logger.log(
+                    "BlockService",
+                    "warning",
+                    "Block not found by name.",
+                    block_name=name
+                )
+
+            return block
+        except Exception as e:
+            self.logger.log("BlockService", "error", "Failed to retrieve block by name", error=str(e))
+            return None
+
+    async def update_block(self, block_id: UUID, update_data: Dict[str, Any], vector: Optional[List[float]] = None) -> Optional[PrismaBlock]:
+        """
+        Updates a block's details.
+
+        Args:
+            block_id (UUID): The ID of the block to update.
+            update_data (Dict[str, Any]): Dictionary containing fields to update.
+            vector (Optional[List[float]]): Optional vector data to update.
+
+        Returns:
+            Optional[PrismaBlock]: The updated block.
+        """
+        try:
+            update_data['updated_at'] = datetime.utcnow()
+
+            # Remove 'vector' from update_data since it's unsupported by Prisma
+            update_vector = update_data.pop('vector', None)
+
+            # Update block via Prisma
+            updated_block = await self.prisma.block.update(
+                where={"block_id": str(block_id)},
+                data=update_data
             )
 
             self.logger.log(
                 "BlockService",
                 "info",
-                "Block retrieved successfully.",
-                extra={"block_id": str(retrieved_block.block_id)}
+                "Block updated successfully.",
+                block_id=updated_block.block_id,
+                updated_fields=list(update_data.keys())
             )
-            return retrieved_block
-
         except Exception as e:
-            self.logger.log(
-                "BlockService",
-                "critical",
-                f"Exception during block retrieval: {str(e)}",
-                extra={"traceback": traceback.format_exc(), "block_id": str(block_id)}
-            )
+            self.logger.log("BlockService", "error", "Failed to update block", error=str(e))
             return None
 
-    def update_block(self, block_id: UUID, update_data: BlockUpdateSchema) -> Optional[BlockResponseSchema]:
-        """
-        Updates an existing block's information in the Supabase `blocks` table.
-
-        Args:
-            block_id (UUID): The UUID of the block to update.
-            update_data (BlockUpdateSchema): The data to update for the block.
-
-        Returns:
-            Optional[BlockResponseSchema]: The updated block data if successful, None otherwise.
-        """
-        try:
-            # Prepare update data with updated_at timestamp
-            current_time = datetime.utcnow()
-            update_dict = update_data.dict(exclude_unset=True)
-            update_dict.update({
-                "updated_at": current_time.isoformat()
-            })
-
-            # Update the block in Supabase
-            response = self.supabase_client.table("blocks").update(serialize_dict(update_dict)).eq("block_id", str(block_id)).execute()
-
-            if response.error:
-                self.logger.log(
-                    "BlockService",
-                    "error",
-                    "Failed to update block in Supabase.",
-                    extra={"error": response.error.message, "block_id": str(block_id), "update_data": update_dict}
-                )
-                return None
-
-            # Retrieve the updated block
-            updated_block = self.get_block_by_id(block_id)
-            if updated_block:
+        if vector:
+            # Update vector using raw SQL
+            vector_success = await self.set_block_vector(updated_block.block_id, vector)
+            if vector_success:
                 self.logger.log(
                     "BlockService",
                     "info",
-                    "Block updated successfully.",
-                    extra={"block_id": str(updated_block.block_id)}
+                    "Vector updated successfully.",
+                    block_id=updated_block.block_id
                 )
-                return updated_block
             else:
                 self.logger.log(
                     "BlockService",
                     "warning",
-                    "Block updated but retrieval failed.",
-                    extra={"block_id": str(block_id)}
+                    "Failed to update vector.",
+                    block_id=updated_block.block_id
                 )
-                return None
 
-        except ValidationError as ve:
-            self.logger.log(
-                "BlockService",
-                "error",
-                "Validation error during block update.",
-                extra={"error": ve.errors(), "update_data": update_data.dict()}
-            )
-            return None
-        except Exception as e:
-            self.logger.log(
-                "BlockService",
-                "critical",
-                f"Exception during block update: {str(e)}",
-                extra={"traceback": traceback.format_exc(), "block_id": str(block_id), "update_data": update_data.dict()}
-            )
-            return None
+        return updated_block
 
-    def delete_block(self, block_id: UUID) -> bool:
+    async def delete_block(self, block_id: UUID) -> bool:
         """
-        Deletes a block from the Supabase `blocks` table.
+        Deletes a block from the database.
 
         Args:
-            block_id (UUID): The UUID of the block to delete.
+            block_id (UUID): The ID of the block to delete.
 
         Returns:
             bool: True if deletion was successful, False otherwise.
         """
         try:
-            response = self.supabase_client.table("blocks").delete().eq("block_id", str(block_id)).execute()
-
-            if response.error:
-                self.logger.log(
-                    "BlockService",
-                    "error",
-                    "Failed to delete block from Supabase.",
-                    extra={"error": response.error.message, "block_id": str(block_id)}
-                )
-                return False
+            await self.prisma.block.delete(where={"block_id": str(block_id)})
 
             self.logger.log(
                 "BlockService",
                 "info",
                 "Block deleted successfully.",
-                extra={"block_id": str(block_id)}
+                block_id=str(block_id)
             )
-            return True
 
+            return True
         except Exception as e:
-            self.logger.log(
-                "BlockService",
-                "critical",
-                f"Exception during block deletion: {str(e)}",
-                extra={"traceback": traceback.format_exc(), "block_id": str(block_id)}
-            )
+            self.logger.log("BlockService", "error", "Failed to delete block", error=str(e))
             return False
 
-    def get_blocks_by_ids(self, block_ids: List[UUID]) -> Optional[List[BlockResponseSchema]]:
+    async def set_block_vector(self, block_id: str, vector: List[float]) -> bool:
         """
-        Retrieves multiple blocks by their unique identifiers from the Supabase `blocks` table.
+        Associates or updates a vector representation for a block using raw SQL.
 
         Args:
-            block_ids (List[UUID]): A list of UUIDs of the blocks to retrieve.
+            block_id (str): The ID of the block.
+            vector (List[float]): The vector data.
 
         Returns:
-            Optional[List[BlockResponseSchema]]: A list of block data if successful, None otherwise.
+            bool: True if operation was successful, False otherwise.
         """
         try:
-            # Convert UUIDs to strings for the query
-            block_ids_str = [str(bid) for bid in block_ids]
+            # Convert the vector list to a PostgreSQL array string
+            vector_str = ','.join(map(str, vector))
 
-            response = self.supabase_client.table("blocks").select("*").in_("block_id", block_ids_str).execute()
+            # Execute raw SQL to update the 'vector' field
+            raw_query = """
+                UPDATE "Block"
+                SET vector = ARRAY[{vector}]::vector, updated_at = NOW()
+                WHERE block_id = '{block_id}';
+            """.format(vector=vector_str, block_id=block_id)
 
-            if response.error:
-                self.logger.log(
-                    "BlockService",
-                    "error",
-                    "Failed to retrieve blocks from Supabase.",
-                    extra={"error": response.error.message, "block_ids": block_ids_str}
-                )
-                return None
+            await self.prisma.execute_raw(raw_query)
 
-            blocks = []
-            for block_data in response.data:
-                block = BlockResponseSchema(
-                    block_id=UUID(block_data["block_id"]),
-                    name=block_data["name"],
-                    block_type=block_data["block_type"],
-                    description=block_data.get("description", ""),
-                    created_at=block_data["created_at"],
-                    updated_at=block_data["updated_at"],
-                    current_version_id=UUID(block_data["current_version_id"]) if block_data.get("current_version_id") else None,
-                    taxonomy=None,
-                    vector_embedding=None
-                )
-                blocks.append(block)
-
-            self.logger.log(
-                "BlockService",
-                "info",
-                f"{len(blocks)} blocks retrieved successfully.",
-                extra={"block_ids": block_ids_str}
-            )
-            return blocks
-
-        except Exception as e:
-            self.logger.log(
-                "BlockService",
-                "critical",
-                f"Exception during multiple block retrieval: {str(e)}",
-                extra={"traceback": traceback.format_exc(), "block_ids": [str(bid) for bid in block_ids]}
-            )
-            return None
-
-    def associate_version(self, block_id: UUID, version_id: UUID) -> bool:
-        """
-        Associates a specific version with a block by updating the `current_version_id`.
-
-        Args:
-            block_id (UUID): The UUID of the block.
-            version_id (UUID): The UUID of the version to associate.
-
-        Returns:
-            bool: True if association was successful, False otherwise.
-        """
-        try:
-            update_data = {
-                "current_version_id": str(version_id),
-                "updated_at": datetime.utcnow().isoformat()
-            }
-
-            response = self.supabase_client.table("blocks").update(serialize_dict(update_data)).eq("block_id", str(block_id)).execute()
-
-            if response.error:
-                self.logger.log(
-                    "BlockService",
-                    "error",
-                    "Failed to associate version with block in Supabase.",
-                    extra={"error": response.error.message, "block_id": str(block_id), "version_id": str(version_id)}
-                )
-                return False
-
-            self.logger.log(
-                "BlockService",
-                "info",
-                "Version associated with block successfully.",
-                extra={"block_id": str(block_id), "version_id": str(version_id)}
-            )
             return True
-
         except Exception as e:
-            self.logger.log(
-                "BlockService",
-                "critical",
-                f"Exception during version association: {str(e)}",
-                extra={"traceback": traceback.format_exc(), "block_id": str(block_id), "version_id": str(version_id)}
-            )
+            self.logger.log("BlockService", "error", "Failed to set block vector", error=str(e))
             return False
 
-    def list_all_blocks(self) -> Optional[List[BlockResponseSchema]]:
+    async def get_block_vector(self, block_id: str) -> Optional[List[float]]:
         """
-        Retrieves all blocks from the Supabase `blocks` table.
+        Retrieves the vector representation of a block.
+
+        Args:
+            block_id (str): The ID of the block.
 
         Returns:
-            Optional[List[BlockResponseSchema]]: A list of all block data if successful, None otherwise.
+            Optional[List[float]]: The vector representation, or None if not found.
         """
         try:
-            response = self.supabase_client.table("blocks").select("*").execute()
+            # Use Prisma's raw query to fetch the vector
+            query = f"""
+                SELECT vector::text AS vector_text
+                FROM "Block"
+                WHERE block_id = '{block_id}';
+            """
+            result = await self.prisma.query_raw(query)
+            
+            if result and result[0]['vector_text']:
+                # Parse the PostgreSQL array string into a list of floats
+                vector_text = result[0]['vector_text']
+                # Use regex to extract all float values
+                vector_values = re.findall(r'-?\d+(?:\.\d+)?', vector_text)
+                # Convert each value to float
+                return [float(value) for value in vector_values]
+            return None
+        except Exception as e:
+            self.logger.log("BlockService", "error", f"Failed to retrieve block vector - error={str(e)}")
+            return None
 
-            if response.error:
-                self.logger.log(
-                    "BlockService",
-                    "error",
-                    "Failed to retrieve all blocks from Supabase.",
-                    extra={"error": response.error.message}
-                )
-                return None
+    async def search_blocks_by_vector_similarity(self, query_vector: List[float], top_k: int = 5) -> List[Dict[str, Any]]:
+        """
+        Performs a vector similarity search on blocks.
 
-            blocks = []
-            for block_data in response.data:
-                block = BlockResponseSchema(
-                    block_id=UUID(block_data["block_id"]),
-                    name=block_data["name"],
-                    block_type=block_data["block_type"],
-                    description=block_data.get("description", ""),
-                    created_at=block_data["created_at"],
-                    updated_at=block_data["updated_at"],
-                    current_version_id=UUID(block_data["current_version_id"]) if block_data.get("current_version_id") else None,
-                    taxonomy=None,
-                    vector_embedding=None
-                )
-                blocks.append(block)
+        Args:
+            query_vector (List[float]): The query vector.
+            top_k (int): The number of top similar blocks to return.
+
+        Returns:
+            List[Dict[str, Any]]: List of similar blocks with their similarity scores.
+        """
+        try:
+            vector_str = ','.join(map(str, query_vector))
+            query = f"""
+                SELECT b.block_id, b.name, b.block_type, b.description, 
+                       1 - (b.vector <=> ARRAY[{vector_str}]::vector) as similarity
+                FROM "Block" b
+                WHERE b.vector IS NOT NULL
+                ORDER BY similarity DESC
+                LIMIT {top_k};
+            """
+            results = await self.prisma.query_raw(query)
+            
+            return [
+                {
+                    "block_id": str(row['block_id']),
+                    "name": row['name'],
+                    "block_type": row['block_type'],
+                    "description": row['description'],
+                    "similarity": float(row['similarity'])
+                }
+                for row in results
+            ]
+        except Exception as e:
+            self.logger.log("BlockService", "error", "Failed to perform vector similarity search", error=str(e))
+            return []
+
+    async def get_all_vectors(self) -> List[List[float]]:
+        """
+        Retrieves all vector representations for blocks using raw SQL.
+
+        Returns:
+            List[List[float]]: A list of all vector representations.
+        """
+        try:
+            raw_query = """
+                SELECT block_id, vector
+                FROM "Block"
+                WHERE vector IS NOT NULL;
+            """
+
+            results = await self.prisma.execute_raw(raw_query)
+
+            vectors = [row['vector'] for row in results]
 
             self.logger.log(
                 "BlockService",
                 "info",
-                f"Total of {len(blocks)} blocks retrieved successfully.",
-                extra={"count": len(blocks)}
+                f"Retrieved {len(vectors)} vectors for blocks."
             )
-            return blocks
 
+            return vectors
         except Exception as e:
-            self.logger.log(
-                "BlockService",
-                "critical",
-                f"Exception during all blocks retrieval: {str(e)}",
-                extra={"traceback": traceback.format_exc()}
-            )
-            return None
+            self.logger.log("BlockService", "error", "Failed to retrieve all vectors", error=str(e))
+            return []
+
+ 
+async def main():
+    """
+    Main function to demonstrate and test the BlockService functionality.
+    """
+    print("Starting BlockService test...")
+
+    print("Connecting to the database...")
+    await database.connect()
+    print("Database connected successfully.")
+
+    block_service = BlockService()
+
+    try:
+        # Step 1: Create a new block without vector
+        print("\nCreating a new block without vector...")
+        new_block_data = {
+            "name": "TestBlock1",
+            "block_type": "dataset",
+            "description": "This is a test block without vector."
+        }
+        created_block = await block_service.create_block(new_block_data)
+        if created_block:
+            print(f"Created block: {created_block}")
+        else:
+            print("Failed to create block 'TestBlock1'.")
+
+        # Step 2: Create a new block with vector
+        print("\nCreating a new block with vector...")
+        new_block_with_vector_data = {
+            "name": "TestBlock2",
+            "block_type": "model",
+            "description": "This is a test block with vector."
+        }
+        test_vector = [0.1, 0.2, 0.3, 0.4, 0.5]  # Example vector
+        created_block_with_vector = await block_service.create_block(new_block_with_vector_data, vector=test_vector)
+        if created_block_with_vector:
+            print(f"Created block with vector: {created_block_with_vector}")
+        else:
+            print("Failed to create block 'TestBlock2'.")
+
+        if created_block_with_vector:
+            block_id = created_block_with_vector.block_id
+
+            # Step 3: Retrieve block by ID
+            print(f"\nRetrieving block with ID: {block_id}")
+            retrieved_block = await block_service.get_block_by_id(UUID(block_id))
+            print(f"Retrieved block: {retrieved_block}")
+
+            # Step 4: Retrieve block by Name
+            print(f"\nRetrieving block with name: {created_block_with_vector.name}")
+            block_by_name = await block_service.get_block_by_name(created_block_with_vector.name)
+            print(f"Retrieved block by name: {block_by_name}")
+
+            # Step 5: Update block
+            print(f"\nUpdating block with ID: {block_id}")
+            update_data = {"description": "Updated description for TestBlock2."}
+            updated_block = await block_service.update_block(UUID(block_id), update_data)
+            print(f"Updated block: {updated_block}")
+
+            # Step 6: Associate a new vector to the block
+            print(f"\nAssociating a new vector to block with ID: {block_id}")
+            new_vector = [0.5, 0.4, 0.3, 0.2, 0.1]
+            vector_success = await block_service.set_block_vector(block_id, new_vector)
+            print(f"Vector associated: {vector_success}")
+
+            # Step 7: Retrieve block vector
+            print(f"\nRetrieving vector for block with ID: {block_id}")
+            block_vector = await block_service.get_block_vector(block_id)
+            print(f"Retrieved vector: {block_vector}")
+
+            # Step 8: Perform a vector similarity search
+            print("\nPerforming vector similarity search...")
+            query_vector = [0.1, 0.2, 0.3, 0.4, 0.5]
+            similar_blocks = await block_service.search_blocks_by_vector_similarity(query_vector, top_k=5)
+            print(f"Similar blocks: {similar_blocks}")
+
+            # Step 9: Delete block
+            print(f"\nDeleting block with ID: {block_id}")
+            deleted = await block_service.delete_block(UUID(block_id))
+            print(f"Block deleted: {deleted}")
+
+        # Step 10: List all blocks
+        print("\nListing all blocks...")
+        all_blocks = await block_service.prisma.block.find_many()
+        print(f"Total blocks: {len(all_blocks)}")
+        for block in all_blocks:
+            print(f"- Block ID: {block.block_id}, Name: {block.name}, Type: {block.block_type}, Description: {block.description}")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        import traceback
+        print(traceback.format_exc())
+
+    finally:
+        print("\nDisconnecting from the database...")
+        await database.disconnect()
+        print("Database disconnected.")
+
+if __name__ == "__main__":
+    asyncio.run(main())
