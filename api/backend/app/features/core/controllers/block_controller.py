@@ -287,9 +287,7 @@ class BlockController:
             }
             await self.audit_service.create_audit_log(audit_log)
 
-            if blocks is None:
-                return []
-            return blocks
+            return blocks if blocks is not None else []
         except Exception as e:
             print(f"An error occurred during similarity search: {e}")
             print(traceback.format_exc())
