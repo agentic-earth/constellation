@@ -16,8 +16,10 @@ Design Philosophy:
 """
 
 import sys
-import os
+sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api")
+sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api/backend")
 
+import os
 from backend.app.logger import ConstellationLogger
 
 # Add the parent directory of 'backend' to the Python path
@@ -53,15 +55,6 @@ def create_dev_crew(github_repo_url: str):
 
 
 if __name__ == "__main__":
-    os.environ['OPENAI_API_KEY'] = 'OPENAI_API_KEY'
-
-    SUPABASE_URL=''
-    SUPABASE_KEY='SUPABASE_KEY'
-    SUPABASE_SERVICE_KEY='SUPABASE_SERVICE_KEY'
-    os.environ['SUPABASE_URL'] = SUPABASE_URL
-    os.environ['SUPABASE_KEY'] = SUPABASE_KEY
-    os.environ['SUPABASE_SERVICE_KEY'] = SUPABASE_SERVICE_KEY
-
     crew = create_dev_crew('https://github.com/MaartenGr/BERTopic')
     result = crew.kickoff()
     print(result)
