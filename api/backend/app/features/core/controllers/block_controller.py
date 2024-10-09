@@ -16,12 +16,14 @@ Responsibilities:
 - Ensure transactional safety and data consistency.
 """
 
+import traceback
 from prisma import Prisma
 from uuid import UUID
 from typing import Optional, List, Dict, Any
 from backend.app.features.core.services.block_service import BlockService
 from backend.app.features.core.services.taxonomy_service import TaxonomyService
 from backend.app.features.core.services.audit_service import AuditService
+from backend.app.logger import ConstellationLogger
 from backend.app.database import database
 from backend.app.utils.serialization_utils import align_dict_with_model  # Ensure this import is present
 import asyncio
@@ -33,6 +35,7 @@ class BlockController:
         self.block_service = BlockService(prisma)
         self.taxonomy_service = TaxonomyService(prisma)
         self.audit_service = AuditService(prisma)
+        self.logger = ConstellationLogger().get_logger("BlockController")
 
     async def create_block(self, block_data: Dict[str, Any], user_id: UUID) -> Optional[Dict[str, Any]]:
         """
@@ -82,7 +85,6 @@ class BlockController:
 
             except Exception as e:
                 print(f"An error occurred during block creation: {e}")
-                import traceback
                 print(traceback.format_exc())
                 return None
 
@@ -106,7 +108,6 @@ class BlockController:
                 return None
         except Exception as e:
             print(f"An error occurred during block retrieval: {e}")
-            import traceback
             print(traceback.format_exc())
             return None
 
@@ -158,7 +159,6 @@ class BlockController:
 
             except Exception as e:
                 print(f"An error occurred during block update: {e}")
-                import traceback
                 print(traceback.format_exc())
                 return None
 
@@ -196,7 +196,6 @@ class BlockController:
                 return True
             except Exception as e:
                 print(f"An error occurred during block deletion: {e}")
-                import traceback
                 print(traceback.format_exc())
                 return False
 
@@ -257,8 +256,57 @@ class BlockController:
                 return None
         except Exception as e:
             print(f"An error occurred during perform_search: {e}")
-            import traceback
             print(traceback.format_exc())
+            return None
+        
+    async def perform_similarity_search(self, query: List[float], top_k: int, user_id: UUID) -> Optional[List[Dict[str, Any]]]:
+        """
+        Performs a similarity search based on a query vector.
+
+        Args:
+            query (List[float]): Query vector for similarity search.
+            top_k (int): Number of results to return.
+            user_id (UUID): UUID of the user performing the search.
+
+        Returns:
+            Optional[List[Dict[str, Any]]]: List of blocks matching the search criteria, or None if an error occurs.
+        """
+        try:
+            blocks = await self.block_service.search_blocks_by_vector_similarity(query, top_k)
+            
+            # Audit Logging for Similarity Search
+            audit_log = {
+                "user_id": str(user_id),
+                "action_type": "READ",
+                "entity_type": "block",
+                "entity_id": "SIMILARITY_SEARCH",
+                "details": {
+                    "top_k": top_k,
+                    "results_count": len(blocks) if blocks is not None else 0
+                }
+            }
+            await self.audit_service.create_audit_log(audit_log)
+
+            if blocks is None:
+                return []
+            return blocks
+        except Exception as e:
+            print(f"An error occurred during similarity search: {e}")
+            print(traceback.format_exc())
+            
+            # Audit Logging for Failed Similarity Search
+            error_audit_log = {
+                "user_id": str(user_id),
+                "action_type": "ERROR",
+                "entity_type": "block",
+                "entity_id": "SIMILARITY_SEARCH_ERROR",
+                "details": {
+                    "error_message": str(e),
+                    "top_k": top_k
+                }
+            }
+            await self.audit_service.create_audit_log(error_audit_log)
+            
             return None
 
 # -------------------
@@ -374,6 +422,18 @@ async def main():
     print("\nDisconnecting from database...")
     await database.prisma.disconnect()
     print("Test completed.")
+
+    # Step 6: Perform a similarity search
+    print("\nStep 6: Performing a similarity search...")
+    query = [0.1] * 512  # Example query vector
+    top_k = 5  # Number of results to return
+    similarity_results = await controller.perform_similarity_search(query, top_k, user_id)
+    if similarity_results is not None:
+        print(f"Found {len(similarity_results)} similar block(s):")
+        for blk in similarity_results:
+            print(f"- Block ID: {blk['block_id']}, Name: {blk['name']}, Type: {blk['block_type']}")
+    else:
+        print("Error happened during similarity search.")
 
 if __name__ == "__main__":
     asyncio.run(main())
