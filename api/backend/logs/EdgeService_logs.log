@@ -1,2 +1,6 @@
-Log file initialized on 2024-10-03 20:46:24.103374
-2024-10-03 20:46:24,103 - EdgeService - ERROR - An error occurred in main. - error=name 'BlockService' is not defined
+Log file initialized on 2024-10-09 21:58:46.765214
+2024-10-09 21:58:46,765 - EdgeService - INFO - Edge created successfully. - edge_id=763f8d28-383e-439b-9947-ca44767f0968 - source_block_id=d15606a4-ed15-4244-ad4d-21b07ae634a8 - target_block_id=0a3c2c06-e4b3-437a-87f2-edcecfe68575
+2024-10-09 21:58:46,965 - EdgeService - INFO - Edge created successfully. - edge_id=d7e960cd-900e-41f6-9dcb-492802cf17ab - source_block_id=0a3c2c06-e4b3-437a-87f2-edcecfe68575 - target_block_id=11b16b29-c8bc-4763-8bc7-d3fc7dd15c49
+2024-10-09 21:58:47,293 - EdgeService - INFO - Edge retrieved successfully. - edge_id=763f8d28-383e-439b-9947-ca44767f0968
+2024-10-09 21:58:47,494 - EdgeService - INFO - Edge updated successfully. - edge_id=763f8d28-383e-439b-9947-ca44767f0968 - updated_fields=['target_block_id', 'updated_at']
+2024-10-09 21:58:47,819 - EdgeService - INFO - Retrieved 2 edges. - filters=None - limit=100 - offset=0
