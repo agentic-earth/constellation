@@ -28,11 +28,11 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime
 import asyncio
+from backend.app.config import settings
 
 from prisma.errors import UniqueViolationError
 from prisma.models import Block as PrismaBlock
 from prisma import Prisma
-from backend.app.database import database
 from backend.app.logger import ConstellationLogger
 
 class BlockService:
@@ -306,7 +306,7 @@ class BlockService:
                 FROM "Block"
                 WHERE block_id = '{block_id}';
             """
-            result = await tx.execute_raw(query)
+            result = await tx.query_raw(query)
             
             if result and result[0]['vector_text']:
                 # Parse the PostgreSQL array string into a list of floats
@@ -397,13 +397,14 @@ async def main():
     print("Starting BlockService test...")
 
     print("Connecting to the database...")
-    await database.connect()
+    prisma = Prisma(datasource={"url": str(settings.DATABASE_URL)})
+    await prisma.connect()
     print("Database connected successfully.")
 
     block_service = BlockService()
 
     try:
-        async with database.prisma.tx() as tx:
+        async with prisma.tx() as tx:
             # Step 1: Create a new block without vector
             print("\nCreating a new block without vector...")
             new_block_data = {
@@ -478,6 +479,9 @@ async def main():
             print(f"Total blocks: {len(all_blocks)}")
             for block in all_blocks:
                 print(f"- Block ID: {block.block_id}, Name: {block.name}, Type: {block.block_type}, Description: {block.description}")
+            
+            # Step 11: Clean up
+            await tx.block.delete_many()
 
     except Exception as e:
         print(f"An error occurred: {e}")
@@ -486,7 +490,7 @@ async def main():
 
     finally:
         print("\nDisconnecting from the database...")
-        await database.disconnect()
+        await prisma.disconnect()
         print("Database disconnected.")
 
 if __name__ == "__main__":
