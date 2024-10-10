@@ -30,9 +30,10 @@ import asyncio
 class BlockController:
     def __init__(self, prisma: Prisma):
         self.prisma = prisma
-        self.block_service = BlockService(prisma)
-        self.taxonomy_service = TaxonomyService(prisma)
-        self.audit_service = AuditService(prisma)
+        self.block_service = BlockService()
+        self.taxonomy_service = TaxonomyService()
+        self.audit_service = AuditService()
+        self.logger = ConstellationLogger
 
     async def create_block(self, block_data: Dict[str, Any], user_id: UUID) -> Optional[Dict[str, Any]]:
         """
@@ -51,7 +52,7 @@ class BlockController:
                 block_data.pop('metadata', None)  # Removed 'metadata' as it's not in Prisma schema
 
                 # Step 1: Create Block
-                created_block = await self.block_service.create_block(block_data, transaction)
+                created_block = await self.block_service.create_block(tx=transactions, block_data=block_data)
                 if not created_block:
                     raise ValueError("Failed to create block.")
 
@@ -76,7 +77,9 @@ class BlockController:
                 }
                 # Align the audit_log without relation fields
                 aligned_audit_log = align_dict_with_model(audit_log, PrismaAuditLog)
-                await self.audit_service.create_audit_log(aligned_audit_log, transaction=transaction)
+                audit_log = await self.audit_service.create_audit_log(aligned_audit_log, transaction=transaction)
+                if not audit_log:
+                    raise Exception("Failed to create audit log for block creation")
 
                 return created_block
 
@@ -97,18 +100,19 @@ class BlockController:
         Returns:
             Optional[Dict[str, Any]]: The retrieved block data if found, None otherwise.
         """
-        try:
-            block = await self.block_service.get_block_by_id(block_id)
-            if block:
-                return block
-            else:
-                print(f"Block with ID {block_id} not found.")
+        async with self.prisma.tx() as transaction:
+            try:
+                block = await self.block_service.get_block_by_id(tx=transaction, block_id=block_id)
+                if block:
+                    return block
+                else:
+                    print(f"Block with ID {block_id} not found.")
+                    return None
+            except Exception as e:
+                print(f"An error occurred during block retrieval: {e}")
+                import traceback
+                print(traceback.format_exc())
                 return None
-        except Exception as e:
-            print(f"An error occurred during block retrieval: {e}")
-            import traceback
-            print(traceback.format_exc())
-            return None
 
     async def update_block(self, block_id: UUID, update_data: Dict[str, Any], user_id: UUID) -> Optional[Dict[str, Any]]:
         """
@@ -127,7 +131,7 @@ class BlockController:
                 update_data.pop('metadata', None)  # Removed 'metadata' as it's not in Prisma schema
 
                 # Step 1: Update Block
-                updated_block = await self.block_service.update_block(block_id, update_data, transaction)
+                updated_block = await self.block_service.update_block(tx=transaction, block_id=block_id, update_data=update_data)
                 if not updated_block:
                     raise ValueError("Failed to update block.")
 
@@ -152,7 +156,9 @@ class BlockController:
                 }
                 # Align the audit_log without relation fields
                 aligned_audit_log = align_dict_with_model(audit_log, PrismaAuditLog)
-                await self.audit_service.create_audit_log(aligned_audit_log, transaction=transaction)
+                audit_log = await self.audit_service.create_audit_log(aligned_audit_log, transaction=transaction)
+                if not audit_log:
+                    raise Exception("Failed to create audit log for block update")
 
                 return updated_block
 
@@ -176,7 +182,7 @@ class BlockController:
         async with self.prisma.tx() as transaction:
             try:
                 # Step 1: Delete Block
-                deletion_success = await self.block_service.delete_block(block_id, transaction)
+                deletion_success = await self.block_service.delete_block(tx=transaction, block_id=block_id)
                 if not deletion_success:
                     raise ValueError("Failed to delete block.")
 
@@ -191,7 +197,9 @@ class BlockController:
                 }
                 # Align the audit_log without relation fields
                 aligned_audit_log = align_dict_with_model(audit_log, PrismaAuditLog)
-                await self.audit_service.create_audit_log(aligned_audit_log, transaction=transaction)
+                audit_log = await self.audit_service.create_audit_log(aligned_audit_log, transaction=transaction)
+                if not audit_log:
+                    raise Exception("Failed to create audit log for block deletion")
 
                 return True
             except Exception as e:
@@ -200,7 +208,7 @@ class BlockController:
                 print(traceback.format_exc())
                 return False
 
-    async def search_blocks(self, search_filters: Dict[str, Any], user_id: UUID) -> Optional[List[Dict[str, Any]]]:
+    async def search_blocks(self, search_filters: Dict[str, Any], user_id: UUID, transaction: Optional[Prisma] = None) -> Optional[List[Dict[str, Any]]]:
         """
         Searches for blocks based on taxonomy filters.
 
@@ -212,7 +220,7 @@ class BlockController:
             Optional[List[Dict[str, Any]]]: List of blocks matching the search criteria, or None if an error occurs.
         """
         try:
-            blocks = await self.taxonomy_service.search_blocks(search_filters)
+            blocks = await self.taxonomy_service.search_blocks(search_filters, transaction=transaction)
             if blocks is not None:
                 return blocks
             else:
@@ -235,31 +243,36 @@ class BlockController:
         Returns:
             Optional[List[Dict[str, Any]]]: List of matching blocks, or None if an error occurs.
         """
-        try:
-            search_results = await self.search_blocks(search_filters, user_id)
-            if search_results is not None:
-                # Audit Logging for Search
-                audit_log = {
-                    "user_id": str(user_id),
-                    "action_type": "READ",  # Use 'READ' for searches
-                    "entity_type": "block",  # If 'block_search' is not in enum, use 'block'
-                    "entity_id": "SEARCH",  # Consider revising if needed
-                    "details": {
-                        "search_filters": search_filters,
-                        "results_count": len(search_results)
+        async with self.prisma.tx() as transaction:
+            try:
+                search_results = await self.search_blocks(search_filters, user_id, transaction=transaction)
+                if search_results is not None:
+                    # Audit Logging for Search
+                    audit_log = {
+                        "user_id": str(user_id),
+                        "action_type": "READ",  # Use 'READ' for searches
+                        "entity_type": "block",  # If 'block_search' is not in enum, use 'block'
+                        "entity_id": "SEARCH",  # Consider revising if needed
+                        "details": {
+                            "search_filters": search_filters,
+                            "results_count": len(search_results)
+                        }
+                        # Removed 'users' field
                     }
-                    # Removed 'users' field
-                }
-                # Align the audit_log without relation fields
-                await self.audit_service.create_audit_log(audit_log)
-                return search_results
-            else:
+                    # Align the audit_log without relation fields
+                    aligned_audit_log = align_dict_with_model(audit_log, PrismaAuditLog)
+                    audit_log = await self.audit_service.create_audit_log(audit_log=audit_log, tx=transaction)
+                    if not audit_log:
+                        raise Exception("Failed to create audit log for block search")
+
+                    return search_results
+                else:
+                    return None
+            except Exception as e:
+                print(f"An error occurred during perform_search: {e}")
+                import traceback
+                print(traceback.format_exc())
                 return None
-        except Exception as e:
-            print(f"An error occurred during perform_search: {e}")
-            import traceback
-            print(traceback.format_exc())
-            return None
 
 # -------------------
 # Testing Utility
