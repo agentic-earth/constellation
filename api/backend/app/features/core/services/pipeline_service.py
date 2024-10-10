@@ -28,7 +28,7 @@ from uuid import UUID, uuid4
 from datetime import datetime
 import asyncio
 
-from prisma.models import pipelines, pipeline_blocks, pipeline_edges
+from prisma.models import Pipeline, PipelineBlock, PipelineEdge
 from backend.app.database import database
 from backend.app.logger import ConstellationLogger
 
@@ -38,7 +38,7 @@ class PipelineService:
         self.prisma = database.prisma
         self.logger = ConstellationLogger()
 
-    async def create_pipeline(self, pipeline_data: Dict[str, Any]) -> pipelines:
+    async def create_pipeline(self, pipeline_data: Dict[str, Any]) -> Pipeline:
         """
         Creates a new pipeline in the database.
 
@@ -61,7 +61,7 @@ class PipelineService:
         )
         return created_pipeline
 
-    async def get_pipeline_by_id(self, pipeline_id: UUID) -> Optional[pipelines]:
+    async def get_pipeline_by_id(self, pipeline_id: UUID) -> Optional[Pipeline]:
         """
         Retrieves a pipeline by its ID.
 
@@ -89,7 +89,7 @@ class PipelineService:
             )
         return pipeline
 
-    async def update_pipeline(self, pipeline_id: UUID, update_data: Dict[str, Any]) -> pipelines:
+    async def update_pipeline(self, pipeline_id: UUID, update_data: Dict[str, Any]) -> Pipeline:
         """
         Updates an existing pipeline's information.
 
@@ -142,7 +142,7 @@ class PipelineService:
             )
             return False
 
-    async def list_pipelines(self, filters: Optional[Dict[str, Any]] = None, limit: int = 100, offset: int = 0) -> List[pipelines]:
+    async def list_pipelines(self, filters: Optional[Dict[str, Any]] = None, limit: int = 100, offset: int = 0) -> List[Pipeline]:
         """
         Retrieves a list of pipelines, optionally filtered.
 
@@ -166,7 +166,7 @@ class PipelineService:
         )
         return pipelines_list
 
-    async def assign_block_to_pipeline(self, pipeline_block_data: Dict[str, Any]) -> pipeline_blocks:
+    async def assign_block_to_pipeline(self, pipeline_block_data: Dict[str, Any]) -> PipelineBlock:
         """
         Assigns a block to a pipeline.
 
@@ -218,7 +218,7 @@ class PipelineService:
             )
             return False
 
-    async def assign_edge_to_pipeline(self, pipeline_edge_data: Dict[str, Any]) -> pipeline_edges:
+    async def assign_edge_to_pipeline(self, pipeline_edge_data: Dict[str, Any]) -> PipelineEdge:
         """
         Assigns an edge to a pipeline.
 
@@ -270,7 +270,7 @@ class PipelineService:
             )
             return False
 
-    async def get_pipeline_blocks(self, pipeline_id: UUID) -> List[pipeline_blocks]:
+    async def get_pipeline_blocks(self, pipeline_id: UUID) -> List[PipelineBlock]:
         """
         Retrieves all blocks associated with a pipeline.
 
@@ -290,7 +290,7 @@ class PipelineService:
         )
         return pipeline_blocks_list
 
-    async def get_pipeline_edges(self, pipeline_id: UUID) -> List[pipeline_edges]:
+    async def get_pipeline_edges(self, pipeline_id: UUID) -> List[PipelineEdge]:
         """
         Retrieves all edges associated with a pipeline.
 
