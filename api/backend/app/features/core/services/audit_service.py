@@ -29,7 +29,7 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
 import asyncio
-from enum import Enum
+import json
 
 from prisma import Prisma
 from prisma.enums import ActionTypeEnum as PrismaActionTypeEnum, AuditEntityTypeEnum as PrismaAuditEntityTypeEnum
@@ -42,14 +42,14 @@ from backend.app.logger import ConstellationLogger
 
 class AuditService:
     def __init__(self):
-        self.prisma = database.prisma
         self.logger = ConstellationLogger()
 
-    async def create_audit_log(self, audit_data: Dict[str, Any]) -> PrismaAuditLog:
+    async def create_audit_log(self, tx: Prisma, audit_data: Dict[str, Any]) -> PrismaAuditLog:
         """
         Create a new audit log entry.
 
         Args:
+            tx: Prisma transaction client
             audit_data (Dict[str, Any]): Dictionary containing audit log data.
                 Expected keys:
                     - 'user_id': UUID (string)
@@ -87,11 +87,11 @@ class AuditService:
             "entity_type": PrismaAuditEntityTypeEnum[audit_data["entity_type"]],
             "entity_id": audit_data["entity_id"],
             "timestamp": datetime.now(timezone.utc),
-            "details": details  # Will default to '{}'::jsonb if not provided
+            "details": json.dumps(details)  # Will default to '{}'::jsonb if not provided
         }
 
         # Create the audit log
-        created_log = await self.prisma.auditlog.create(
+        created_log = await tx.auditlog.create(
             data=create_data
         )
 
@@ -107,17 +107,18 @@ class AuditService:
 
         return created_log
 
-    async def get_audit_log_by_id(self, log_id: UUID) -> Optional[PrismaAuditLog]:
+    async def get_audit_log_by_id(self, tx: Prisma, log_id: UUID) -> Optional[PrismaAuditLog]:
         """
         Retrieve an audit log entry by its ID.
 
         Args:
+            tx (Prisma): Prisma transaction client
             log_id (UUID): The UUID of the audit log to retrieve.
 
         Returns:
             Optional[PrismaAuditLog]: The retrieved audit log entry, or None if not found.
         """
-        audit_log = await self.prisma.auditlog.find_unique(
+        audit_log = await tx.auditlog.find_unique(
             where={"log_id": str(log_id)}
         )
 
@@ -138,11 +139,12 @@ class AuditService:
 
         return audit_log
 
-    async def list_audit_logs(self, filters: Optional[Dict[str, Any]] = None, limit: int = 100, offset: int = 0) -> List[PrismaAuditLog]:
+    async def list_audit_logs(self, tx: Prisma, filters: Optional[Dict[str, Any]] = None, limit: int = 100, offset: int = 0) -> List[PrismaAuditLog]:
         """
         List audit log entries, optionally filtered.
 
         Args:
+            tx (Prisma): Prisma transaction client
             filters (Optional[Dict[str, Any]]): Optional filters to apply to the query.
                 Supported filters:
                     - 'user_id': UUID (string)
@@ -171,7 +173,7 @@ class AuditService:
             if "entity_id" in filters:
                 prisma_filters["entity_id"] = filters["entity_id"]
 
-        audit_logs = await self.prisma.auditlog.find_many(
+        audit_logs = await tx.auditlog.find_many(
             where=prisma_filters,
             take=limit,
             skip=offset,
@@ -189,11 +191,12 @@ class AuditService:
 
         return audit_logs
 
-    async def update_audit_log(self, log_id: UUID, update_data: Dict[str, Any]) -> PrismaAuditLog:
+    async def update_audit_log(self, tx: Prisma, log_id: UUID, update_data: Dict[str, Any]) -> PrismaAuditLog:
         """
         Update an existing audit log entry.
 
         Args:
+            tx (Prisma): Prisma transaction client
             log_id (UUID): The UUID of the audit log to update.
             update_data (Dict[str, Any]): Dictionary containing updated audit log data.
                 Allowed keys: 'action_type', 'entity_type', 'entity_id', 'details'.
@@ -221,12 +224,12 @@ class AuditService:
             details = update_data["details"]
             if details is not None and not isinstance(details, dict):
                 raise ValueError("`details` must be a dictionary representing JSON data.")
-            update_data["details"] = details  # Will default to '{}'::jsonb if set to default
+            update_data["details"] = json.dumps(details)  # Will default to '{}'::jsonb if set to default
 
         # Update timestamp
         update_data["timestamp"] = datetime.now(timezone.utc)
 
-        updated_log = await self.prisma.auditlog.update(
+        updated_log = await tx.auditlog.update(
             where={"log_id": str(log_id)},
             data=update_data
         )
@@ -241,17 +244,18 @@ class AuditService:
 
         return updated_log
 
-    async def delete_audit_log(self, log_id: UUID) -> bool:
+    async def delete_audit_log(self, tx: Prisma, log_id: UUID) -> bool:
         """
         Delete an audit log entry.
 
         Args:
+            tx (Prisma): Prisma transaction client
             log_id (UUID): The UUID of the audit log to delete.
 
         Returns:
             bool: True if the audit log was successfully deleted, False otherwise.
         """
-        deleted_log = await self.prisma.auditlog.delete(
+        deleted_log = await tx.auditlog.delete(
             where={"log_id": str(log_id)}
         )
 
@@ -279,68 +283,69 @@ class AuditService:
         """
         print("Starting AuditService test...")
 
-        # Step 1: Create a new audit log
-        print("\nCreating a new audit log...")
-        new_log_data = {
-            "user_id": str(uuid4()),  # Random UUID since no Profile relation
-            "action_type": "CREATE",
-            "entity_type": "block",
-            "entity_id": str(uuid4()),
-            "details": {"message": "Created a new block with ID xyz"}  # Ensure this is a dict
-        }
-        created_log = await self.create_audit_log(new_log_data)
-        if created_log:
-            print(f"Created AuditLog: {created_log.log_id} - Action: {created_log.action_type}")
-        else:
-            print("Failed to create AuditLog.")
-
-        # Step 2: Retrieve the audit log by ID
-        if created_log:
-            print(f"\nRetrieving AuditLog with ID: {created_log.log_id}")
-            retrieved_log = await self.get_audit_log_by_id(UUID(created_log.log_id))
-            if retrieved_log:
-                print(f"Retrieved AuditLog: {retrieved_log.log_id} - Action: {retrieved_log.action_type} - Details: {retrieved_log.details}")
-            else:
-                print("Failed to retrieve AuditLog.")
-        else:
-            print("Skipping retrieval since AuditLog creation failed.")
-
-        # Step 3: List all audit logs
-        print("\nListing all audit logs...")
-        audit_logs = await self.list_audit_logs()
-        print(f"Total AuditLogs: {len(audit_logs)}")
-        for log in audit_logs:
-            print(f"- Log ID: {log.log_id}, Action: {log.action_type}, Entity: {log.entity_type}, Details: {log.details}")
-
-        # Step 4: Update the audit log's details
-        if created_log:
-            print(f"\nUpdating AuditLog with ID: {created_log.log_id}")
-            update_data = {
-                "details": {"message": "Updated audit log details."},  # Ensure this is a dict
-                "action_type": "UPDATE"
+        async with database.prisma.tx() as tx:
+            # Step 1: Create a new audit log
+            print("\nCreating a new audit log...")
+            new_log_data = {
+                "user_id": str(uuid4()),  # Random UUID since no Profile relation
+                "action_type": "CREATE",
+                "entity_type": "block",
+                "entity_id": str(uuid4()),
+                "details": {"message": "Created a new block with ID xyz"}  # Ensure this is a dict
             }
-            updated_log = await self.update_audit_log(UUID(created_log.log_id), update_data)
-            if updated_log:
-                print(f"Updated AuditLog: {updated_log.log_id} - Action: {updated_log.action_type} - Details: {updated_log.details}")
+            created_log = await self.create_audit_log(tx, new_log_data)
+            if created_log:
+                print(f"Created AuditLog: {created_log.log_id} - Action: {created_log.action_type}")
             else:
-                print("Failed to update AuditLog.")
-        else:
-            print("Skipping update since AuditLog creation failed.")
+                print("Failed to create AuditLog.")
 
-        # Step 5: Delete the audit log
-        if created_log:
-            print(f"\nDeleting AuditLog with ID: {created_log.log_id}")
-            deletion_success = await self.delete_audit_log(UUID(created_log.log_id))
-            print(f"AuditLog deleted: {deletion_success}")
-        else:
-            print("Skipping deletion since AuditLog creation failed.")
+            # Step 2: Retrieve the audit log by ID
+            if created_log:
+                print(f"\nRetrieving AuditLog with ID: {created_log.log_id}")
+                retrieved_log = await self.get_audit_log_by_id(tx, UUID(created_log.log_id))
+                if retrieved_log:
+                    print(f"Retrieved AuditLog: {retrieved_log.log_id} - Action: {retrieved_log.action_type} - Details: {retrieved_log.details}")
+                else:
+                    print("Failed to retrieve AuditLog.")
+            else:
+                print("Skipping retrieval since AuditLog creation failed.")
 
-        # Step 6: List audit logs after deletion
-        print("\nListing audit logs after deletion...")
-        audit_logs_after_deletion = await self.list_audit_logs()
-        print(f"Total AuditLogs: {len(audit_logs_after_deletion)}")
-        for log in audit_logs_after_deletion:
-            print(f"- Log ID: {log.log_id}, Action: {log.action_type}, Entity: {log.entity_type}, Details: {log.details}")
+            # Step 3: List all audit logs
+            print("\nListing all audit logs...")
+            audit_logs = await self.list_audit_logs(tx)
+            print(f"Total AuditLogs: {len(audit_logs)}")
+            for log in audit_logs:
+                print(f"- Log ID: {log.log_id}, Action: {log.action_type}, Entity: {log.entity_type}, Details: {log.details}")
+
+            # Step 4: Update the audit log's details
+            if created_log:
+                print(f"\nUpdating AuditLog with ID: {created_log.log_id}")
+                update_data = {
+                    "details": {"message": "Updated audit log details."},  # Ensure this is a dict
+                    "action_type": "UPDATE"
+                }
+                updated_log = await self.update_audit_log(tx, UUID(created_log.log_id), update_data)
+                if updated_log:
+                    print(f"Updated AuditLog: {updated_log.log_id} - Action: {updated_log.action_type} - Details: {updated_log.details}")
+                else:
+                    print("Failed to update AuditLog.")
+            else:
+                print("Skipping update since AuditLog creation failed.")
+
+            # Step 5: Delete the audit log
+            if created_log:
+                print(f"\nDeleting AuditLog with ID: {created_log.log_id}")
+                deletion_success = await self.delete_audit_log(tx, UUID(created_log.log_id))
+                print(f"AuditLog deleted: {deletion_success}")
+            else:
+                print("Skipping deletion since AuditLog creation failed.")
+
+            # Step 6: List audit logs after deletion
+            print("\nListing audit logs after deletion...")
+            audit_logs_after_deletion = await self.list_audit_logs(tx)
+            print(f"Total AuditLogs: {len(audit_logs_after_deletion)}")
+            for log in audit_logs_after_deletion:
+                print(f"- Log ID: {log.log_id}, Action: {log.action_type}, Entity: {log.entity_type}, Details: {log.details}")
 
         print("\nAuditService test completed.")
 
