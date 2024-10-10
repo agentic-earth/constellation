@@ -1,4 +1,8 @@
-Log file initialized on 2024-10-09 22:33:58.537679
-2024-10-09 22:33:58,537 - PipelineService - ERROR - Error creating pipeline. - error=User does not exist.
-2024-10-09 22:33:58,680 - PipelineService - INFO - Pipelines searched successfully. - search_params={'name': 'Updated'} - pipelines_found=0
-2024-10-09 22:33:58,820 - PipelineService - INFO - Pipelines listed successfully. - limit=10 - offset=0 - pipelines_found=0
+Log file initialized on 2024-10-10 03:42:26.584343
+2024-10-10 03:42:26,584 - PipelineService - INFO - Pipeline created successfully. - pipeline_id=47dfc556-66a3-437f-9a3e-9db9d32227ad - pipeline_name=Test Pipeline - user_id=123e4567-e89b-12d3-a456-426614174000
+2024-10-10 03:42:27,094 - PipelineService - INFO - Pipeline retrieved successfully. - pipeline_id=47dfc556-66a3-437f-9a3e-9db9d32227ad
+2024-10-10 03:42:27,251 - PipelineService - INFO - Pipeline updated successfully. - pipeline_id=47dfc556-66a3-437f-9a3e-9db9d32227ad - updated_fields=['name', 'description', 'updated_at']
+2024-10-10 03:42:27,468 - PipelineService - ERROR - Error assigning version to pipeline. - error=Version does not exist.
+2024-10-10 03:42:27,780 - PipelineService - INFO - Pipelines searched successfully. - search_params={'name': 'Updated'} - pipelines_found=1
+2024-10-10 03:42:28,087 - PipelineService - INFO - Pipelines listed successfully. - limit=10 - offset=0 - pipelines_found=1
+2024-10-10 03:42:28,244 - PipelineService - INFO - Pipeline deleted successfully. - pipeline_id=47dfc556-66a3-437f-9a3e-9db9d32227ad
