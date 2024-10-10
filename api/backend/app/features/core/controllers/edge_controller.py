@@ -1,43 +1,3 @@
-# app/controllers/edge_controller.py
-
-"""
-Edge Controller Module
-
-This module defines the EdgeController class responsible for managing edge-related operations.
-It orchestrates interactions between EdgeService and AuditService to perform CRUD operations
-and handle search functionalities.
-
-Responsibilities:
-- Coordinating between EdgeService and AuditService to perform edge-related workflows.
-- Handling CRUD operations for edges.
-- Managing search functionalities with optional filtering.
-- Ensuring transactional integrity and robust error handling.
-- Managing audit logs through AuditService.
-
-Design Philosophy:
-- Maintain high cohesion by focusing solely on edge-related orchestration.
-- Promote loose coupling by interacting with services through well-defined interfaces.
-- Ensure robustness through comprehensive error handling and logging.
-"""
-
-import traceback
-from typing import List, Optional, Dict, Any
-from uuid import UUID
-
-from fastapi import HTTPException, status
-
-from backend.app.features.core.services.edge_service import EdgeService
-from backend.app.features.core.services.audit_service import AuditService
-from backend.app.schemas import (
-    EdgeCreateSchema,
-    EdgeUpdateSchema,
-    EdgeResponseSchema,
-    EdgeVerificationRequestSchema,
-    EdgeVerificationResponseSchema,
-)
-from backend.app.logger import ConstellationLogger
-
-
 class EdgeController:
     """
     EdgeController manages all edge-related operations, coordinating between EdgeService
@@ -48,16 +8,30 @@ class EdgeController:
         """
         Initializes the EdgeController with instances of EdgeService and AuditService,
         along with the ConstellationLogger for logging purposes.
+        Also initializes the Prisma client.
         """
         self.edge_service = EdgeService()
         self.audit_service = AuditService()
         self.logger = ConstellationLogger()
+        self.prisma = Prisma()
+    
+    async def connect_prisma(self):
+        """
+        Connects the Prisma client.
+        """
+        await self.prisma.connect()
+
+    async def disconnect_prisma(self):
+        """
+        Disconnects the Prisma client.
+        """
+        await self.prisma.disconnect()
 
     # -------------------
     # Edge CRUD Operations
     # -------------------
 
-    def create_edge(self, edge_data: EdgeCreateSchema) -> EdgeResponseSchema:
+    async def create_edge(self, edge_data: EdgeCreateSchema) -> EdgeResponseSchema:
         """
         Creates a new edge.
 
@@ -71,8 +45,9 @@ class EdgeController:
             HTTPException: If edge creation fails due to validation or server errors.
         """
         try:
+            await self.connect_prisma()
             # Step 1: Create Edge
-            edge = self.edge_service.create_edge(edge_data)
+            edge = await self.edge_service.create_edge(self.prisma, edge_data.dict())
             if not edge:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -119,8 +94,10 @@ class EdgeController:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Internal Server Error during edge creation.",
             )
+        finally:
+            await self.disconnect_prisma()
 
-    def get_edge_by_id(self, edge_id: UUID) -> EdgeResponseSchema:
+    async def get_edge_by_id(self, edge_id: UUID) -> EdgeResponseSchema:
         """
         Retrieves an edge by its unique identifier.
 
@@ -134,8 +111,9 @@ class EdgeController:
             HTTPException: If the edge is not found or retrieval fails.
         """
         try:
+            await self.connect_prisma()
             # Step 1: Retrieve Edge
-            edge = self.edge_service.get_edge_by_id(edge_id)
+            edge = await self.edge_service.get_edge_by_id(self.prisma, edge_id)
             if not edge:
                 # Log the failed retrieval in Audit Logs
                 audit_log = {
@@ -191,8 +169,10 @@ class EdgeController:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Internal Server Error during edge retrieval.",
             )
+        finally:
+            await self.disconnect_prisma()
 
-    def update_edge(
+    async def update_edge(
         self, edge_id: UUID, update_data: EdgeUpdateSchema
     ) -> EdgeResponseSchema:
         """
@@ -209,8 +189,11 @@ class EdgeController:
             HTTPException: If edge update fails due to validation or server errors.
         """
         try:
+            await self.connect_prisma()
             # Step 1: Update Edge Details
-            edge = self.edge_service.update_edge(edge_id, update_data)
+            edge = await self.edge_service.update_edge(
+                self.prisma, edge_id, update_data.dict()
+            )
             if not edge:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -257,8 +240,10 @@ class EdgeController:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Internal Server Error during edge update.",
             )
+        finally:
+            await self.disconnect_prisma()
 
-    def delete_edge(self, edge_id: UUID) -> bool:
+    async def delete_edge(self, edge_id: UUID) -> bool:
         """
         Deletes an edge.
 
@@ -272,8 +257,9 @@ class EdgeController:
             HTTPException: If edge deletion fails.
         """
         try:
+            await self.connect_prisma()
             # Step 1: Delete Edge
-            deletion_success = self.edge_service.delete_edge(edge_id)
+            deletion_success = await self.edge_service.delete_edge(self.prisma, edge_id)
             if not deletion_success:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -320,8 +306,10 @@ class EdgeController:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Internal Server Error during edge deletion.",
             )
+        finally:
+            await self.disconnect_prisma()
 
-    def list_edges(
+    async def list_edges(
         self,
         filters: Optional[Dict[str, Any]] = None,
         limit: int = 100,
@@ -342,9 +330,10 @@ class EdgeController:
             HTTPException: If edge listing fails due to server errors.
         """
         try:
+            await self.connect_prisma()
             # Step 1: Retrieve Edges with Filters
-            edges = self.edge_service.list_edges(
-                filters=filters, limit=limit, offset=offset
+            edges = await self.edge_service.list_edges(
+                self.prisma, filters=filters, limit=limit, offset=offset
             )
             if edges is None:
                 raise HTTPException(
@@ -392,8 +381,10 @@ class EdgeController:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Internal Server Error during edge listing.",
             )
+        finally:
+            await self.disconnect_prisma()
 
-    def search_edges(
+    async def search_edges(
         self, query_params: Dict[str, Any], limit: int = 100, offset: int = 0
     ) -> List[EdgeResponseSchema]:
         """
@@ -411,9 +402,10 @@ class EdgeController:
             HTTPException: If edge search fails due to server errors.
         """
         try:
+            await self.connect_prisma()
             # Step 1: Perform Search
-            edges = self.edge_service.search_edges(
-                query_params=query_params, limit=limit, offset=offset
+            edges = await self.edge_service.search_edges(
+                self.prisma, query_params=query_params, limit=limit, offset=offset
             )
             if edges is None:
                 raise HTTPException(
@@ -422,7 +414,9 @@ class EdgeController:
                 )
 
             # Step 2: Count Total Matching Edges
-            total_count = self.edge_service.count_edges(filters=query_params)
+            total_count = await self.edge_service.count_edges(
+                self.prisma, filters=query_params
+            )
             if total_count is None:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -456,9 +450,6 @@ class EdgeController:
                 },
             )
 
-            # Note: Since we are restricted from using undefined schemas, we'll return the list along with pagination metadata as a dictionary.
-            # This can be adjusted based on how the response is handled in the API routes.
-
             return edges
 
         except HTTPException as he:
@@ -482,12 +473,14 @@ class EdgeController:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Internal Server Error during edge search.",
             )
+        finally:
+            await self.disconnect_prisma()
 
     # -------------------
     # Edge Verification Endpoint
     # -------------------
 
-    def verify_edge(
+    async def verify_edge(
         self, verification_request: EdgeVerificationRequestSchema
     ) -> EdgeVerificationResponseSchema:
         """
@@ -500,8 +493,10 @@ class EdgeController:
             EdgeVerificationResponseSchema: The result of the verification.
         """
         try:
+            await self.connect_prisma()
             # Use EdgeService to perform the verification
-            verification_result = self.edge_service.can_connect_blocks(
+            verification_result = await self.edge_service.can_connect_blocks(
+                self.prisma,
                 source_block_id=verification_request.source_block_id,
                 target_block_id=verification_request.target_block_id,
             )
@@ -529,6 +524,15 @@ class EdgeController:
             )
             return verification_result
 
+        except HTTPException as he:
+            # Log HTTPExceptions with error level
+            self.logger.log(
+                "EdgeController",
+                "error",
+                f"HTTPException during edge verification: {he.detail}",
+                extra={"status_code": he.status_code, "detail": he.detail},
+            )
+            raise he
         except Exception as e:
             # Log unexpected exceptions with critical level
             self.logger.log(
@@ -541,3 +545,5 @@ class EdgeController:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Internal Server Error during edge verification.",
             )
+        finally:
+            await self.disconnect_prisma()
