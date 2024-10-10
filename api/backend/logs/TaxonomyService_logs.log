@@ -1,2 +1,5 @@
-Log file initialized on 2024-10-03 20:41:50.004923
-2024-10-03 20:41:50,005 - TaxonomyService - ERROR - An error occurred in main - error=name 'BlockService' is not defined
+Log file initialized on 2024-10-09 19:21:58.868749
+2024-10-09 19:21:58,869 - TaxonomyService - ERROR - Failed to create taxonomy for block - error=Could not find field at `findUniqueCategory.where.name_parent_id`
+2024-10-09 19:21:58,869 - TaxonomyService - ERROR - Failed to retrieve block categories - error='Prisma' object has no attribute 'block_category'
+2024-10-09 19:21:58,869 - TaxonomyService - ERROR - Failed to search blocks - error=CategoryActions.find_many() got an unexpected keyword argument 'select'
+2024-10-09 19:21:59,045 - TaxonomyService - ERROR - Failed to retrieve all categories - error=Field: "children" either does not exist or is not a relational field on the Category model

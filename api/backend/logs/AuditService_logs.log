@@ -1,4 +1,7 @@
-Log file initialized on 2024-10-03 21:59:59.818539
-2024-10-03 21:59:59,818 - AuditService - ERROR - Failed to create audit log. - error=Unable to match input value to any allowed input type for the field. Parse errors: [Unable to match input value to any allowed input type for the field. Parse errors: [Invalid argument type. `details` should be of any of the following types: `JsonNullValueInput`, Invalid argument type. `details` should be of any of the following types: `Json`], Unable to match input value to any allowed input type for the field. Parse errors: [Invalid argument type. `details` should be of any of the following types: `JsonNullValueInput`, Invalid argument type. `details` should be of any of the following types: `Json`]] - audit_data={'user_id': '710d2e46-fcf5-433d-b148-4dfe6836c8c4', 'action_type': 'CREATE', 'entity_type': 'block', 'entity_id': '75b20067-8cab-4e84-9757-50b2b1708249', 'details': {'message': 'Created a new block with ID xyz'}}
-2024-10-03 21:59:59,952 - AuditService - INFO - Retrieved 0 audit logs. - filters=None - limit=100 - offset=0
-2024-10-03 22:00:00,020 - AuditService - INFO - Retrieved 0 audit logs. - filters=None - limit=100 - offset=0
+Log file initialized on 2024-10-09 17:17:18.132223
+2024-10-09 17:17:18,133 - AuditService - INFO - Audit log created successfully. - log_id=eacd3dd5-2231-472c-afe5-fe9ac83d091c - action_type=CREATE - entity_type=block - entity_id=84c773b1-c7d7-4370-b62e-0ebc3510c4aa
+2024-10-09 17:17:18,317 - AuditService - INFO - Audit log retrieved successfully. - log_id=eacd3dd5-2231-472c-afe5-fe9ac83d091c
+2024-10-09 17:17:18,544 - AuditService - INFO - Retrieved 5 audit logs. - filters=None - limit=100 - offset=0
+2024-10-09 17:17:18,719 - AuditService - INFO - Audit log updated successfully. - log_id=eacd3dd5-2231-472c-afe5-fe9ac83d091c - updated_fields=['details', 'action_type', 'timestamp']
+2024-10-09 17:17:18,892 - AuditService - INFO - Audit log deleted successfully. - log_id=eacd3dd5-2231-472c-afe5-fe9ac83d091c
+2024-10-09 17:17:18,982 - AuditService - INFO - Retrieved 4 audit logs. - filters=None - limit=100 - offset=0
