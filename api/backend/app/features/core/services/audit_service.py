@@ -92,21 +92,21 @@ class AuditService:
                 )
                 return None
 
-        # Prepare data for creation
-        create_data = {
-            "log_id": str(uuid4()),
-            "user_id": audit_data["user_id"],
-            "action_type": PrismaActionTypeEnum[audit_data["action_type"]],
-            "entity_type": PrismaAuditEntityTypeEnum[audit_data["entity_type"]],
-            "entity_id": audit_data["entity_id"],
-            "timestamp": datetime.now(timezone.utc),
-            "details": json.dumps(details)  # Will default to '{}'::jsonb if not provided
-        }
+            # Prepare data for creation
+            create_data = {
+                "log_id": str(uuid4()),
+                "user_id": audit_data["user_id"],
+                "action_type": PrismaActionTypeEnum[audit_data["action_type"]],
+                "entity_type": PrismaAuditEntityTypeEnum[audit_data["entity_type"]],
+                "entity_id": audit_data["entity_id"],
+                "timestamp": datetime.now(timezone.utc),
+                "details": json.dumps(details)  # Will default to '{}'::jsonb if not provided
+            }
 
-        # Create the audit log
-        created_log = await tx.auditlog.create(
-            data=create_data
-        )
+            # Create the audit log
+            created_log = await tx.auditlog.create(
+                data=create_data
+            )
 
             self.logger.log(
                 "AuditService",
