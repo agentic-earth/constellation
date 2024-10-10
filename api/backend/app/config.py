@@ -48,6 +48,6 @@ settings = Settings()
 
 #print("Loaded settings:", settings.dict())
 # Uncomment these lines for debugging
-print("Loaded settings:", settings.dict())
-print("ENV file path:", ROOT_DIR / ".env")
-print("DATABASE_URL:", settings.DATABASE_URL)
+# print("Loaded settings:", settings.dict())
+# print("ENV file path:", ROOT_DIR / ".env")
+# print("DATABASE_URL:", settings.DATABASE_URL)

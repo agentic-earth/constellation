@@ -163,8 +163,7 @@ model PipelineEdge {
 }
 
 model Profile {
-  id          String      @id @default(uuid()) @db.Uuid
-  userId      String      @unique
+  auth_uid    String      @id @default(uuid()) @db.Uuid
   username    String      @unique @db.VarChar(255)
   email       String      @unique @db.VarChar(255)
   role        String      @default("user") @db.VarChar(50)
@@ -173,7 +172,7 @@ model Profile {
   ApiKey      ApiKey[]
   Pipeline    Pipeline[]
 
-  @@map("profiles")
+  // @@map("profiles")
 }
 
 model ApiKey {
@@ -183,7 +182,7 @@ model ApiKey {
   created_at        DateTime @default(now()) @db.Timestamptz(6)
   expires_at        DateTime @db.Timestamptz(6)
   is_active         Boolean @default(true)
-  Profile           Profile @relation(fields: [user_id], references: [userId], onDelete: Cascade, onUpdate: NoAction, map: "fk_api_key_user")
+  Profile           Profile @relation(fields: [user_id], references: [auth_uid], onDelete: Cascade, onUpdate: NoAction, map: "fk_api_key_user")
 }
 
 enum ActionTypeEnum {
