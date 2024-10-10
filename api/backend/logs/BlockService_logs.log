@@ -1,9 +1,5 @@
-Log file initialized on 2024-10-09 20:27:56.550970
-2024-10-09 20:27:56,551 - BlockService - INFO - Block retrieved successfully by name. - block_id=fb2c9d8f-fdb6-4ec7-8761-3a581ff5e697 - block_name=TestBlock1
-2024-10-09 20:27:56,551 - BlockService - INFO - Block already exists, retrieved existing block. - block_id=fb2c9d8f-fdb6-4ec7-8761-3a581ff5e697 - block_name=TestBlock1
-2024-10-09 20:27:56,617 - BlockService - INFO - Block created successfully. - block_id=f918cbb7-4af1-4756-8168-192e0a394e11 - block_name=TestBlock2
-2024-10-09 20:27:56,745 - BlockService - INFO - Vector associated with block successfully. - block_id=f918cbb7-4af1-4756-8168-192e0a394e11
-2024-10-09 20:27:56,872 - BlockService - INFO - Block retrieved successfully. - block_id=f918cbb7-4af1-4756-8168-192e0a394e11 - block_name=TestBlock2
-2024-10-09 20:27:56,937 - BlockService - INFO - Block retrieved successfully by name. - block_id=f918cbb7-4af1-4756-8168-192e0a394e11 - block_name=TestBlock2
-2024-10-09 20:27:57,063 - BlockService - INFO - Block updated successfully. - block_id=f918cbb7-4af1-4756-8168-192e0a394e11 - updated_fields=['description', 'updated_at']
-2024-10-09 20:27:57,699 - BlockService - INFO - Block deleted successfully. - block_id=f918cbb7-4af1-4756-8168-192e0a394e11
+Log file initialized on 2024-10-10 03:40:50.305729
+2024-10-10 03:40:50,306 - BlockService - INFO - Block created successfully. - block_id=f9e863e3-a72b-4a6f-8b41-1aa3178c30dc - block_name=EarthObservationModelExample
+2024-10-10 03:40:51,628 - BlockService - INFO - Block retrieved successfully. - block_id=f9e863e3-a72b-4a6f-8b41-1aa3178c30dc - block_name=EarthObservationModelExample
+2024-10-10 03:40:51,960 - BlockService - INFO - Block updated successfully. - block_id=f9e863e3-a72b-4a6f-8b41-1aa3178c30dc - updated_fields=['name', 'updated_at']
+2024-10-10 03:40:53,779 - BlockService - INFO - Block deleted successfully. - block_id=f9e863e3-a72b-4a6f-8b41-1aa3178c30dc

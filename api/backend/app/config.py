@@ -5,9 +5,12 @@ from pydantic import Field, AnyHttpUrl, PostgresDsn
 from typing import Optional
 import os
 from pathlib import Path
+import dotenv
 
 # Get the path to the root of the project
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
+
+dotenv.load_dotenv(ROOT_DIR / ".env", override=True)
 
 class Settings(BaseSettings):
     """
@@ -45,6 +48,6 @@ settings = Settings()
 
 #print("Loaded settings:", settings.dict())
 # Uncomment these lines for debugging
-print("Loaded settings:", settings.dict())
-print("ENV file path:", ROOT_DIR / ".env")
-print("DATABASE_URL:", settings.DATABASE_URL)
+# print("Loaded settings:", settings.dict())
+# print("ENV file path:", ROOT_DIR / ".env")
+# print("DATABASE_URL:", settings.DATABASE_URL)

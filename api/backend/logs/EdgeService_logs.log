@@ -1,6 +1,8 @@
-Log file initialized on 2024-10-09 21:58:46.765214
-2024-10-09 21:58:46,765 - EdgeService - INFO - Edge created successfully. - edge_id=763f8d28-383e-439b-9947-ca44767f0968 - source_block_id=d15606a4-ed15-4244-ad4d-21b07ae634a8 - target_block_id=0a3c2c06-e4b3-437a-87f2-edcecfe68575
-2024-10-09 21:58:46,965 - EdgeService - INFO - Edge created successfully. - edge_id=d7e960cd-900e-41f6-9dcb-492802cf17ab - source_block_id=0a3c2c06-e4b3-437a-87f2-edcecfe68575 - target_block_id=11b16b29-c8bc-4763-8bc7-d3fc7dd15c49
-2024-10-09 21:58:47,293 - EdgeService - INFO - Edge retrieved successfully. - edge_id=763f8d28-383e-439b-9947-ca44767f0968
-2024-10-09 21:58:47,494 - EdgeService - INFO - Edge updated successfully. - edge_id=763f8d28-383e-439b-9947-ca44767f0968 - updated_fields=['target_block_id', 'updated_at']
-2024-10-09 21:58:47,819 - EdgeService - INFO - Retrieved 2 edges. - filters=None - limit=100 - offset=0
+Log file initialized on 2024-10-09 21:34:13.799334
+2024-10-09 21:34:13,800 - EdgeService - INFO - Edge created successfully. - edge_id=3b53705c-85c7-4a97-8935-92fd69854283 - source_block_id=3edb7a0e-e1e4-4007-a756-b72d615b6ff4 - target_block_id=9dccc6a7-4517-486d-a3b9-d3786a735c2a
+2024-10-09 21:34:14,079 - EdgeService - INFO - Edge created successfully. - edge_id=4dfc736a-0c66-4587-aeed-02e384f09e39 - source_block_id=9dccc6a7-4517-486d-a3b9-d3786a735c2a - target_block_id=d6ffc571-1050-44c9-a98a-3ce8f6b3873d
+2024-10-09 21:34:14,528 - EdgeService - INFO - Edge retrieved successfully. - edge_id=3b53705c-85c7-4a97-8935-92fd69854283
+2024-10-09 21:34:14,803 - EdgeService - INFO - Edge updated successfully. - edge_id=3b53705c-85c7-4a97-8935-92fd69854283 - updated_fields=['target_block_id', 'updated_at']
+2024-10-09 21:34:15,247 - EdgeService - INFO - Retrieved 2 edges. - filters=None - limit=100 - offset=0
+2024-10-09 21:34:15,434 - EdgeService - INFO - Edge deleted successfully. - edge_id=4dfc736a-0c66-4587-aeed-02e384f09e39
+2024-10-09 21:34:15,701 - EdgeService - INFO - Retrieved 1 edges. - filters=None - limit=100 - offset=0

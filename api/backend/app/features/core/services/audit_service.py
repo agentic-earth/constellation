@@ -31,12 +31,12 @@ class AuditService:
     def __init__(self):
         self.logger = ConstellationLogger()
 
-    async def create_audit_log(self, prisma: Prisma, audit_data: Dict[str, Any]) -> Optional[PrismaAuditLog]:
+    async def create_audit_log(self, tx: Prisma, audit_data: Dict[str, Any]) -> Optional[PrismaAuditLog]:
         """
         Create a new audit log entry.
 
         Args:
-            prisma (Prisma): The Prisma client instance.
+            tx (Prisma): The Prisma client instance.
             audit_data (Dict[str, Any]): Dictionary containing audit log data.
                 Expected keys:
                     - 'user_id': UUID (string)
@@ -100,10 +100,15 @@ class AuditService:
                 "details": json.dumps(details)  # Ensure this is a dict
             }
 
-            # Create the audit log
-            created_log = await prisma.auditlog.create(
-                data=create_data
+            self.logger.log(
+                "AuditService",
+                "info",
+                "Audit log data is valid.",
+                extra={"audit_create_data": create_data}
             )
+
+            # Create the audit log
+            created_log = await tx.auditlog.create(data=create_data)
 
             self.logger.log(
                 "AuditService",
@@ -126,19 +131,19 @@ class AuditService:
             )
             return None
 
-    async def get_audit_log_by_id(self, prisma: Prisma, log_id: UUID) -> Optional[PrismaAuditLog]:
+    async def get_audit_log_by_id(self, tx: Prisma, log_id: UUID) -> Optional[PrismaAuditLog]:
         """
         Retrieve an audit log entry by its ID.
 
         Args:
-            prisma (Prisma): The Prisma client instance.
+            tx (Prisma): The Prisma client instance.
             log_id (UUID): The UUID of the audit log to retrieve.
 
         Returns:
             Optional[PrismaAuditLog]: The audit log data if found, None otherwise.
         """
         try:
-            audit_log = await prisma.auditlog.find_unique(
+            audit_log = await tx.auditlog.find_unique(
                 where={"log_id": str(log_id)}
             )
 
@@ -167,12 +172,12 @@ class AuditService:
             )
             return None
 
-    async def list_audit_logs(self, prisma: Prisma, filters: Optional[Dict[str, Any]] = None, limit: int = 100, offset: int = 0) -> List[PrismaAuditLog]:
+    async def list_audit_logs(self, tx: Prisma, filters: Optional[Dict[str, Any]] = None, limit: int = 100, offset: int = 0) -> List[PrismaAuditLog]:
         """
         List audit log entries, optionally filtered.
 
         Args:
-            prisma (Prisma): The Prisma client instance.
+            tx (Prisma): The Prisma client instance.
             filters (Optional[Dict[str, Any]]): Optional filters to apply to the query.
                 Supported filters:
                     - 'user_id': UUID (string)
@@ -212,7 +217,7 @@ class AuditService:
                 if "entity_id" in filters:
                     prisma_filters["entity_id"] = filters["entity_id"]
 
-            audit_logs = await prisma.auditlog.find_many(
+            audit_logs = await tx.auditlog.find_many(
                 where=prisma_filters,
                 take=limit,
                 skip=offset,
@@ -238,12 +243,12 @@ class AuditService:
             )
             return []
 
-    async def update_audit_log(self, prisma: Prisma, log_id: UUID, update_data: Dict[str, Any]) -> Optional[PrismaAuditLog]:
+    async def update_audit_log(self, tx: Prisma, log_id: UUID, update_data: Dict[str, Any]) -> Optional[PrismaAuditLog]:
         """
         Update an existing audit log entry.
 
         Args:
-            prisma (Prisma): The Prisma client instance.
+            tx (Prisma): The Prisma client instance.
             log_id (UUID): The UUID of the audit log to update.
             update_data (Dict[str, Any]): Dictionary containing updated audit log data.
                 Allowed keys: 'action_type', 'entity_type', 'entity_id', 'details'.
@@ -293,7 +298,7 @@ class AuditService:
             # Update timestamp
             update_data["timestamp"] = datetime.now(timezone.utc)
             update_data["details"] = json.dumps(update_data["details"])
-            updated_log = await prisma.auditlog.update(
+            updated_log = await tx.auditlog.update(
                 where={"log_id": str(log_id)},
                 data=update_data
             )
@@ -316,19 +321,19 @@ class AuditService:
             )
             return None
 
-    async def delete_audit_log(self, prisma: Prisma, log_id: UUID) -> bool:
+    async def delete_audit_log(self, tx: Prisma, log_id: UUID) -> bool:
         """
         Delete an audit log entry.
 
         Args:
-            prisma (Prisma): The Prisma client instance.
+            tx (Prisma): The Prisma client instance.
             log_id (UUID): The UUID of the audit log to delete.
 
         Returns:
             bool: True if the audit log was successfully deleted, False otherwise.
         """
         try:
-            deleted_log = await prisma.auditlog.delete(
+            deleted_log = await tx.auditlog.delete(
                 where={"log_id": str(log_id)}
             )
 
