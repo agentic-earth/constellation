@@ -1,0 +1,14 @@
+{
+    "title": "Learning quantum data with the quantum Earth Mover's distance",
+    "authors": [
+        "Bobak Toussi Kiani",
+        "Giacomo De Palma",
+        "Milad Marvian",
+        "Zi-Wen Liu",
+        "Seth Lloyd"
+    ],
+    "abstract": "  Quantifying how far the output of a learning algorithm is from its target is\nan essential task in machine learning. However, in quantum settings, the loss\nlandscapes of commonly used distance metrics often produce undesirable outcomes\nsuch as poor local minima and exponentially decaying gradients. To overcome\nthese obstacles, we consider here the recently proposed quantum earth mover's\n(EM) or Wasserstein-1 distance as a quantum analog to the classical EM\ndistance. We show that the quantum EM distance possesses unique properties, not\nfound in other commonly used quantum distance metrics, that make quantum\nlearning more stable and efficient. We propose a quantum Wasserstein generative\nadversarial network (qWGAN) which takes advantage of the quantum EM distance\nand provides an efficient means of performing learning on quantum data. We\nprovide examples where our qWGAN is capable of learning a diverse set of\nquantum data with only resources polynomial in the number of qubits.\n",
+    "published_date": "2021-01-08T14:33:19Z",
+    "doi": "10.1088/2058-9565/ac79c9",
+    "pdf_url": "http://arxiv.org/pdf/2101.03037v2"
+}

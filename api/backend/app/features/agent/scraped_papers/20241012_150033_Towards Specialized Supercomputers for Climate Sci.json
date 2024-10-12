@@ -1,0 +1,15 @@
+{
+    "title": "Towards Specialized Supercomputers for Climate Sciences: Computational\n  Requirements of the Icosahedral Nonhydrostatic Weather and Climate Model",
+    "authors": [
+        "Torsten Hoefler",
+        "Alexandru Calotoiu",
+        "Anurag Dipankar",
+        "Thomas Schulthess",
+        "Xavier Lapillonne",
+        "Oliver Fuhrer"
+    ],
+    "abstract": "  We discuss the computational challenges and requirements for high-resolution\nclimate simulations using the Icosahedral Nonhydrostatic Weather and Climate\nModel (ICON). We define a detailed requirements model for ICON which emphasizes\nthe need for specialized supercomputers to accurately predict climate change\nimpacts and extreme weather events. Based on the requirements model, we outline\ncomputational demands for km-scale simulations, and suggests machine learning\ntechniques to enhance model accuracy and efficiency. Our findings aim to guide\nthe design of future supercomputers for advanced climate science.\n",
+    "published_date": "2024-05-18T08:03:31Z",
+    "doi": null,
+    "pdf_url": "http://arxiv.org/pdf/2405.13043v1"
+}

@@ -1,0 +1,15 @@
+{
+    "title": "AI Security for Geoscience and Remote Sensing: Challenges and Future\n  Trends",
+    "authors": [
+        "Yonghao Xu",
+        "Tao Bai",
+        "Weikang Yu",
+        "Shizhen Chang",
+        "Peter M. Atkinson",
+        "Pedram Ghamisi"
+    ],
+    "abstract": "  Recent advances in artificial intelligence (AI) have significantly\nintensified research in the geoscience and remote sensing (RS) field. AI\nalgorithms, especially deep learning-based ones, have been developed and\napplied widely to RS data analysis. The successful application of AI covers\nalmost all aspects of Earth observation (EO) missions, from low-level vision\ntasks like super-resolution, denoising and inpainting, to high-level vision\ntasks like scene classification, object detection and semantic segmentation.\nWhile AI techniques enable researchers to observe and understand the Earth more\naccurately, the vulnerability and uncertainty of AI models deserve further\nattention, considering that many geoscience and RS tasks are highly\nsafety-critical. This paper reviews the current development of AI security in\nthe geoscience and RS field, covering the following five important aspects:\nadversarial attack, backdoor attack, federated learning, uncertainty and\nexplainability. Moreover, the potential opportunities and trends are discussed\nto provide insights for future research. To the best of the authors' knowledge,\nthis paper is the first attempt to provide a systematic review of AI\nsecurity-related research in the geoscience and RS community. Available code\nand datasets are also listed in the paper to move this vibrant field of\nresearch forward.\n",
+    "published_date": "2022-12-19T10:54:51Z",
+    "doi": "10.1109/MGRS.2023.3272825",
+    "pdf_url": "http://arxiv.org/pdf/2212.09360v2"
+}

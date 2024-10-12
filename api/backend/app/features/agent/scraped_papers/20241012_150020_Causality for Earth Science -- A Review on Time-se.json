@@ -1,0 +1,17 @@
+{
+    "title": "Causality for Earth Science -- A Review on Time-series and\n  Spatiotemporal Causality Methods",
+    "authors": [
+        "Sahara Ali",
+        "Uzma Hasan",
+        "Xingyan Li",
+        "Omar Faruque",
+        "Akila Sampath",
+        "Yiyi Huang",
+        "Md Osman Gani",
+        "Jianwu Wang"
+    ],
+    "abstract": "  This survey paper covers the breadth and depth of time-series and\nspatiotemporal causality methods, and their applications in Earth Science. More\nspecifically, the paper presents an overview of causal discovery and causal\ninference, explains the underlying causal assumptions, and enlists evaluation\ntechniques and key terminologies of the domain area. The paper elicits the\nvarious state-of-the-art methods introduced for time-series and spatiotemporal\ncausal analysis along with their strengths and limitations. The paper further\ndescribes the existing applications of several methods for answering specific\nEarth Science questions such as extreme weather events, sea level rise,\nteleconnections etc. This survey paper can serve as a primer for Data Science\nresearchers interested in data-driven causal study as we share a list of\nresources, such as Earth Science datasets (synthetic, simulated and\nobservational data) and open source tools for causal analysis. It will equally\nbenefit the Earth Science community interested in taking an AI-driven approach\nto study the causality of different dynamic and thermodynamic processes as we\npresent the open challenges and opportunities in performing causality-based\nEarth Science study.\n",
+    "published_date": "2024-04-03T14:33:23Z",
+    "doi": null,
+    "pdf_url": "http://arxiv.org/pdf/2404.05746v2"
+}

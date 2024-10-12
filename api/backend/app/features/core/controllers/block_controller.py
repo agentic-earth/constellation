@@ -22,7 +22,7 @@ sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-b
 
 import traceback
 from prisma import Prisma
-from uuid import UUID
+from uuid import UUID, uuid4
 from typing import Optional, List, Dict, Any
 from backend.app.features.core.services.block_service import BlockService
 from backend.app.features.core.services.taxonomy_service import TaxonomyService
@@ -246,7 +246,7 @@ class BlockController:
                     "user_id": str(user_id),
                     "action_type": "READ",  # Use 'READ' for searches
                     "entity_type": "block",  # If 'block_search' is not in enum, use 'block'
-                    "entity_id": "SEARCH",  # Consider revising if needed
+                    "entity_id": str(uuid4()),  # Consider revising if needed
                     "details": {
                         "search_filters": search_filters,
                         "results_count": len(search_results)
@@ -283,7 +283,7 @@ class BlockController:
                 "user_id": str(user_id),
                 "action_type": "READ",
                 "entity_type": "block",
-                "entity_id": "SIMILARITY_SEARCH",
+                "entity_id": str(uuid4()),
                 "details": {
                     "top_k": top_k,
                     "results_count": len(blocks) if blocks is not None else 0
@@ -407,10 +407,6 @@ async def main():
         else:
             print("Block deletion failed.")
 
-    print("\nDisconnecting from database...")
-    await database.prisma.disconnect()
-    print("Test completed.")
-
     # Step 6: Perform a similarity search
     print("\nStep 6: Performing a similarity search...")
     query = [0.1] * 512  # Example query vector
@@ -422,6 +418,10 @@ async def main():
             print(f"- Block ID: {blk['block_id']}, Name: {blk['name']}, Type: {blk['block_type']}")
     else:
         print("Error happened during similarity search.")
+
+    print("\nDisconnecting from database...")
+    await database.prisma.disconnect()
+    print("Test completed.")
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -1,0 +1,14 @@
+{
+    "title": "Machine-learning enabled thermodynamic model for the design of new\n  rare-earth compounds",
+    "authors": [
+        "Prashant Singh",
+        "Tyler Del Rose",
+        "Guillermo Vazquez",
+        "Raymundo Arroyave",
+        "Yaroslav Mudryk"
+    ],
+    "abstract": "  We employ a descriptor based machine-learning approach to assess the effect\nof chemical alloying on formation-enthalpy of rare-earth intermetallics.\nApplication of machine-learning approaches in rare-earth intermetallic design\nhave been sparse due to limited availability of reliable datasets. In this\nwork, we developed an `in-house' rare-earth database with more than 600$+$\ncompounds, each entry was populated with formation enthalpy and related atomic\nfeatures using high-throughput density-functional theory (DFT). The SISSO (sure\nindependence screening and sparsifying operator) based machine-learning method\nwith meaningful atomic features was used for training and testing the formation\nenthalpies of rare earth compounds. The complex lattice function coupled with\nthe machine-learning model was used to explore the effect of transition metal\nalloying on the energy stability of Ce based cubic Laves phases (MgCu$_{2}$\ntype). The SISSO predictions show good agreement with high-fidelity DFT\ncalculations and X$-$ray powder diffraction measurements. Our study provides\nquantitative guidance for compositional considerations within a\nmachine-learning model and discovering new metastable materials. The\nelectronic-structure of Ce$-$Fe$-$Cu based compound was also analyzed\nin$-$depth to understand the electronic origin of phase stability. The\ninterpretable analytical models in combination with density$-$functional theory\nand experiments provide a fast and reliable design guide for discovering\ntechnologically useful materials.\n",
+    "published_date": "2022-03-04T15:58:17Z",
+    "doi": "10.1016/j.actamat.2022.117759",
+    "pdf_url": "http://arxiv.org/pdf/2203.02391v1"
+}

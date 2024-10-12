@@ -1,0 +1,13 @@
+{
+    "title": "Modeling chaotic Lorenz ODE System using Scientific Machine Learning",
+    "authors": [
+        "Sameera S Kashyap",
+        "Raj Abhijit Dandekar",
+        "Rajat Dandekar",
+        "Sreedath Panat"
+    ],
+    "abstract": "  In climate science, models for global warming and weather prediction face\nsignificant challenges due to the limited availability of high-quality data and\nthe difficulty in obtaining it, making data efficiency crucial. In the past few\nyears, Scientific Machine Learning (SciML) models have gained tremendous\ntraction as they can be trained in a data-efficient manner, making them highly\nsuitable for real-world climate applications. Despite this, very little\nattention has been paid to chaotic climate system modeling utilizing SciML\nmethods. In this paper, we have integrated SciML methods into foundational\nweather models, where we have enhanced large-scale climate predictions with a\nphysics-informed approach that achieves high accuracy with reduced data. We\nsuccessfully demonstrate that by combining the interpretability of physical\nclimate models with the computational power of neural networks, SciML models\ncan prove to be a reliable tool for modeling climate. This indicates a shift\nfrom the traditional black box-based machine learning modeling of climate\nsystems to physics-informed decision-making, leading to effective climate\npolicy implementation.\n",
+    "published_date": "2024-10-09T01:17:06Z",
+    "doi": null,
+    "pdf_url": "http://arxiv.org/pdf/2410.06452v1"
+}

@@ -1,0 +1,13 @@
+{
+    "title": "Prediction on Properties of Rare-earth 2-17-X Magnets Ce2Fe17-xCoxCN : A\n  Combined Machine-learning and Ab-initio Study",
+    "authors": [
+        "Anita Halder",
+        "Samir Rom",
+        "Aishwaryo Ghosh",
+        "Tanusri Saha-Dasgupta"
+    ],
+    "abstract": "  We employ a combination of machine learning and first-principles calculations\nto predict magnetic properties of rare-earth lean magnets. For this purpose,\nbased on training set constructed out of experimental data, the machine is\ntrained to make predictions on magnetic transition temperature (Tc), largeness\nof saturation magnetization ({\\mu}0Ms), and nature of the magnetocrystalline\nanisotropy (Ku). Subsequently, the quantitative values of {\\mu}0Ms and Ku of\nthe yet-to-be synthesized compounds, screened by machine learning, are\ncalculated by first-principles density functional theory. The applicability of\nthe proposed technique of combined machine learning and first-principles\ncalculations is demonstrated on 2-17-X magnets, Ce2Fe17-xCoxCN. Further to this\nstudy, we explore stability of the proposed compounds by calculating vacancy\nformation energy of small atom interstitials (N/C). Our study indicates a\nnumber of compounds in the proposed family, offers the possibility to become\nsolution of cheap, and efficient permanent magnet.\n",
+    "published_date": "2020-08-12T06:11:59Z",
+    "doi": "10.1103/PhysRevApplied.14.034024",
+    "pdf_url": "http://arxiv.org/pdf/2008.05125v1"
+}

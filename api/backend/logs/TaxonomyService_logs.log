@@ -1,2 +1,2 @@
-Log file initialized on 2024-10-09 13:46:43.987101
-2024-10-09 13:46:43,987 - TaxonomyService - ERROR - Failed to search blocks - error=CategoryActions.find_many() got an unexpected keyword argument 'select'
+Log file initialized on 2024-10-09 15:08:38.797174
+2024-10-09 15:08:38,797 - TaxonomyService - ERROR - Failed to search blocks - error=CategoryActions.find_many() got an unexpected keyword argument 'select'

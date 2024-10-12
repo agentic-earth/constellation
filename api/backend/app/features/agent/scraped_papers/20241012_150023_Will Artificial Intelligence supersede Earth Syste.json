@@ -1,0 +1,16 @@
+{
+    "title": "Will Artificial Intelligence supersede Earth System and Climate Models?",
+    "authors": [
+        "Christopher Irrgang",
+        "Niklas Boers",
+        "Maike Sonnewald",
+        "Elizabeth A. Barnes",
+        "Christopher Kadow",
+        "Joanna Staneva",
+        "Jan Saynisch-Wagner"
+    ],
+    "abstract": "  We outline a perspective of an entirely new research branch in Earth and\nclimate sciences, where deep neural networks and Earth system models are\ndismantled as individual methodological approaches and reassembled as learning,\nself-validating, and interpretable Earth system model-network hybrids.\nFollowing this path, we coin the term \"Neural Earth System Modelling\" (NESYM)\nand highlight the necessity of a transdisciplinary discussion platform,\nbringing together Earth and climate scientists, big data analysts, and AI\nexperts. We examine the concurrent potential and pitfalls of Neural Earth\nSystem Modelling and discuss the open question whether artificial intelligence\nwill not only infuse Earth system modelling, but ultimately render them\nobsolete.\n",
+    "published_date": "2021-01-22T14:33:24Z",
+    "doi": "10.1038/s42256-021-00374-3",
+    "pdf_url": "http://arxiv.org/pdf/2101.09126v1"
+}
