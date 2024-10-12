@@ -12,6 +12,7 @@ uvicorn = "^0.30.6"
 dagster = "^1.8.8"
 pandas = "^2.2.3"
 prisma = "^0.15.0"
+crewai = "^0.11.0"
 
 
 [tool.poetry.group.dev.dependencies]
