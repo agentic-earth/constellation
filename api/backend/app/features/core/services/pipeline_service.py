@@ -26,11 +26,6 @@ class PipelineService:
             Optional[PrismaPipeline]: The created pipeline if successful, None otherwise.
         """
         try:
-            # Ensure user exists
-            user = await tx.profile.find_unique(where={"auth_uid": str(pipeline_data["user_id"])})
-            if not user:
-                raise ValueError("User does not exist.")
-
             # Create pipeline via Prisma
             pipeline_id = str(uuid4())
             created_at = datetime.now(timezone.utc)
@@ -287,8 +282,149 @@ class PipelineService:
         except Exception as e:
             self.logger.log("PipelineService", "error", "Error listing pipelines.", error=str(e))
             return []
+    
+    async def assign_block_to_pipeline(self, tx: Prisma, block_id: UUID, pipeline_id: UUID) -> Optional[PrismaPipelineBlock]:
+        """
+        Assigns a block to a pipeline.
 
-    # ... (rest of the class, including the main method for testing)
+        Args:
+            tx (Prisma): The Prisma client instance.
+            block_id (UUID): The UUID of the block to assign.
+            pipeline_id (UUID): The UUID of the pipeline to assign the block to.
+
+        Returns:
+            Optional[PrismaPipelineBlock]: The assigned pipeline block if successful, None otherwise.
+        """
+        try:
+            pipeline_block = await tx.pipelineblock.create(
+                data={
+                    "pipeline_id": str(pipeline_id),
+                    "block_id": str(block_id),
+                }
+            )
+            self.logger.log(
+                "PipelineService",
+                "info",
+                "Block assigned to pipeline successfully.",
+                block_id=str(block_id),
+                pipeline_id=str(pipeline_id),
+            )
+            return pipeline_block
+        except Exception as e:
+            self.logger.log("PipelineService", "error", "Error assigning block to pipeline.", error=str(e))
+            return None
+    
+    async def assign_edge_to_pipeline(self, tx: Prisma, edge_id: UUID, pipeline_id: UUID) -> Optional[PrismaPipelineEdge]:
+        """
+        Assigns an edge to a pipeline.
+
+        Args:
+            tx (Prisma): The Prisma client instance.
+            edge_id (UUID): The UUID of the edge to assign.
+            pipeline_id (UUID): The UUID of the pipeline to assign the edge to.
+        
+        Returns:
+            Optional[PrismaPipelineEdge]: The assigned pipeline edge if successful, None otherwise.
+        """
+        try:
+            pipeline_edge = await tx.pipelineedge.create(
+                data={
+                    "pipeline_id": str(pipeline_id),
+                    "edge_id": str(edge_id),
+                }
+            )
+
+            self.logger.log(
+                "PipelineService",
+                "info",
+                "Edge assigned to pipeline successfully.",
+                edge_id=str(edge_id),
+                pipeline_id=str(pipeline_id),
+            )
+            return pipeline_edge
+
+        except Exception as e:
+            self.logger.log("PipelineService", "error", "Error assigning edge to pipeline.", error=str(e))
+            return None
+    
+    async def get_pipeline_blocks(self, tx: Prisma, pipeline_id: UUID) -> Optional[List[PrismaPipelineBlock]]:
+        """
+        Retrieves all blocks associated with a pipeline.
+
+        Args:
+            tx (Prisma): The Prisma client instance.
+            pipeline_id (UUID): The UUID of the pipeline to retrieve blocks for.
+
+        Returns:
+            Optional[List[PrismaPipelineBlock]]: A list of blocks associated with the pipeline, or None if an error occurs.
+        """
+        try:
+            pipeline_blocks = await tx.pipelineblock.find_many(where={"pipeline_id": str(pipeline_id)})
+            self.logger.log(
+                "PipelineService",
+                "info",
+                "Pipeline blocks retrieved successfully.",
+                pipeline_id=str(pipeline_id),
+                blocks_found=len(pipeline_blocks)
+            )
+            return pipeline_blocks
+        except Exception as e:
+            self.logger.log("PipelineService", "error", "Error retrieving pipeline blocks.", error=str(e))
+            return None
+
+    async def get_pipeline_edges(self, tx: Prisma, pipeline_id: UUID) -> Optional[List[PrismaPipelineEdge]]:
+        """
+        Retrieves all edges associated with a pipeline.
+
+        Args:
+            tx (Prisma): The Prisma client instance.
+            pipeline_id (UUID): The UUID of the pipeline to retrieve edges for.
+
+        Returns:
+            Optional[List[PrismaPipelineEdge]]: A list of edges associated with the pipeline, or None if an error occurs.
+        """
+        try:
+            pipeline_edges = await tx.pipelineedge.find_many(where={"pipeline_id": str(pipeline_id)})
+            self.logger.log(
+                "PipelineService",
+                "info",
+                "Pipeline edges retrieved successfully.",
+                pipeline_id=str(pipeline_id),
+                edges_found=len(pipeline_edges)
+            )
+            return pipeline_edges
+        except Exception as e:
+            self.logger.log("PipelineService", "error", "Error retrieving pipeline edges.", error=str(e))
+            return None
+    
+    async def remove_block_from_pipeline(self, tx: Prisma, pipeline_block_id: UUID) -> bool:
+        try:
+            deleted_pb = await tx.pipelineblock.delete(where={"pipeline_block_id": str(pipeline_block_id)})
+            self.logger.log(
+                "PipelineService",
+                "info",
+                "Block removed from pipeline successfully.",
+                pipeline_block_id=str(pipeline_block_id)
+            )
+            return True
+        except Exception as e:
+            self.logger.log("PipelineService", "error", "Error removing block from pipeline.", error=str(e))
+            return False
+
+    async def remove_edge_from_pipeline(self, tx: Prisma, pipeline_edge_id: UUID) -> bool:
+        try:
+            deleted_pe = await tx.pipelineedge.delete(where={"pipeline_edge_id": str(pipeline_edge_id)})
+            self.logger.log(
+                "PipelineService",
+                "info",
+                "Edge removed from pipeline successfully.",
+                pipeline_edge_id=str(pipeline_edge_id)
+            )
+            return True
+        except Exception as e:
+            self.logger.log("PipelineService", "error", "Error removing edge from pipeline.", error=str(e))
+            return False
+
     # -------------------
     # Main function for testing
     # -------------------

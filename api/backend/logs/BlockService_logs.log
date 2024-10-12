@@ -1,5 +1,10 @@
-Log file initialized on 2024-10-10 03:40:50.305729
-2024-10-10 03:40:50,306 - BlockService - INFO - Block created successfully. - block_id=f9e863e3-a72b-4a6f-8b41-1aa3178c30dc - block_name=EarthObservationModelExample
-2024-10-10 03:40:51,628 - BlockService - INFO - Block retrieved successfully. - block_id=f9e863e3-a72b-4a6f-8b41-1aa3178c30dc - block_name=EarthObservationModelExample
-2024-10-10 03:40:51,960 - BlockService - INFO - Block updated successfully. - block_id=f9e863e3-a72b-4a6f-8b41-1aa3178c30dc - updated_fields=['name', 'updated_at']
-2024-10-10 03:40:53,779 - BlockService - INFO - Block deleted successfully. - block_id=f9e863e3-a72b-4a6f-8b41-1aa3178c30dc
+Log file initialized on 2024-10-12 02:19:58.542122
+2024-10-12 02:19:58,542 - BlockService - INFO - Block created successfully. - block_id=83bc1ff9-6848-4bc5-91ad-a0e1d9549906 - block_name=Test Block 1
+2024-10-12 02:19:58,636 - BlockService - INFO - Block created successfully. - block_id=86af1634-68af-4dd5-b8e0-241c439f42cb - block_name=Test Block 2
+2024-10-12 02:19:58,740 - BlockService - INFO - Block created successfully. - block_id=70983502-36ec-4fd8-b611-723529b448df - block_name=Test Block 3
+2024-10-12 02:19:59,197 - BlockService - INFO - Block retrieved successfully by name. - block_id=83bc1ff9-6848-4bc5-91ad-a0e1d9549906 - block_name=Test Block 1
+2024-10-12 02:19:59,468 - BlockService - INFO - Block retrieved successfully by name. - block_id=86af1634-68af-4dd5-b8e0-241c439f42cb - block_name=Test Block 2
+2024-10-12 02:19:59,648 - BlockService - INFO - Block retrieved successfully by name. - block_id=70983502-36ec-4fd8-b611-723529b448df - block_name=Test Block 3
+2024-10-12 02:20:07,211 - BlockService - INFO - Block deleted successfully. - block_id=83bc1ff9-6848-4bc5-91ad-a0e1d9549906
+2024-10-12 02:20:07,394 - BlockService - INFO - Block deleted successfully. - block_id=86af1634-68af-4dd5-b8e0-241c439f42cb
+2024-10-12 02:20:07,580 - BlockService - INFO - Block deleted successfully. - block_id=70983502-36ec-4fd8-b611-723529b448df
