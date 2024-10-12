@@ -34,14 +34,14 @@ from prisma.errors import UniqueViolationError
 from prisma.models import Block as PrismaBlock
 from prisma import Prisma
 from backend.app.logger import ConstellationLogger
-
+import traceback
 class BlockService:
     def __init__(self):
         self.logger = ConstellationLogger()
 
     async def create_block(self, tx: Prisma, block_data: Dict[str, Any], vector: Optional[List[float]] = None) -> Optional[PrismaBlock]:
         """
-        Creates a new block in the database or retrieves it if it already exists.
+        Creates a new block in the database.
 
         Args:
             tx (Prisma): Prisma transaction client
@@ -67,23 +67,8 @@ class BlockService:
                 block_id=created_block.block_id,
                 block_name=created_block.name
             )
-        except UniqueViolationError:
-            # Block with this name already exists, retrieve it
-            existing_block = await self.get_block_by_name(tx, block_data['name'])
-            if existing_block:
-                self.logger.log(
-                    "BlockService",
-                    "info",
-                    "Block already exists, retrieved existing block.",
-                    block_id=existing_block.block_id,
-                    block_name=existing_block.name
-                )
-                return existing_block
-            else:
-                # This shouldn't happen, but handle it just in case
-                raise ValueError(f"Failed to create or retrieve block with name: {block_data['name']}")
         except Exception as e:
-            self.logger.log("BlockService", "error", "Failed to create block", error=str(e))
+            self.logger.log("BlockService", "error", f"Failed to create block", error=str(e), traceback=traceback.format_exc())
             return None
 
         if vector:

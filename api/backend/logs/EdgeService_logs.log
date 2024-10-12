@@ -1,8 +1,21 @@
-Log file initialized on 2024-10-09 21:34:13.799334
-2024-10-09 21:34:13,800 - EdgeService - INFO - Edge created successfully. - edge_id=3b53705c-85c7-4a97-8935-92fd69854283 - source_block_id=3edb7a0e-e1e4-4007-a756-b72d615b6ff4 - target_block_id=9dccc6a7-4517-486d-a3b9-d3786a735c2a
-2024-10-09 21:34:14,079 - EdgeService - INFO - Edge created successfully. - edge_id=4dfc736a-0c66-4587-aeed-02e384f09e39 - source_block_id=9dccc6a7-4517-486d-a3b9-d3786a735c2a - target_block_id=d6ffc571-1050-44c9-a98a-3ce8f6b3873d
-2024-10-09 21:34:14,528 - EdgeService - INFO - Edge retrieved successfully. - edge_id=3b53705c-85c7-4a97-8935-92fd69854283
-2024-10-09 21:34:14,803 - EdgeService - INFO - Edge updated successfully. - edge_id=3b53705c-85c7-4a97-8935-92fd69854283 - updated_fields=['target_block_id', 'updated_at']
-2024-10-09 21:34:15,247 - EdgeService - INFO - Retrieved 2 edges. - filters=None - limit=100 - offset=0
-2024-10-09 21:34:15,434 - EdgeService - INFO - Edge deleted successfully. - edge_id=4dfc736a-0c66-4587-aeed-02e384f09e39
-2024-10-09 21:34:15,701 - EdgeService - INFO - Retrieved 1 edges. - filters=None - limit=100 - offset=0
+Log file initialized on 2024-10-12 02:20:00.193807
+2024-10-12 02:20:00,194 - EdgeService - INFO - Edge created successfully. - edge_id=88c13e01-80f7-420b-822f-4c6b28256870 - source_block_id=83bc1ff9-6848-4bc5-91ad-a0e1d9549906 - target_block_id=86af1634-68af-4dd5-b8e0-241c439f42cb
+2024-10-12 02:20:00,649 - EdgeService - INFO - Edge created successfully. - edge_id=2f0db338-fa94-41f2-80e9-7bf69fe25b48 - source_block_id=86af1634-68af-4dd5-b8e0-241c439f42cb - target_block_id=70983502-36ec-4fd8-b611-723529b448df
+2024-10-12 02:20:03,355 - EdgeService - INFO - Edge retrieved successfully. - edge_id=88c13e01-80f7-420b-822f-4c6b28256870
+2024-10-12 02:20:03,628 - EdgeService - INFO - Edge retrieved successfully. - edge_id=2f0db338-fa94-41f2-80e9-7bf69fe25b48
+2024-10-12 02:20:03,629 - EdgeService - INFO - All edges exist in verification.
+2024-10-12 02:20:03,895 - EdgeService - INFO - Edge retrieved successfully. - edge_id=88c13e01-80f7-420b-822f-4c6b28256870
+2024-10-12 02:20:04,159 - EdgeService - INFO - Edge retrieved successfully. - edge_id=2f0db338-fa94-41f2-80e9-7bf69fe25b48
+2024-10-12 02:20:04,613 - EdgeService - INFO - Edge created successfully. - edge_id=a3c3adec-c349-49a6-b321-6d12a127f14b - source_block_id=70983502-36ec-4fd8-b611-723529b448df - target_block_id=83bc1ff9-6848-4bc5-91ad-a0e1d9549906
+2024-10-12 02:20:05,148 - EdgeService - INFO - Edge retrieved successfully. - edge_id=88c13e01-80f7-420b-822f-4c6b28256870
+2024-10-12 02:20:05,414 - EdgeService - INFO - Edge retrieved successfully. - edge_id=2f0db338-fa94-41f2-80e9-7bf69fe25b48
+2024-10-12 02:20:05,678 - EdgeService - INFO - Edge retrieved successfully. - edge_id=a3c3adec-c349-49a6-b321-6d12a127f14b
+2024-10-12 02:20:05,678 - EdgeService - INFO - All edges exist in verification.
+2024-10-12 02:20:05,679 - EdgeService - ERROR - Failed to verify edges. - error=Edges form a cycle. - traceback=Traceback (most recent call last):
+  File "/Users/leo/Desktop/Brown/Autumn24/constellation-backend/api/backend/app/features/core/services/edge_service.py", line 342, in verify_edges
+    raise ValueError("Edges form a cycle.")
+ValueError: Edges form a cycle.
+
+2024-10-12 02:20:06,485 - EdgeService - INFO - Edge deleted successfully. - edge_id=88c13e01-80f7-420b-822f-4c6b28256870
+2024-10-12 02:20:06,669 - EdgeService - INFO - Edge deleted successfully. - edge_id=2f0db338-fa94-41f2-80e9-7bf69fe25b48
+2024-10-12 02:20:06,852 - EdgeService - INFO - Edge deleted successfully. - edge_id=a3c3adec-c349-49a6-b321-6d12a127f14b
