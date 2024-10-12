@@ -25,6 +25,7 @@ This approach balances flexibility, type safety, and simplicity, leveraging Pris
 while providing a clean API for audit log operations.
 """
 
+import json
 from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
@@ -87,7 +88,7 @@ class AuditService:
             "entity_type": PrismaAuditEntityTypeEnum[audit_data["entity_type"]],
             "entity_id": audit_data["entity_id"],
             "timestamp": datetime.now(timezone.utc),
-            "details": details  # Will default to '{}'::jsonb if not provided
+            "details": json.dumps(details)  # Will default to '{}'::jsonb if not provided
         }
 
         # Create the audit log

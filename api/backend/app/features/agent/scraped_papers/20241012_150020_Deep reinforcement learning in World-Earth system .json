@@ -1,0 +1,13 @@
+{
+    "title": "Deep reinforcement learning in World-Earth system models to discover\n  sustainable management strategies",
+    "authors": [
+        "Felix M. Strnad",
+        "Wolfram Barfuss",
+        "Jonathan F. Donges",
+        "Jobst Heitzig"
+    ],
+    "abstract": "  Increasingly complex, non-linear World-Earth system models are used for\ndescribing the dynamics of the biophysical Earth system and the socio-economic\nand socio-cultural World of human societies and their interactions. Identifying\npathways towards a sustainable future in these models for informing policy\nmakers and the wider public, e.g. pathways leading to a robust mitigation of\ndangerous anthropogenic climate change, is a challenging and widely\ninvestigated task in the field of climate research and broader Earth system\nscience. This problem is particularly difficult when constraints on avoiding\ntransgressions of planetary boundaries and social foundations need to be taken\ninto account. In this work, we propose to combine recently developed machine\nlearning techniques, namely deep reinforcement learning (DRL), with classical\nanalysis of trajectories in the World-Earth system. Based on the concept of the\nagent-environment interface, we develop an agent that is generally able to act\nand learn in variable manageable environment models of the Earth system. We\ndemonstrate the potential of our framework by applying DRL algorithms to two\nstylized World-Earth system models. Conceptually, we explore thereby the\nfeasibility of finding novel global governance policies leading into a safe and\njust operating space constrained by certain planetary and socio-economic\nboundaries. The artificially intelligent agent learns that the timing of a\nspecific mix of taxing carbon emissions and subsidies on renewables is of\ncrucial relevance for finding World-Earth system trajectories that are\nsustainable on the long term.\n",
+    "published_date": "2019-08-15T14:48:31Z",
+    "doi": "10.1063/1.5124673",
+    "pdf_url": "http://arxiv.org/pdf/1908.05567v1"
+}

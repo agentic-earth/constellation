@@ -1,0 +1,13 @@
+{
+    "title": "High Definition image classification in Geoscience using Machine\n  Learning",
+    "authors": [
+        "Yajun An",
+        "Zachary Golden",
+        "Tarka Wilcox",
+        "Renzhi Cao"
+    ],
+    "abstract": "  High Definition (HD) digital photos taken with drones are widely used in the\nstudy of Geoscience. However, blurry images are often taken in collected data,\nand it takes a lot of time and effort to distinguish clear images from blurry\nones. In this work, we apply Machine learning techniques, such as Support\nVector Machine (SVM) and Neural Network (NN) to classify HD images in\nGeoscience as clear and blurry, and therefore automate data cleaning in\nGeoscience. We compare the results of classification based on features\nabstracted from several mathematical models. Some of the implementation of our\nmachine learning tool is freely available at:\nhttps://github.com/zachgolden/geoai.\n",
+    "published_date": "2020-09-25T17:30:03Z",
+    "doi": null,
+    "pdf_url": "http://arxiv.org/pdf/2010.03965v1"
+}

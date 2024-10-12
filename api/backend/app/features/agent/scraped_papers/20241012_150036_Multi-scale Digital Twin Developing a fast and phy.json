@@ -1,0 +1,18 @@
+{
+    "title": "Multi-scale Digital Twin: Developing a fast and physics-informed\n  surrogate model for groundwater contamination with uncertain climate models",
+    "authors": [
+        "Lijing Wang",
+        "Takuya Kurihana",
+        "Aurelien Meray",
+        "Ilijana Mastilovic",
+        "Satyarth Praveen",
+        "Zexuan Xu",
+        "Milad Memarzadeh",
+        "Alexander Lavin",
+        "Haruko Wainwright"
+    ],
+    "abstract": "  Soil and groundwater contamination is a pervasive problem at thousands of\nlocations across the world. Contaminated sites often require decades to\nremediate or to monitor natural attenuation. Climate change exacerbates the\nlong-term site management problem because extreme precipitation and/or shifts\nin precipitation/evapotranspiration regimes could re-mobilize contaminants and\nproliferate affected groundwater. To quickly assess the spatiotemporal\nvariations of groundwater contamination under uncertain climate disturbances,\nwe developed a physics-informed machine learning surrogate model using U-Net\nenhanced Fourier Neural Operator (U-FNO) to solve Partial Differential\nEquations (PDEs) of groundwater flow and transport simulations at the site\nscale.We develop a combined loss function that includes both data-driven\nfactors and physical boundary constraints at multiple spatiotemporal scales.\nOur U-FNOs can reliably predict the spatiotemporal variations of groundwater\nflow and contaminant transport properties from 1954 to 2100 with realistic\nclimate projections. In parallel, we develop a convolutional autoencoder\ncombined with online clustering to reduce the dimensionality of the vast\nhistorical and projected climate data by quantifying climatic region\nsimilarities across the United States. The ML-based unique climate clusters\nprovide climate projections for the surrogate modeling and help return reliable\nfuture recharge rate projections immediately without querying large climate\ndatasets. In all, this Multi-scale Digital Twin work can advance the field of\nenvironmental remediation under climate change.\n",
+    "published_date": "2022-11-20T06:46:35Z",
+    "doi": null,
+    "pdf_url": "http://arxiv.org/pdf/2211.10884v1"
+}

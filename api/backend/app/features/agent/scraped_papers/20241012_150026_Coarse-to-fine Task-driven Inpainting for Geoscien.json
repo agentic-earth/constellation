@@ -1,0 +1,16 @@
+{
+    "title": "Coarse-to-fine Task-driven Inpainting for Geoscience Images",
+    "authors": [
+        "Huiming Sun",
+        "Jin Ma",
+        "Qing Guo",
+        "Qin Zou",
+        "Shaoyue Song",
+        "Yuewei Lin",
+        "Hongkai Yu"
+    ],
+    "abstract": "  The processing and recognition of geoscience images have wide applications.\nMost of existing researches focus on understanding the high-quality geoscience\nimages by assuming that all the images are clear. However, in many real-world\ncases, the geoscience images might contain occlusions during the image\nacquisition. This problem actually implies the image inpainting problem in\ncomputer vision and multimedia. To the best of our knowledge, all the existing\nimage inpainting algorithms learn to repair the occluded regions for a better\nvisualization quality, they are excellent for natural images but not good\nenough for geoscience images by ignoring the geoscience related tasks. This\npaper aims to repair the occluded regions for a better geoscience task\nperformance with the advanced visualization quality simultaneously, without\nchanging the current deployed deep learning based geoscience models. Because of\nthe complex context of geoscience images, we propose a coarse-to-fine\nencoder-decoder network with coarse-to-fine adversarial context discriminators\nto reconstruct the occluded image regions. Due to the limited data of\ngeoscience images, we use a MaskMix based data augmentation method to exploit\nmore information from limited geoscience image data. The experimental results\non three public geoscience datasets for remote sensing scene recognition,\ncross-view geolocation and semantic segmentation tasks respectively show the\neffectiveness and accuracy of the proposed method.\n",
+    "published_date": "2022-11-20T19:14:51Z",
+    "doi": null,
+    "pdf_url": "http://arxiv.org/pdf/2211.11059v3"
+}

@@ -1,3 +1,2 @@
-Log file initialized on 2024-10-09 13:46:43.895925
-2024-10-09 13:46:43,896 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.taxonomy`
-2024-10-09 13:46:43,999 - BlockService - ERROR - Failed to perform vector similarity search - error=Client is not connected to the query engine, you must call `connect()` before attempting to query data.
+Log file initialized on 2024-10-09 15:08:38.706953
+2024-10-09 15:08:38,707 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.taxonomy`

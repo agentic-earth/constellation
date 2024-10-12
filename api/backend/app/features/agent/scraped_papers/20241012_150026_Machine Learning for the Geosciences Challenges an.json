@@ -1,0 +1,14 @@
+{
+    "title": "Machine Learning for the Geosciences: Challenges and Opportunities",
+    "authors": [
+        "Anuj Karpatne",
+        "Imme Ebert-Uphoff",
+        "Sai Ravela",
+        "Hassan Ali Babaie",
+        "Vipin Kumar"
+    ],
+    "abstract": "  Geosciences is a field of great societal relevance that requires solutions to\nseveral urgent problems facing our humanity and the planet. As geosciences\nenters the era of big data, machine learning (ML) -- that has been widely\nsuccessful in commercial domains -- offers immense potential to contribute to\nproblems in geosciences. However, problems in geosciences have several unique\nchallenges that are seldom found in traditional applications, requiring novel\nproblem formulations and methodologies in machine learning. This article\nintroduces researchers in the machine learning (ML) community to these\nchallenges offered by geoscience problems and the opportunities that exist for\nadvancing both machine learning and geosciences. We first highlight typical\nsources of geoscience data and describe their properties that make it\nchallenging to use traditional machine learning techniques. We then describe\nsome of the common categories of geoscience problems where machine learning can\nplay a role, and discuss some of the existing efforts and promising directions\nfor methodological development in machine learning. We conclude by discussing\nsome of the emerging research themes in machine learning that are applicable\nacross all problems in the geosciences, and the importance of a deep\ncollaboration between machine learning and geosciences for synergistic\nadvancements in both disciplines.\n",
+    "published_date": "2017-11-13T17:16:38Z",
+    "doi": null,
+    "pdf_url": "http://arxiv.org/pdf/1711.04708v1"
+}

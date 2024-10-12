@@ -1,0 +1,16 @@
+{
+    "title": "When Geoscience Meets Foundation Models: Towards General Geoscience\n  Artificial Intelligence System",
+    "authors": [
+        "Hao Zhang",
+        "Jin-Jian Xu",
+        "Hong-Wei Cui",
+        "Lin Li",
+        "Yaowen Yang",
+        "Chao-Sheng Tang",
+        "Niklas Boers"
+    ],
+    "abstract": "  Artificial intelligence (AI) has significantly advanced Earth sciences, yet\nits full potential in to comprehensively modeling Earth's complex dynamics\nremains unrealized. Geoscience foundation models (GFMs) emerge as a\nparadigm-shifting solution, integrating extensive cross-disciplinary data to\nenhance the simulation and understanding of Earth system dynamics. These\ndata-centric AI models extract insights from petabytes of structured and\nunstructured data, effectively addressing the complexities of Earth systems\nthat traditional models struggle to capture. The unique strengths of GFMs\ninclude flexible task specification, diverse input-output capabilities, and\nmulti-modal knowledge representation, enabling analyses that surpass those of\nindividual data sources or traditional AI methods. This review not only\nhighlights the key advantages of GFMs, but also presents essential techniques\nfor their construction, with a focus on transformers, pre-training, and\nadaptation strategies. Subsequently, we examine recent advancements in GFMs,\nincluding large language models, vision models, and vision-language models,\nparticularly emphasizing the potential applications in remote sensing.\nAdditionally, the review concludes with a comprehensive analysis of the\nchallenges and future trends in GFMs, addressing five critical aspects: data\nintegration, model complexity, uncertainty quantification, interdisciplinary\ncollaboration, and concerns related to privacy, trust, and security. This\nreview offers a comprehensive overview of emerging geoscientific research\nparadigms, emphasizing the untapped opportunities at the intersection of\nadvanced AI techniques and geoscience. It examines major methodologies,\nshowcases advances in large-scale models, and discusses the challenges and\nprospects that will shape the future landscape of GFMs.\n",
+    "published_date": "2023-09-13T08:44:09Z",
+    "doi": null,
+    "pdf_url": "http://arxiv.org/pdf/2309.06799v4"
+}

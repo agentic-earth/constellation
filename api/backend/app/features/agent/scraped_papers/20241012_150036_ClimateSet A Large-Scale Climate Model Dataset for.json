@@ -1,0 +1,18 @@
+{
+    "title": "ClimateSet: A Large-Scale Climate Model Dataset for Machine Learning",
+    "authors": [
+        "Julia Kaltenborn",
+        "Charlotte E. E. Lange",
+        "Venkatesh Ramesh",
+        "Philippe Brouillard",
+        "Yaniv Gurwicz",
+        "Chandni Nagda",
+        "Jakob Runge",
+        "Peer Nowack",
+        "David Rolnick"
+    ],
+    "abstract": "  Climate models have been key for assessing the impact of climate change and\nsimulating future climate scenarios. The machine learning (ML) community has\ntaken an increased interest in supporting climate scientists' efforts on\nvarious tasks such as climate model emulation, downscaling, and prediction\ntasks. Many of those tasks have been addressed on datasets created with single\nclimate models. However, both the climate science and ML communities have\nsuggested that to address those tasks at scale, we need large, consistent, and\nML-ready climate model datasets. Here, we introduce ClimateSet, a dataset\ncontaining the inputs and outputs of 36 climate models from the Input4MIPs and\nCMIP6 archives. In addition, we provide a modular dataset pipeline for\nretrieving and preprocessing additional climate models and scenarios. We\nshowcase the potential of our dataset by using it as a benchmark for ML-based\nclimate model emulation. We gain new insights about the performance and\ngeneralization capabilities of the different ML models by analyzing their\nperformance across different climate models. Furthermore, the dataset can be\nused to train an ML emulator on several climate models instead of just one.\nSuch a \"super emulator\" can quickly project new climate change scenarios,\ncomplementing existing scenarios already provided to policymakers. We believe\nClimateSet will create the basis needed for the ML community to tackle\nclimate-related tasks at scale.\n",
+    "published_date": "2023-11-07T04:55:36Z",
+    "doi": null,
+    "pdf_url": "http://arxiv.org/pdf/2311.03721v1"
+}

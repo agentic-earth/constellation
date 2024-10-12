@@ -1,0 +1,18 @@
+{
+    "title": "AI For Global Climate Cooperation 2023 Competition Proceedings",
+    "authors": [
+        "Yoshua Bengio",
+        "Prateek Gupta",
+        "Lu Li",
+        "Soham Phade",
+        "Sunil Srinivasa",
+        "Andrew Williams",
+        "Tianyu Zhang",
+        "Yang Zhang",
+        "Stephan Zheng"
+    ],
+    "abstract": "  The international community must collaborate to mitigate climate change and\nsustain economic growth. However, collaboration is hard to achieve, partly\nbecause no global authority can ensure compliance with international climate\nagreements. Combining AI with climate-economic simulations offers a promising\nsolution to design international frameworks, including negotiation protocols\nand climate agreements, that promote and incentivize collaboration. In\naddition, these frameworks should also have policy goals fulfillment, and\nsustained commitment, taking into account climate-economic dynamics and\nstrategic behaviors. These challenges require an interdisciplinary approach\nacross machine learning, economics, climate science, law, policy, ethics, and\nother fields.\n  Towards this objective, we organized AI for Global Climate Cooperation, a\nMila competition in which teams submitted proposals and analyses of\ninternational frameworks, based on (modifications of) RICE-N, an AI-driven\nintegrated assessment model (IAM). In particular, RICE-N supports modeling\nregional decision-making using AI agents. Furthermore, the IAM then models the\nclimate-economic impact of those decisions into the future.\n  Whereas the first track focused only on performance metrics, the proposals\nsubmitted to the second track were evaluated both quantitatively and\nqualitatively. The quantitative evaluation focused on a combination of (i) the\ndegree of mitigation of global temperature rise and (ii) the increase in\neconomic productivity. On the other hand, an interdisciplinary panel of human\nexperts in law, policy, sociology, economics and environmental science,\nevaluated the solutions qualitatively. In particular, the panel considered the\neffectiveness, simplicity, feasibility, ethics, and notions of climate justice\nof the protocols. In the third track, the participants were asked to critique\nand improve RICE-N.\n",
+    "published_date": "2023-07-10T20:05:42Z",
+    "doi": null,
+    "pdf_url": "http://arxiv.org/pdf/2307.06951v1"
+}

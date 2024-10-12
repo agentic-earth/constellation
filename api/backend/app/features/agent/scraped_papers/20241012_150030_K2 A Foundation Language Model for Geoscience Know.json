@@ -1,0 +1,21 @@
+{
+    "title": "K2: A Foundation Language Model for Geoscience Knowledge Understanding\n  and Utilization",
+    "authors": [
+        "Cheng Deng",
+        "Tianhang Zhang",
+        "Zhongmou He",
+        "Yi Xu",
+        "Qiyuan Chen",
+        "Yuanyuan Shi",
+        "Luoyi Fu",
+        "Weinan Zhang",
+        "Xinbing Wang",
+        "Chenghu Zhou",
+        "Zhouhan Lin",
+        "Junxian He"
+    ],
+    "abstract": "  Large language models (LLMs) have achieved great success in general domains\nof natural language processing. In this paper, we bring LLMs to the realm of\ngeoscience with the objective of advancing research and applications in this\nfield. To this end, we present the first-ever LLM in geoscience, K2, alongside\na suite of resources developed to further promote LLM research within\ngeoscience. For instance, we have curated the first geoscience instruction\ntuning dataset, GeoSignal, which aims to align LLM responses to\ngeoscience-related user queries. Additionally, we have established the first\ngeoscience benchmark, GeoBench, to evaluate LLMs in the context of geoscience.\nIn this work, we experiment with a complete recipe to adapt a pre-trained\ngeneral-domain LLM to the geoscience domain. Specifically, we further train the\nLLaMA-7B model on 5.5B tokens of geoscience text corpus, including over 1\nmillion pieces of geoscience literature, and utilize GeoSignal's supervised\ndata to fine-tune the model. Moreover, we share a protocol that can efficiently\ngather domain-specific data and construct domain-supervised data, even in\nsituations where manpower is scarce. Meanwhile, we equip K2 with the abilities\nof using tools to be a naive geoscience aide. Experiments conducted on the\nGeoBench demonstrate the effectiveness of our approach and datasets on\ngeoscience knowledge understanding and utilization.We open-source all the\ntraining data and K2 model checkpoints at https://github.com/davendw49/k2.\n",
+    "published_date": "2023-06-08T09:29:05Z",
+    "doi": null,
+    "pdf_url": "http://arxiv.org/pdf/2306.05064v2"
+}
