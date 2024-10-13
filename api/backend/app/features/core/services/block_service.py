@@ -34,11 +34,26 @@ from prisma.models import Block as PrismaBlock
 from prisma import Prisma
 from backend.app.database import database
 from backend.app.logger import ConstellationLogger
+from sentence_transformers import SentenceTransformer
 
 class BlockService:
     def __init__(self):
         self.prisma = database.prisma
         self.logger = ConstellationLogger()
+        self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+
+    async def generate_embedding(self, text: str) -> List[float]:
+        """
+        Generates a vector embedding for the provided text.
+
+        Args:
+            text (str): The text to generate an embedding for.
+
+        Returns:
+            List[float]: The generated vector.
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.embedding_model.encode, text)
 
     async def create_block(self, block_data: Dict[str, Any], vector: Optional[List[float]] = None) -> Optional[PrismaBlock]:
         """
@@ -54,12 +69,36 @@ class BlockService:
         block_data['block_id'] = str(uuid4())
         block_data['created_at'] = datetime.utcnow()
         block_data['updated_at'] = datetime.utcnow()
+        
         try:
+            # Generate embedding if text is provided and vector is not
+            if 'text' in block_data and not vector:
+                vector = await self.generate_embedding(block_data['text'])
+
             # Remove 'vector' from block_data since it's unsupported by Prisma
             block_vector = block_data.pop('vector', None)
 
             # Create block via Prisma
             created_block = await self.prisma.block.create(data=block_data)
+            
+            if block_vector:
+                # Associate vector using existing set_block_vector method
+                vector_success = await self.set_block_vector(created_block.block_id, block_vector)
+                if vector_success:
+                    self.logger.log(
+                        "BlockService",
+                        "info",
+                        "Vector associated with block successfully.",
+                        block_id=created_block.block_id
+                    )
+                else:
+                    self.logger.log(
+                        "BlockService",
+                        "warning",
+                        "Failed to associate vector with block.",
+                        block_id=created_block.block_id
+                    )
+
             self.logger.log(
                 "BlockService",
                 "info",
@@ -67,6 +106,8 @@ class BlockService:
                 block_id=created_block.block_id,
                 block_name=created_block.name
             )
+            return created_block
+        
         except UniqueViolationError:
             # Block with this name already exists, retrieve it
             existing_block = await self.get_block_by_name(block_data['name'])
@@ -85,26 +126,6 @@ class BlockService:
         except Exception as e:
             self.logger.log("BlockService", "error", "Failed to create block", error=str(e))
             return None
-
-        if vector:
-            # Associate vector using raw SQL
-            vector_success = await self.set_block_vector(created_block.block_id, vector)
-            if vector_success:
-                self.logger.log(
-                    "BlockService",
-                    "info",
-                    "Vector associated with block successfully.",
-                    block_id=created_block.block_id
-                )
-            else:
-                self.logger.log(
-                    "BlockService",
-                    "warning",
-                    "Failed to associate vector with block.",
-                    block_id=created_block.block_id
-                )
-
-        return created_block
 
     async def get_block_by_id(self, block_id: UUID) -> Optional[PrismaBlock]:
         """
@@ -189,6 +210,10 @@ class BlockService:
         try:
             update_data['updated_at'] = datetime.utcnow()
 
+            # Generate new embedding if text is updated and vector is not provided
+            if 'text' in update_data and not vector:
+                vector = await self.generate_embedding(update_data['text'])
+
             # Remove 'vector' from update_data since it's unsupported by Prisma
             update_vector = update_data.pop('vector', None)
 
@@ -198,6 +223,24 @@ class BlockService:
                 data=update_data
             )
 
+            if update_vector:
+                # Update vector using existing set_block_vector method
+                vector_success = await self.set_block_vector(updated_block.block_id, update_vector)
+                if vector_success:
+                    self.logger.log(
+                        "BlockService",
+                        "info",
+                        "Vector updated successfully.",
+                        block_id=updated_block.block_id
+                    )
+                else:
+                    self.logger.log(
+                        "BlockService",
+                        "warning",
+                        "Failed to update vector.",
+                        block_id=updated_block.block_id
+                    )
+
             self.logger.log(
                 "BlockService",
                 "info",
@@ -205,29 +248,10 @@ class BlockService:
                 block_id=updated_block.block_id,
                 updated_fields=list(update_data.keys())
             )
+            return updated_block
         except Exception as e:
             self.logger.log("BlockService", "error", "Failed to update block", error=str(e))
             return None
-
-        if vector:
-            # Update vector using raw SQL
-            vector_success = await self.set_block_vector(updated_block.block_id, vector)
-            if vector_success:
-                self.logger.log(
-                    "BlockService",
-                    "info",
-                    "Vector updated successfully.",
-                    block_id=updated_block.block_id
-                )
-            else:
-                self.logger.log(
-                    "BlockService",
-                    "warning",
-                    "Failed to update vector.",
-                    block_id=updated_block.block_id
-                )
-
-        return updated_block
 
     async def delete_block(self, block_id: UUID) -> bool:
         """
@@ -294,22 +318,11 @@ class BlockService:
             Optional[List[float]]: The vector representation, or None if not found.
         """
         try:
-            # Use Prisma's raw query to fetch the vector
-            query = f"""
-                SELECT vector::text AS vector_text
-                FROM "Block"
-                WHERE block_id = '{block_id}';
-            """
-            result = await self.prisma.query_raw(query)
-            
-            if result and result[0]['vector_text']:
-                # Parse the PostgreSQL array string into a list of floats
-                vector_text = result[0]['vector_text']
-                # Use regex to extract all float values
-                vector_values = re.findall(r'-?\d+(?:\.\d+)?', vector_text)
-                # Convert each value to float
-                return [float(value) for value in vector_values]
-            return None
+            block = await self.prisma.block.find_unique(
+                where={"block_id": block_id},
+                select={"vector": True}
+            )
+            return block.vector if block else None
         except Exception as e:
             self.logger.log("BlockService", "error", f"Failed to retrieve block vector - error={str(e)}")
             return None

@@ -21,6 +21,7 @@ sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-b
 
 from backend.app.logger import ConstellationLogger
 from crewai import Crew, Task
+from backend.app.logger import ConstellationLogger
 from backend.app.features.core.services.pipeline_service import PipelineService
 from backend.app.features.core.services.taxonomy_service import TaxonomyService
 from backend.app.features.agent.services.dev_agent import DevAgent
