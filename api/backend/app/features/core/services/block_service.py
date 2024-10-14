@@ -28,7 +28,7 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime
 import asyncio
-from backend.app.config import settings
+from app.config import settings
 
 from prisma.errors import UniqueViolationError
 from prisma.models import Block as PrismaBlock
@@ -401,13 +401,12 @@ async def main():
             if created_block:
                 print(f"Created block: {created_block}")
             else:
-                print(f"Failed to create block '{new_block_data["name"]}'.")
-
+                print(f"Failed to create block '{new_block_data['name']}'.")
             # Step 2: Create a new block with vector
             print("\nCreating a new block with vector...")
             new_block_with_vector_data = {
                 "name": "TestBlock5",
-                "block_type": "model",
+                "block_type": "model",  
                 "description": "This is a test block with vector."
             }
             test_vector = [0.1, 0.2, 0.3, 0.4, 0.5]  # Example vector
