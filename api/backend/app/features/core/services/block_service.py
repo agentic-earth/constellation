@@ -41,6 +41,12 @@ class BlockService:
         self.prisma = database.prisma
         self.logger = ConstellationLogger()
         self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+    
+    async def connect(self):
+        await self.prisma.connect()
+
+    async def disconnect(self):
+        await self.prisma.disconnect()
 
     async def generate_embedding(self, text: str) -> List[float]:
         """
@@ -73,31 +79,19 @@ class BlockService:
         try:
             # Generate embedding if text is provided and vector is not
             if 'text' in block_data and not vector:
+                print(f"Generating vector for block: {block_data['name']}")
                 vector = await self.generate_embedding(block_data['text'])
-
-            # Remove 'vector' from block_data since it's unsupported by Prisma
-            block_vector = block_data.pop('vector', None)
+                print(f"Generated vector: {vector[:5]}...")
 
             # Create block via Prisma
             created_block = await self.prisma.block.create(data=block_data)
             
-            if block_vector:
-                # Associate vector using existing set_block_vector method
-                vector_success = await self.set_block_vector(created_block.block_id, block_vector)
-                if vector_success:
-                    self.logger.log(
-                        "BlockService",
-                        "info",
-                        "Vector associated with block successfully.",
-                        block_id=created_block.block_id
-                    )
-                else:
-                    self.logger.log(
-                        "BlockService",
-                        "warning",
-                        "Failed to associate vector with block.",
-                        block_id=created_block.block_id
-                    )
+            if vector:
+                print(f"Associating vector with block: {created_block.name}")
+                vector_success = await self.set_block_vector(created_block.block_id, vector)
+                print(f"Vector association success: {vector_success}")
+                if not vector_success:
+                    print("Failed to associate vector with block")
 
             self.logger.log(
                 "BlockService",
@@ -290,21 +284,17 @@ class BlockService:
             bool: True if operation was successful, False otherwise.
         """
         try:
-            # Convert the vector list to a PostgreSQL array string
             vector_str = ','.join(map(str, vector))
-
-            # Execute raw SQL to update the 'vector' field
-            raw_query = """
+            raw_query = f"""
                 UPDATE "Block"
-                SET vector = ARRAY[{vector}]::vector, updated_at = NOW()
+                SET vector = ARRAY[{vector_str}]::vector, updated_at = NOW()
                 WHERE block_id = '{block_id}';
-            """.format(vector=vector_str, block_id=block_id)
-
+            """
             await self.prisma.execute_raw(raw_query)
-
+            print(f"Vector updated for block: {block_id}")
             return True
         except Exception as e:
-            self.logger.log("BlockService", "error", "Failed to set block vector", error=str(e))
+            print(f"Error in set_block_vector: {str(e)}")
             return False
 
     async def get_block_vector(self, block_id: str) -> Optional[List[float]]:
@@ -318,13 +308,17 @@ class BlockService:
             Optional[List[float]]: The vector representation, or None if not found.
         """
         try:
-            block = await self.prisma.block.find_unique(
-                where={"block_id": block_id},
-                select={"vector": True}
-            )
-            return block.vector if block else None
+            raw_query = f"""
+                SELECT vector
+                FROM "Block"
+                WHERE block_id = '{block_id}';
+            """
+            result = await self.prisma.query_raw(raw_query)
+            if result and result[0]['vector']:
+                return result[0]['vector']
+            return None
         except Exception as e:
-            self.logger.log("BlockService", "error", f"Failed to retrieve block vector - error={str(e)}")
+            print(f"Error in get_block_vector: {str(e)}")
             return None
 
     async def search_blocks_by_vector_similarity(self, query_vector: List[float], top_k: int = 5) -> List[Dict[str, Any]]:
@@ -340,16 +334,17 @@ class BlockService:
         """
         try:
             vector_str = ','.join(map(str, query_vector))
-            query = f"""
-                SELECT b.block_id, b.name, b.block_type, b.description, 
-                       1 - (b.vector <=> ARRAY[{vector_str}]::vector) as similarity
-                FROM "Block" b
-                WHERE b.vector IS NOT NULL
+            raw_query = f"""
+                SELECT block_id, name, block_type, description, 
+                       1 - (vector <=> ARRAY[{vector_str}]::vector) as similarity
+                FROM "Block"
+                WHERE vector IS NOT NULL
                 ORDER BY similarity DESC
                 LIMIT {top_k};
             """
-            results = await self.prisma.query_raw(query)
-            
+            print(f"Executing query: {raw_query}")
+            results = await self.prisma.query_raw(raw_query)
+            print(f"Raw results: {results}")
             return [
                 {
                     "block_id": str(row['block_id']),
@@ -362,6 +357,7 @@ class BlockService:
             ]
         except Exception as e:
             self.logger.log("BlockService", "error", "Failed to perform vector similarity search", error=str(e))
+            print(f"Error in search_blocks_by_vector_similarity: {str(e)}")
             return []
 
     async def get_all_vectors(self) -> List[List[float]]:
@@ -380,7 +376,9 @@ class BlockService:
 
             results = await self.prisma.execute_raw(raw_query)
 
-            vectors = [row['vector'] for row in results]
+            vectors = [row['vector'] for row in results if row['vector']]
+            print(f"Raw results: {results}")
+            print(f"Extracted vectors: {vectors}")
 
             self.logger.log(
                 "BlockService",

@@ -1,2 +1,5 @@
-Log file initialized on 2024-10-14 14:17:28.279917
-2024-10-14 14:17:28,280 - BlockService - ERROR - Failed to create block - error=Client is not connected to the query engine, you must call `connect()` before attempting to query data.
+Log file initialized on 2024-10-14 20:14:26.619187
+2024-10-14 20:14:26,619 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text`
+2024-10-14 20:14:26,657 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text`
+2024-10-14 20:14:26,679 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text`
+2024-10-14 20:14:26,941 - BlockService - ERROR - Failed to retrieve all vectors - error='int' object is not iterable
