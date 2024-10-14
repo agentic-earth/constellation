@@ -69,7 +69,7 @@ async def connect_db():
             "info",
             f"Attempting to connect to database with URL: {database_url}"
         )
-        await prisma_client.connect(datasource={"url": str(database_url)})
+        await prisma_client.connect()
         logger.log(
             "Database",
             "info",

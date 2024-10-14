@@ -1,5 +1,8 @@
-Log file initialized on 2024-10-14 05:42:50.465876
-2024-10-14 05:42:50,466 - Database - INFO - Attempting to connect to Supabase with URL: 
-2024-10-14 05:42:50,472 - Database - INFO - Supabase Client connected successfully.
-2024-10-14 05:42:50,472 - Database - INFO - Attempting to connect to Supabase Admin with URL: 
-2024-10-14 05:42:50,478 - Database - INFO - Supabase Admin Client connected successfully.
+Log file initialized on 2024-10-14 07:10:13.784682
+2024-10-14 07:10:13,784 - Database - INFO - Attempting to connect to database with URL: DATABASE_URL
+2024-10-14 07:10:14,210 - Database - INFO - Prisma Client connected successfully.
+2024-10-14 07:10:14,211 - Database - INFO - Attempting to connect to Supabase with URL: 
+2024-10-14 07:10:14,219 - Database - INFO - Supabase Client connected successfully.
+2024-10-14 07:10:14,220 - Database - INFO - Attempting to connect to Supabase Admin with URL: 
+2024-10-14 07:10:14,228 - Database - INFO - Supabase Admin Client connected successfully.
+2024-10-14 07:10:16,280 - Database - INFO - Prisma Client disconnected successfully.
