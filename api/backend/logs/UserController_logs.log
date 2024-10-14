@@ -1,4 +1,8 @@
-Log file initialized on 2024-10-14 07:10:14.211355
-2024-10-14 07:10:14,211 - UserController - INFO - Prisma client connected successfully.
-2024-10-14 07:10:16,211 - UserController - WARNING - API key created but audit log failed. - user_id=802e55c2-b804-40a6-bf26-7079cb6d5b80
-2024-10-14 07:10:16,281 - UserController - INFO - Prisma client disconnected successfully.
+Log file initialized on 2024-10-14 18:55:33.185721
+2024-10-14 18:55:33,185 - UserController - INFO - Prisma client connected successfully.
+2024-10-14 18:55:37,159 - UserController - ERROR - Exception during user deletion - error=UserService.delete_user() got an unexpected keyword argument 'prisma' - traceback=Traceback (most recent call last):
+  File "/teamspace/studios/this_studio/constellation-backend/api/backend/app/features/core/controllers/user_controller.py", line 240, in delete_user
+    deletion_success = await self.user_service.delete_user(
+TypeError: UserService.delete_user() got an unexpected keyword argument 'prisma'
+
+2024-10-14 18:55:37,162 - UserController - INFO - Prisma client disconnected successfully.

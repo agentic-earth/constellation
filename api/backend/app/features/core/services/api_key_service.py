@@ -32,7 +32,7 @@ class ApiKeyService:
 
     async def create_api_key(
         self, prisma: Prisma, user_id: UUID, expires_at: datetime.datetime
-    ) -> Optional[str]:
+    ) -> tuple[Optional[PrismaApiKey], Optional[str]]:
         """
         Creates a new API key for a user.
         """
@@ -55,7 +55,7 @@ class ApiKeyService:
                 api_key_id=new_api_key.api_key_id,
                 user_id=str(user_id)
             )
-            return raw_api_key  # Return the raw API key to the user
+            return new_api_key, raw_api_key    # Return the raw API key to the user
         except Exception as e:
             self.logger.log(
                 "ApiKeyService",
@@ -226,11 +226,12 @@ async def main():
 
     try:
         print("=== Creating API Key ===")
-        new_api_key = await api_key_service.create_api_key(
+        new_api_key, raw_api_key = await api_key_service.create_api_key(
             prisma=prisma,
             user_id=test_user_id,
             expires_at=expiration_date
         )
+        
         if new_api_key:
             print(f"New API key created: {new_api_key}")
 
@@ -245,7 +246,7 @@ async def main():
             # Validate the API key
             validated_key = await api_key_service.validate_api_key(
                 prisma=prisma,
-                raw_api_key=new_api_key
+                raw_api_key=raw_api_key
             )
             if validated_key:
                 print("API key is valid")

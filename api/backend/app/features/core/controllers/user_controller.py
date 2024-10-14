@@ -48,7 +48,7 @@ class UserController:
         self, email: str, password: str, username: str
     ) -> Dict[str, Any]:
         """
-        Registers a new user, creates an API key, and logs the action.
+        Registers a new user and logs the action.
         Ensures ACID properties using transactions.
         """
         try:
@@ -73,25 +73,8 @@ class UserController:
                     }
 
                 user_id = UUID(profile.auth_uid)
-
-                # Step 2: Create API Key
-                expires_at = datetime.utcnow() + timedelta(days=30)
-                api_key = await self.api_key_service.create_api_key(
-                    prisma=tx,
-                    user_id=user_id,
-                    expires_at=expires_at
-                )
-
-                if not api_key:
-                    # Optionally, rollback user creation if API key fails
-                    await tx.profile.delete(where={"auth_uid": str(user_id)})
-                    return {
-                        "success": False,
-                        "error": "api_key_creation_failed",
-                        "message": "User created but failed to generate API key."
-                    }
-
-                # Step 3: Audit Logging
+                
+                # Step 2: Audit Logging
                 audit_data = {
                     "user_id": str(user_id),
                     "action_type": ActionTypeEnum.CREATE.name,
@@ -114,7 +97,6 @@ class UserController:
                 return {
                     "success": True,
                     "profile": profile.dict(),
-                    "api_key": api_key,
                     "message": "User registered successfully."
                 }
 
@@ -342,7 +324,7 @@ class UserController:
                 audit_data = {
                     "user_id": str(user_id),
                     "action_type": ActionTypeEnum.UPDATE.name,
-                    "entity_type": AuditEntityTypeEnum.API_KEY.name.lower(),
+                    "entity_type": AuditEntityTypeEnum.api_key.name.lower(),
                     "entity_id": str(api_key_id),
                     "details": {"action": "revoke_api_key"},
                 }
@@ -388,7 +370,7 @@ class UserController:
                 audit_data = {
                     "user_id": str(user_id),
                     "action_type": ActionTypeEnum.DELETE.name,
-                    "entity_type": AuditEntityTypeEnum.API_KEY.name.lower(),
+                    "entity_type": AuditEntityTypeEnum.api_key.name.lower(),
                     "entity_id": str(api_key_id),
                     "details": {"action": "delete_api_key"},
                 }
@@ -458,20 +440,23 @@ class UserController:
                 expires_at = datetime.utcnow() + timedelta(days=30)
 
                 # Step 1: Create the API key
-                new_api_key = await self.api_key_service.create_api_key(
+                new_api_key_obj, raw_api_key = await self.api_key_service.create_api_key(
                     prisma=tx,
                     user_id=UUID(user_id),
                     expires_at=expires_at
                 )
-                if not new_api_key:
+                
+                if not new_api_key_obj:
                     return {"success": False, "error": "api_key_creation_failed", "message": "Failed to create API key."}
+
+                api_key_id = new_api_key_obj.api_key_id
 
                 # Step 2: Audit Logging
                 audit_data = {
                     "user_id": user_id,
                     "action_type": ActionTypeEnum.CREATE.name,
                     "entity_type": AuditEntityTypeEnum.api_key.name.lower(),
-                    "entity_id": new_api_key,  # Using the API key itself as the entity_id
+                    "entity_id": str(api_key_id),  # Using the API key ID as the entity_id
                     "description": f"Created new API key for user {user_id}"
                 }
                 audit_log = await self.audit_service.create_audit_log(
@@ -488,7 +473,8 @@ class UserController:
 
                 return {
                     "success": True,
-                    "api_key": new_api_key,
+                    "api_key_id": api_key_id,  # Return the UUID
+                    "raw_api_key": raw_api_key,  # Return the raw API key
                     "expires_at": expires_at.isoformat()
                 }
 
@@ -501,6 +487,8 @@ class UserController:
                 traceback=traceback.format_exc(),
             )
             return {"success": False, "error": "internal_error", "message": "An error occurred during API key creation."}
+
+
 # -------------------
 # Testing Utility
 # -------------------
@@ -587,32 +575,56 @@ async def run_user_controller_tests():
             else:
                 print(f"User profile update failed: {update_result.get('message', 'Unknown error')}")
 
-            # Test listing API keys
+            # Test listing API keys before any are created
             print("\n=== Listing API Keys for User ===")
             api_keys = await user_controller.list_api_keys_for_user(user_id)
             if api_keys is not None:
-                print(f"User has {len(api_keys)} API key(s):")
-                for key in api_keys:
-                    print(f"- API Key ID: {key['api_key_id']}, Expires At: {key['expires_at']}, Is Active: {key['is_active']}")
+                if len(api_keys) == 0:
+                    print("User has no API keys.")
+                else:
+                    print(f"User has {len(api_keys)} API key(s):")
+                    for key in api_keys:
+                        print(f"- API Key ID: {key['api_key_id']}, Expires At: {key['expires_at']}, Is Active: {key['is_active']}")
             else:
                 print("Failed to retrieve API keys.")
 
             # Test creating a new API key
             print("\n=== Creating New API Key ===")
-            new_api_key = await user_controller.create_api_key(user_id)
-            if new_api_key:
-                print(f"New API Key created: {new_api_key}")
+            new_api_key_response = await user_controller.create_api_key(user_id)
+            if new_api_key_response["success"]:
+                api_key_id = new_api_key_response["api_key_id"]
+                raw_api_key = new_api_key_response["raw_api_key"]
+                print(f"New API Key created: {raw_api_key} (ID: {api_key_id})")
             else:
                 print("Failed to create new API key.")
 
-            # Test revoking API key
-            if new_api_key:
+            # Test revoking API key using `api_key_id`
+            if new_api_key_response["success"]:
                 print("\n=== Revoking API Key ===")
-                revoke_result = await user_controller.revoke_api_key(user_id, UUID(new_api_key["api_key_id"]))
-                if revoke_result:
-                    print("API key revoked successfully.")
+                api_key_id = new_api_key_response["api_key_id"]
+                print(f"Revoking API Key ID: {api_key_id}")
+                try:
+                    revoke_uuid = UUID(api_key_id)  # Ensure it's a valid UUID
+                    revoke_result = await user_controller.revoke_api_key(user_id, revoke_uuid)
+                    if revoke_result:
+                        print("API key revoked successfully.")
+                    else:
+                        print("Failed to revoke API key.")
+                except ValueError as ve:
+                    print(f"Invalid UUID provided for revocation: {ve}")
+
+            # Optionally, list API keys after revocation
+            print("\n=== Listing API Keys for User After Revocation ===")
+            api_keys_after_revocation = await user_controller.list_api_keys_for_user(user_id)
+            if api_keys_after_revocation is not None:
+                if len(api_keys_after_revocation) == 0:
+                    print("User has no API keys.")
                 else:
-                    print("Failed to revoke API key.")
+                    print(f"User has {len(api_keys_after_revocation)} API key(s):")
+                    for key in api_keys_after_revocation:
+                        print(f"- API Key ID: {key['api_key_id']}, Expires At: {key['expires_at']}, Is Active: {key['is_active']}")
+            else:
+                print("Failed to retrieve API keys.")
 
             # Test deleting user
             print("\n=== Deleting User ===")
@@ -624,6 +636,13 @@ async def run_user_controller_tests():
 
     except Exception as e:
         print(f"An error occurred during testing: {str(e)}")
+        logger.log(
+            "UserController",
+            "error",
+            "Exception during user controller testing",
+            error=str(e),
+            traceback=traceback.format_exc()
+        )
     finally:
         # Disconnect from the database
         try:
