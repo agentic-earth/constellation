@@ -13,7 +13,7 @@ async def populate_test_data():
     block_service = BlockService()
     paper = {
         "name": "Short-term Weather Prediction Models",
-        "text": "Short term weather prediction models using Graphcast are the furture",
+        "text": "Short term weather prediction models using Graphcast are the future",
         "block_type": "paper",
         "description": "Analysis of short-term weather prediction techniques"
     }
