@@ -5,80 +5,87 @@ Research Agent Module
 
 This module defines the ResearchAgent class, which is responsible for conducting
 research tasks within the Constellation ecosystem. It leverages the CrewAI framework
-and integrates with core services to perform paper searches and taxonomy analysis.
+to perform paper analysis and synthesis.
 
 Design Philosophy:
 - Utilize CrewAI's Agent class for consistent agent behavior and integration.
-- Leverage Core Microservice components (PipelineService and TaxonomyService) for data access and processing.
-- Maintain modularity to allow easy expansion of research capabilities.
-- Implement specific research methods that can be called by the research crew or other parts of the system.
-- Utilize ConstellationLogger for consistent and centralized logging.
-
-Key Components:
-- ResearchAgent: A specialized agent class for research tasks.
-- search_papers: Method to search for relevant papers based on a query.
-- analyze_taxonomy: Method to analyze the taxonomy of a specific paper.
-
-This module is part of the Agent Microservice and plays a crucial role in enabling
-intelligent research capabilities within the Constellation Backend.
+- Focus on the agent's core role and goal.
+- Implement tools as methods that can be used by the agent during task execution.
 """
 
 from crewai import Agent
-from crewai_tools import PDFSearchTool
-from backend.app.features.core.services.pipeline_service import PipelineService
-from backend.app.features.core.services.taxonomy_service import TaxonomyService
-from backend.app.features.core.services.vector_embedding_service import VectorEmbeddingService
+from crewai_tools import tool
+from langchain_community.llms import OpenAI
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
+from backend.app.features.core.services.block_service import BlockService
 from backend.app.logger import ConstellationLogger
-from backend.app.embeddings import PDFEmbeddingService
-from typing import List, Dict
-class ResearchAgent(Agent):
-    def __init__(self, pipeline_service: PipelineService, taxonomy_service: TaxonomyService, vector_embedding_service: VectorEmbeddingService, pdf_embedding_service: PDFEmbeddingService):
+import json
+from typing import List, Dict, Any, ClassVar
 
-        papersearchtool = PDFSearchTool(config=dict(
-            llm=dict(
-                provider="OpenAI",
-                config=dict(
-                    model="gpt-4o-mini",
-                    temperature=0.5,
-                    top_p=1,
-                    stream=True,
-                ),
-            ),
-            embedder=dict(
-                provider="custom",
-                config=dict(
-                    embed_function=pdf_embedding_service.create_embeddings,
-                ),
-            ),
-        ))
+class PaperAnalysis:
+    def __init__(self, papers: List[Dict[str, Any]], analysis: str):
+        self.papers = papers
+        self.analysis = analysis
+
+class ResearchAgent(Agent):
+    find_similar_papers: ClassVar
+    analyze_papers: ClassVar
+
+    def __init__(self, **kwargs):
         super().__init__(
             name="Researcher",
             role="Climate Scientist",
             goal="Conduct thorough research on weather/climate topics",
-            backstory="As a climate scientist, I am tasked with conducting research on weather and climate topics.",
+            backstory="As a climate scientist, I am tasked with analyzing research papers and synthesizing information on weather and climate topics.",
             verbose=True,
             allow_delegation=False,
-            tools=[papersearchtool]
+            tools=[self.find_similar_papers],
+            # tools=[self.find_similar_papers, self.analyze_papers],
+            output_pydantic=PaperAnalysis,
+            **kwargs
         )
-        self.pipeline_service = pipeline_service
-        self.taxonomy_service = taxonomy_service
-        self.pdf_embedding_service = pdf_embedding_service
-        self.vector_embedding_service = vector_embedding_service
-        self.logger = ConstellationLogger("ResearchAgent")
 
-    def find_similar_papers(self, query: str, top_k: int = 5) -> List[Dict[str, str]]:
-        # Embed the query
-        query_embedding = self.pdf_embedding_service.embed_query(query)
+    @tool("Find Similar Papers")
+    def find_similar_papers(self, query: str, top_k: int = 5) -> str:
+        """Find papers similar to the given query."""
+        block_service = BlockService()
+        query_embedding = block_service.generate_embedding(query)
+        similar_blocks = block_service.search_blocks_by_vector_similarity(query_embedding, top_k=top_k)
+        return json.dumps(similar_blocks)
+
+    # @tool("Analyze Papers")
+    # async def analyze_papers(self, papers_json: str, query: str) -> str:
+    #     """Analyze the given papers in relation to the query and provide insights."""
+    #     papers = json.loads(papers_json)
         
-        # Search for similar papers
-        similar_blocks = self.vector_embedding_service.search_similar_blocks(query_embedding, top_k=top_k)
+    #     analysis = f"Analysis of top {len(papers)} papers related to '{query}':\n\n"
         
-        # Format the results
-        results = []
-        for block in similar_blocks:
-            results.append({
-                "title": block.name,  # Assuming the paper title is stored in the 'name' field
-                "link": block.metadata.get("link", "No link available")  # Assuming the link is stored in metadata
-            })
+    #     for paper in papers:
+    #         paper_name = paper['name']
+    #         paper_description = paper.get('description', 'No description available')
+    #         similarity_score = paper['similarity']
+            
+    #         # Generate analysis using the LLM
+    #         paper_analysis = await self._generate_paper_analysis(paper_name, paper_description, query, similarity_score)
+            
+    #         analysis += f"Paper: {paper_name}\n"
+    #         analysis += f"Relevance Score: {similarity_score:.2f}\n"
+    #         analysis += f"Analysis: {paper_analysis}\n\n"
         
-        return results
+        # return json.dumps(PaperAnalysis(papers=papers, analysis=analysis).__dict())
+
+    # async def _generate_paper_analysis(self, paper_name: str, paper_description: str, query: str, similarity_score: float) -> str:
+    #     """Generate a brief analysis of why a paper relates to the query using an LLM."""
+    #     try:
+    #         analysis = await self.analysis_chain.arun(
+    #             paper_name=paper_name,
+    #             paper_description=paper_description,
+    #             query=query,
+    #             similarity_score=f"{similarity_score:.2f}"
+    #         )
+    #         return analysis.strip()
+    #     except Exception as e:
+    #         self.logger.error(f"Error generating paper analysis: {str(e)}")
+    #         return "Unable to generate analysis due to an error."
+

@@ -1,9 +1,2 @@
-Log file initialized on 2024-10-03 20:35:25.763744
-2024-10-03 20:35:25,763 - BlockService - INFO - Block retrieved successfully by name. - block_id=33e8e0d7-0378-42cb-aaed-e71fd444d37f - block_name=TestBlock1
-2024-10-03 20:35:25,764 - BlockService - INFO - Block already exists, retrieved existing block. - block_id=33e8e0d7-0378-42cb-aaed-e71fd444d37f - block_name=TestBlock1
-2024-10-03 20:35:25,839 - BlockService - INFO - Block created successfully. - block_id=d5801824-0026-4154-9ec4-79471d36ad86 - block_name=TestBlock2
-2024-10-03 20:35:26,013 - BlockService - INFO - Vector associated with block successfully. - block_id=d5801824-0026-4154-9ec4-79471d36ad86
-2024-10-03 20:35:26,145 - BlockService - INFO - Block retrieved successfully. - block_id=d5801824-0026-4154-9ec4-79471d36ad86 - block_name=TestBlock2
-2024-10-03 20:35:26,214 - BlockService - INFO - Block retrieved successfully by name. - block_id=d5801824-0026-4154-9ec4-79471d36ad86 - block_name=TestBlock2
-2024-10-03 20:35:26,348 - BlockService - INFO - Block updated successfully. - block_id=d5801824-0026-4154-9ec4-79471d36ad86 - updated_fields=['description', 'updated_at']
-2024-10-03 20:35:27,021 - BlockService - INFO - Block deleted successfully. - block_id=d5801824-0026-4154-9ec4-79471d36ad86
+Log file initialized on 2024-10-14 14:17:28.279917
+2024-10-14 14:17:28,280 - BlockService - ERROR - Failed to create block - error=Client is not connected to the query engine, you must call `connect()` before attempting to query data.
