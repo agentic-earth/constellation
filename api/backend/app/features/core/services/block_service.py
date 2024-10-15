@@ -78,10 +78,11 @@ class BlockService:
         
         try:
             # Generate embedding if text is provided and vector is not
-            if 'text' in block_data and not vector:
-                print(f"Generating vector for block: {block_data['name']}")
-                vector = await self.generate_embedding(block_data['text'])
-                print(f"Generated vector: {vector[:5]}...")
+            # Remove block_id from block_data if it's there
+            block_data.pop('block_id', None)
+
+            if 'block_type' in block_data:
+                block_data['block_type'] = str(block_data['block_type']) 
 
             # Create block via Prisma
             created_block = await self.prisma.block.create(data=block_data)
@@ -103,6 +104,7 @@ class BlockService:
             return created_block
         
         except UniqueViolationError:
+            print(f"Block with name '{block_data['name']}' already exists.")
             # Block with this name already exists, retrieve it
             existing_block = await self.get_block_by_name(block_data['name'])
             if existing_block:
