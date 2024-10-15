@@ -28,7 +28,7 @@ class ResearchCrew:
     @task
     def research_task(self) -> Task:
         return Task(
-            config=self.tasks_config["research_task"],
+            config=self.tasks_config["find_similar_papers_task"],
             agent=self.research_agent,
             process=Process.sequential,
         )
@@ -40,4 +40,3 @@ class ResearchCrew:
             tasks=[self.research_task],
             verbose=2,
         )
-    
