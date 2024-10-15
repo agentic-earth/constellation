@@ -14,7 +14,7 @@ async def test_tools():
         query = "climate change mitigation strategies"
         vector = await VectorEmbedTool.func(query)
         print(f"Vector embedding for '{query}':")
-        print(vector[:5])  # Print first 5 elements of the vector
+        print(vector[:5])  
 
         sample_papers = [
             {
