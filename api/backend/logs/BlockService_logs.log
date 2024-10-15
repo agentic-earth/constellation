@@ -1,4 +1,8 @@
-Log file initialized on 2024-10-15 00:26:58.981597
-2024-10-15 00:26:58,981 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text`
-2024-10-15 00:26:58,983 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text`
-2024-10-15 00:26:58,986 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text`
+Log file initialized on 2024-10-13 21:55:09.694523
+2024-10-13 21:55:09,694 - BlockService - INFO - Block created successfully. - block_id=509823a4-b479-43b7-96c0-89706b9e2004 - block_name=TestBlock3
+2024-10-13 21:55:09,761 - BlockService - INFO - Block created successfully. - block_id=7126d40d-cfbc-440b-b6d7-7a33f67cc3aa - block_name=TestBlock5
+2024-10-13 21:55:09,890 - BlockService - INFO - Vector associated with block successfully. - block_id=7126d40d-cfbc-440b-b6d7-7a33f67cc3aa
+2024-10-13 21:55:10,020 - BlockService - INFO - Block retrieved successfully. - block_id=7126d40d-cfbc-440b-b6d7-7a33f67cc3aa - block_name=TestBlock5
+2024-10-13 21:55:10,151 - BlockService - INFO - Block retrieved successfully by name. - block_id=7126d40d-cfbc-440b-b6d7-7a33f67cc3aa - block_name=TestBlock5
+2024-10-13 21:55:10,281 - BlockService - INFO - Block updated successfully. - block_id=7126d40d-cfbc-440b-b6d7-7a33f67cc3aa - updated_fields=['description', 'updated_at']
+2024-10-13 21:55:10,925 - BlockService - INFO - Block deleted successfully. - block_id=7126d40d-cfbc-440b-b6d7-7a33f67cc3aa

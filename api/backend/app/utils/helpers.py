@@ -1,8 +1,8 @@
 # app/utils/helpers.py
 
 from supabase import create_client, Client
-from backend.app.config import settings
 from backend.app.logger import ConstellationLogger
+import os
 
 class SupabaseClientManager:
     _instance = None
@@ -22,7 +22,11 @@ class SupabaseClientManager:
 
     def connect(self) -> Client:
         try:
-            client = create_client(str(settings.SUPABASE_URL), settings.SUPABASE_KEY)
+            supabase_url = os.getenv('SUPABASE_URL')
+            supabase_key = os.getenv('SUPABASE_KEY')
+            if not supabase_url or not supabase_key:
+                raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set in environment variables.")
+            client = create_client(supabase_url, supabase_key)
             self.logger.log("SupabaseClientManager", "info", "Supabase client connected successfully.")
             return client
         except Exception as e:

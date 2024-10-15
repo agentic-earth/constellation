@@ -5,9 +5,12 @@ from pydantic import Field, AnyHttpUrl, PostgresDsn
 from typing import Optional
 import os
 from pathlib import Path
+import dotenv
 
 # Get the path to the root of the project
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
+
+dotenv.load_dotenv(ROOT_DIR / ".env", override=True)
 
 class Settings(BaseSettings):
     """
@@ -46,11 +49,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 #print("Loaded settings:", settings.dict())
-
-# Add this to your existing config
-HAYSTACK_CONFIG = {
-    "document_store": "InMemoryDocumentStore",
-    "retriever": "EmbeddingRetriever",
-    "embedding_model": "sentence-transformers/multi-qa-mpnet-base-dot-v1",
-    "generator_model": "gpt-3.5-turbo"
-}
+# Uncomment these lines for debugging
+# print("Loaded settings:", settings.dict())
+# print("ENV file path:", ROOT_DIR / ".env")
+# print("DATABASE_URL:", settings.DATABASE_URL)
