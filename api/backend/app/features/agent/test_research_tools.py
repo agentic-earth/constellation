@@ -7,6 +7,7 @@ from backend.app.features.core.services.block_service import BlockService
 async def test_tools():
     block_service = BlockService()
     await block_service.connect()
+    print("Connected to db")
 
     try:
         # Test VectorEmbedTool
@@ -36,40 +37,39 @@ async def test_tools():
             }
         ]
 
+        # Test creating blocks for sample papers
+        print("\nCreating blocks for sample papers:")
         for paper in sample_papers:
             created_block = await block_service.create_block(paper)
             if created_block:
                 print(f"Created block: {created_block.name}")
                 # Retrieve and print the vector for each created block
                 block_vector = await block_service.get_block_vector(created_block.block_id)
-                print(f"Vector for {created_block.name}: {block_vector[:5] if block_vector else 'None'}")
-
-        print("Sample papers populated successfully")
-
-        # Retrieve all vectors to make sure they're stored
-        all_vectors = await block_service.get_all_vectors()
-        print(f"Total vectors retrieved: {len(all_vectors)}")
+                if block_vector:
+                    print(f"Vector for {created_block.name}: {block_vector[:5]}")
+                else:
+                    print(f"No vector found for {created_block.name}")
+            else:
+                print(f"Failed to create block for {paper['name']}")
 
         # Test SimilaritySearchTool
-        results = await SimilaritySearchTool.func(vector)
-        print("\nSimilar papers found:")
-        if results:
-            for result in results:
-                print(f"- {result['name']}: {result['description']} (Similarity: {result['similarity']})")
+        print("\nTesting SimilaritySearchTool:")
+        similar_blocks = await SimilaritySearchTool.func(vector)
+        if similar_blocks:
+            print("Similar blocks found:")
+            for block in similar_blocks:
+                print(f"- {block['name']}: {block['description']} (Similarity: {block['similarity']})")
         else:
-            print("No similar papers found.")
+            print("No similar blocks found.")
 
-        # If no results, try direct similarity search
-        if not results:
-            print("\nTrying direct similarity search:")
-            direct_results = await block_service.search_blocks_by_vector_similarity(vector)
-            if direct_results:
-                for result in direct_results:
-                    print(f"- {result['name']}: {result['description']} (Similarity: {result['similarity']})")
-            else:
-                print("No results from direct similarity search.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        import traceback
+        print(traceback.format_exc())
+
     finally:
         await block_service.disconnect()
+        print("Disconnected from the database")
 
 if __name__ == "__main__":
     asyncio.run(test_tools())
