@@ -72,67 +72,55 @@ The Constellation API is a FastAPI-based application designed to manage pipeline
 
 """
 
-import uvicorn
+# main.py
+
 from fastapi import FastAPI, HTTPException
 from backend.app.features.core.routes import blocks, edges, pipelines, audit_logs, users
-from backend.app.utils.helpers import SupabaseClientManager
+from backend.app.database import connect_db, disconnect_db, prisma_client
 from backend.app.logger import ConstellationLogger
-from backend.app.database import get_supabase_client
-from backend.app.config import settings
+from backend.app.utils.helpers import SupabaseClientManager
 
-# Initialize the logger
 logger = ConstellationLogger()
 
-# Initialize the Supabase client manager
-supabase_manager = SupabaseClientManager()
-supabase_manager.connect()
-
-# Create the FastAPI application instance with Lifespan context manager
 app = FastAPI(
     title="Constellation API",
     description="API for managing Users, Blocks, Edges, Pipelines, and Audit Logs.",
     version="1.0.0",
 )
 
-# Include all the API routers
-app.include_router(blocks.router)
-app.include_router(edges.router)
-app.include_router(pipelines.router)
-app.include_router(audit_logs.router)
-app.include_router(users.router)
+@app.on_event("startup")
+async def on_startup():
+    await connect_db()
 
+@app.on_event("shutdown")
+async def on_shutdown():
+    await disconnect_db()
+
+# Include all the API routers
+app.include_router(blocks.router, prefix="/blocks", tags=["Blocks"])
+app.include_router(edges.router, prefix="/edges", tags=["Edges"])
+app.include_router(pipelines.router, prefix="/pipelines", tags=["Pipelines"])
+app.include_router(audit_logs.router, prefix="/audit-logs", tags=["Audit Logs"])
+app.include_router(users.router, prefix="/users", tags=["Users"])
 
 @app.get("/", tags=["Root"])
 async def root():
-    """
-    Root endpoint that returns a welcome message.
-
-    Returns:
-    dict: A dictionary containing a welcome message.
-    """
     return {"message": "Welcome to the Constellation API!"}
-
 
 @app.get("/health", tags=["Health Check"])
 async def health_check():
-    """
-    Health check endpoint to verify the application's connectivity with Supabase.
-
-    Returns:
-    dict: A dictionary containing the health status.
-    """
     try:
-        if supabase_manager._initialized:
+        # Simple query to check database connectivity
+        result = await prisma_client.alembic_version.find_first()
+        if result:
             return {"status": "healthy"}
         else:
             raise HTTPException(
-                status_code=503, detail="Supabase backend is unreachable."
+                status_code=503, detail="Database query failed."
             )
     except Exception as e:
         logger.log("main", "critical", f"Health check failed: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error.")
-
-
 def main():
     """
     Main function to launch the FastAPI application using Uvicorn.

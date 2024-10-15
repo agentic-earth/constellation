@@ -1,543 +1,382 @@
-# app/controllers/edge_controller.py
-
 """
 Edge Controller Module
 
-This module defines the EdgeController class responsible for managing edge-related operations.
-It orchestrates interactions between EdgeService and AuditService to perform CRUD operations
-and handle search functionalities.
+This module implements the Edge Controller, handling operations related to edges.
+It integrates audit logging using the AuditService.
 
-Responsibilities:
-- Coordinating between EdgeService and AuditService to perform edge-related workflows.
-- Handling CRUD operations for edges.
-- Managing search functionalities with optional filtering.
-- Ensuring transactional integrity and robust error handling.
-- Managing audit logs through AuditService.
+Design Pattern:
+- Dependency Injection: Prisma client is passed to the controller and subsequently to services.
+- Separation of Concerns: Controller handles HTTP requests, delegates business logic to services.
 
-Design Philosophy:
-- Maintain high cohesion by focusing solely on edge-related orchestration.
-- Promote loose coupling by interacting with services through well-defined interfaces.
-- Ensure robustness through comprehensive error handling and logging.
+Key Integrations:
+1. Audit Logging: Each operation logs relevant audit information via AuditService.
+2. Schema Usage: Utilizes existing schemas from schemas.py to ensure consistency.
 """
 
+import asyncio
 import traceback
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 
-from fastapi import HTTPException, status
+from prisma import Prisma
 
-from backend.app.features.core.services.edge_service import EdgeService
-from backend.app.features.core.services.audit_service import AuditService
-from backend.app.schemas import (
-    EdgeCreateSchema,
-    EdgeUpdateSchema,
-    EdgeResponseSchema,
-    EdgeVerificationRequestSchema,
-    EdgeVerificationResponseSchema,
-)
 from backend.app.logger import ConstellationLogger
+from backend.app.features.core.services.audit_service import AuditService
+from backend.app.features.core.services.edge_service import EdgeService
 
 
 class EdgeController:
-    """
-    EdgeController manages all edge-related operations, coordinating between EdgeService
-    to perform CRUD operations and handle search functionalities.
-    """
-
-    def __init__(self):
-        """
-        Initializes the EdgeController with instances of EdgeService and AuditService,
-        along with the ConstellationLogger for logging purposes.
-        """
+    def __init__(self, prisma_client: Prisma):
+        self.prisma = prisma_client
+        self.logger = ConstellationLogger()
         self.edge_service = EdgeService()
         self.audit_service = AuditService()
-        self.logger = ConstellationLogger()
 
-    # -------------------
-    # Edge CRUD Operations
-    # -------------------
-
-    def create_edge(self, edge_data: EdgeCreateSchema) -> EdgeResponseSchema:
+    async def create_edge(self, edge_data: Dict[str, Any], user_id: UUID) -> Optional[Dict[str, Any]]:
         """
-        Creates a new edge.
+        Create a new edge.
 
         Args:
-            edge_data (EdgeCreateSchema): The data required to create a new edge.
+            edge_data (Dict[str, Any]): The data required to create an edge.
+            user_id (UUID): The ID of the user performing the action.
 
         Returns:
-            EdgeResponseSchema: The created edge data if successful.
-
-        Raises:
-            HTTPException: If edge creation fails due to validation or server errors.
+            Optional[Dict[str, Any]]: The created edge if successful, None otherwise.
         """
         try:
-            # Step 1: Create Edge
-            edge = self.edge_service.create_edge(edge_data)
-            if not edge:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Edge creation failed due to invalid data.",
-                )
+            async with self.prisma.tx() as tx:
+                edge = await self.edge_service.create_edge(tx, edge_data)
 
-            # Step 2: Log the creation in Audit Logs
-            audit_log = {
-                "user_id": edge_data.created_by,  # Assuming `created_by` exists in EdgeCreateSchema
-                "action_type": "CREATE",
-                "entity_type": "edge",
-                "entity_id": str(edge.edge_id),
-                "details": f"Edge '{edge.name}' created successfully.",
-            }
-            self.audit_service.create_audit_log(audit_log)
+                if not edge:
+                    raise ValueError("Failed to create edge.")
 
-            # Step 3: Log the creation in ConstellationLogger
-            self.logger.log(
-                "EdgeController",
-                "info",
-                "Edge created successfully.",
-                extra={"edge_id": str(edge.edge_id)},
-            )
-            return edge
-
-        except HTTPException as he:
-            # Log HTTPExceptions with error level
-            self.logger.log(
-                "EdgeController",
-                "error",
-                f"HTTPException during edge creation: {he.detail}",
-                extra={"status_code": he.status_code, "detail": he.detail},
-            )
-            raise he
-        except Exception as e:
-            # Log unexpected exceptions with critical level
-            self.logger.log(
-                "EdgeController",
-                "critical",
-                f"Exception during edge creation: {str(e)}",
-                extra={"traceback": traceback.format_exc()},
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Internal Server Error during edge creation.",
-            )
-
-    def get_edge_by_id(self, edge_id: UUID) -> EdgeResponseSchema:
-        """
-        Retrieves an edge by its unique identifier.
-
-        Args:
-            edge_id (UUID): The UUID of the edge to retrieve.
-
-        Returns:
-            EdgeResponseSchema: The edge data if found.
-
-        Raises:
-            HTTPException: If the edge is not found or retrieval fails.
-        """
-        try:
-            # Step 1: Retrieve Edge
-            edge = self.edge_service.get_edge_by_id(edge_id)
-            if not edge:
-                # Log the failed retrieval in Audit Logs
-                audit_log = {
-                    "user_id": None,  # Replace with actual user ID if available
-                    "action_type": "READ",
+                # Audit Logging
+                audit_data = {
+                    "user_id": str(user_id),
+                    "action_type": "CREATE",
                     "entity_type": "edge",
-                    "entity_id": str(edge_id),
-                    "details": "Edge not found.",
+                    "entity_id": str(edge.edge_id),
+                    "details": {"edge_data": edge_data}
                 }
-                self.audit_service.create_audit_log(audit_log)
-
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, detail="Edge not found."
-                )
-
-            # Step 2: Log the retrieval in Audit Logs
-            audit_log = {
-                "user_id": None,  # Replace with actual user ID if available
-                "action_type": "READ",
-                "entity_type": "edge",
-                "entity_id": str(edge.edge_id),
-                "details": f"Edge '{edge.name}' retrieved successfully.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            # Step 3: Log the retrieval in ConstellationLogger
-            self.logger.log(
-                "EdgeController",
-                "info",
-                "Edge retrieved successfully.",
-                extra={"edge_id": str(edge.edge_id)},
-            )
-            return edge
-
-        except HTTPException as he:
-            # Log HTTPExceptions with error level
+                audit_log = await self.audit_service.create_audit_log(tx, audit_data)
+                if not audit_log:
+                    raise Exception("Failed to create audit log")
+                
+                self.logger.log("EdgeController", "info", "Edge created successfully.", edge_id=str(edge.edge_id))
+                return edge.dict()
+        except Exception as e:
             self.logger.log(
                 "EdgeController",
                 "error",
-                f"HTTPException during edge retrieval: {he.detail}",
-                extra={"status_code": he.status_code, "detail": he.detail},
+                f"Exception in create_edge: {str(e)}",
+                extra={"traceback": traceback.format_exc()}
             )
-            raise he
-        except Exception as e:
-            # Log unexpected exceptions with critical level
-            self.logger.log(
-                "EdgeController",
-                "critical",
-                f"Exception during edge retrieval: {str(e)}",
-                extra={"traceback": traceback.format_exc(), "edge_id": str(edge_id)},
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Internal Server Error during edge retrieval.",
-            )
+            return None
 
-    def update_edge(
-        self, edge_id: UUID, update_data: EdgeUpdateSchema
-    ) -> EdgeResponseSchema:
+    async def get_edge(self, edge_id: UUID, user_id: UUID) -> Optional[Dict[str, Any]]:
         """
-        Updates an existing edge's information.
+        Retrieve an edge by its ID.
 
         Args:
-            edge_id (UUID): The UUID of the edge to update.
-            update_data (EdgeUpdateSchema): The data to update for the edge.
+            edge_id (UUID): The ID of the edge to retrieve.
 
         Returns:
-            EdgeResponseSchema: The updated edge data if successful.
-
-        Raises:
-            HTTPException: If edge update fails due to validation or server errors.
+            Optional[Dict[str, Any]]: The edge if found, None otherwise.
         """
         try:
-            # Step 1: Update Edge Details
-            edge = self.edge_service.update_edge(edge_id, update_data)
-            if not edge:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Edge update failed due to invalid data.",
-                )
-
-            # Step 2: Log the update in Audit Logs
-            audit_log = {
-                "user_id": update_data.updated_by,  # Assuming `updated_by` exists in EdgeUpdateSchema
-                "action_type": "UPDATE",
-                "entity_type": "edge",
-                "entity_id": str(edge.edge_id),
-                "details": f"Edge '{edge.name}' updated with fields: {list(update_data.dict().keys())}.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            # Step 3: Log the update in ConstellationLogger
-            self.logger.log(
-                "EdgeController",
-                "info",
-                "Edge updated successfully.",
-                extra={"edge_id": str(edge.edge_id)},
-            )
-            return edge
-
-        except HTTPException as he:
-            # Log HTTPExceptions with error level
+            async with self.prisma.tx() as tx:
+                edge = await self.edge_service.get_edge_by_id(tx, edge_id)
+                if edge:
+                    # Audit Logging
+                    audit_data = {
+                        "user_id": str(user_id),
+                        "action_type": "READ",
+                        "entity_type": "edge",
+                        "entity_id": str(edge.edge_id),
+                        "details": {"read_action": True}
+                    }
+                    audit_log = await self.audit_service.create_audit_log(tx, audit_data)
+                    if not audit_log:
+                        raise Exception("Failed to create audit log")
+                    
+                    self.logger.log("EdgeController", "info", "Edge retrieved successfully.", edge_id=str(edge.edge_id))
+                    return edge.dict()
+                else:
+                    self.logger.log("EdgeController", "info", "Edge not found.", edge_id=str(edge_id))
+                    return None
+        except Exception as e:
             self.logger.log(
                 "EdgeController",
                 "error",
-                f"HTTPException during edge update: {he.detail}",
-                extra={"status_code": he.status_code, "detail": he.detail},
+                f"Exception in get_edge: {str(e)}",
+                extra={"traceback": traceback.format_exc()}
             )
-            raise he
-        except Exception as e:
-            # Log unexpected exceptions with critical level
-            self.logger.log(
-                "EdgeController",
-                "critical",
-                f"Exception during edge update: {str(e)}",
-                extra={"traceback": traceback.format_exc(), "edge_id": str(edge_id)},
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Internal Server Error during edge update.",
-            )
+            return None
 
-    def delete_edge(self, edge_id: UUID) -> bool:
-        """
-        Deletes an edge.
-
-        Args:
-            edge_id (UUID): The UUID of the edge to delete.
-
-        Returns:
-            bool: True if deletion was successful.
-
-        Raises:
-            HTTPException: If edge deletion fails.
-        """
-        try:
-            # Step 1: Delete Edge
-            deletion_success = self.edge_service.delete_edge(edge_id)
-            if not deletion_success:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Edge deletion failed.",
-                )
-
-            # Step 2: Log the deletion in Audit Logs
-            audit_log = {
-                "user_id": None,  # Replace with actual user ID if available
-                "action_type": "DELETE",
-                "entity_type": "edge",
-                "entity_id": str(edge_id),
-                "details": f"Edge with ID '{edge_id}' deleted successfully.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            # Step 3: Log the deletion in ConstellationLogger
-            self.logger.log(
-                "EdgeController",
-                "info",
-                "Edge deleted successfully.",
-                extra={"edge_id": str(edge_id)},
-            )
-            return True
-
-        except HTTPException as he:
-            # Log HTTPExceptions with error level
-            self.logger.log(
-                "EdgeController",
-                "error",
-                f"HTTPException during edge deletion: {he.detail}",
-                extra={"status_code": he.status_code, "detail": he.detail},
-            )
-            raise he
-        except Exception as e:
-            # Log unexpected exceptions with critical level
-            self.logger.log(
-                "EdgeController",
-                "critical",
-                f"Exception during edge deletion: {str(e)}",
-                extra={"traceback": traceback.format_exc(), "edge_id": str(edge_id)},
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Internal Server Error during edge deletion.",
-            )
-
-    def list_edges(
+    async def list_edges(
         self,
+        user_id: UUID,
         filters: Optional[Dict[str, Any]] = None,
         limit: int = 100,
-        offset: int = 0,
-    ) -> List[EdgeResponseSchema]:
+        offset: int = 0
+    ) -> List[Dict[str, Any]]:
         """
-        Retrieves a list of edges with optional filtering and pagination.
+        List edges with optional filtering, pagination.
 
         Args:
-            filters (Optional[Dict[str, Any]]): Key-value pairs to filter the edges.
+            filters (Optional[Dict[str, Any]]): Filters to apply.
             limit (int): Maximum number of edges to retrieve.
-            offset (int): Number of edges to skip for pagination.
+            offset (int): Number of edges to skip.
 
         Returns:
-            List[EdgeResponseSchema]: A list of edges if successful.
-
-        Raises:
-            HTTPException: If edge listing fails due to server errors.
+            List[Dict[str, Any]]: A list of edges.
         """
         try:
-            # Step 1: Retrieve Edges with Filters
-            edges = self.edge_service.list_edges(
-                filters=filters, limit=limit, offset=offset
-            )
-            if edges is None:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to retrieve edges.",
-                )
+            async with self.prisma.tx() as tx:
+                edges = await self.edge_service.list_edges(tx, filters, limit, offset)
+                if edges:
+                    # Audit Logging
+                    audit_data = {
+                        "user_id": str(user_id),  # Assuming system access; adjust as needed
+                        "action_type": "READ",
+                        "entity_type": "edge",
+                        "entity_id": str(edges[0].edge_id), # TODO: temporarily use first edge id
+                        "details": {"filters": filters, "limit": limit, "offset": offset}
+                    }
+                    audit_log = await self.audit_service.create_audit_log(tx, audit_data)
+                    if not audit_log:
+                        raise Exception("Failed to create audit log")
 
-            # Step 2: Log the listing in Audit Logs
-            audit_log = {
-                "user_id": None,  # Replace with actual user ID if available
-                "action_type": "READ",
-                "entity_type": "edge",
-                "entity_id": None,
-                "details": f"Listed edges with filters: {filters}, limit: {limit}, offset: {offset}.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            # Step 3: Log the listing in ConstellationLogger
-            self.logger.log(
-                "EdgeController",
-                "info",
-                f"Listed {len(edges)} edges successfully.",
-                extra={"filters": filters, "limit": limit, "offset": offset},
-            )
-            return edges
-
-        except HTTPException as he:
-            # Log HTTPExceptions with error level
+                    self.logger.log("EdgeController", "info", f"Listed {len(edges)} edges.")
+                    return [edge.dict() for edge in edges]
+                else:
+                    self.logger.log("EdgeController", "info", "No edges found.", filters=filters, limit=limit, offset=offset)
+                    return []
+        except Exception as e:
             self.logger.log(
                 "EdgeController",
                 "error",
-                f"HTTPException during edge listing: {he.detail}",
-                extra={"status_code": he.status_code, "detail": he.detail},
+                f"Exception in list_edges: {str(e)}",
+                extra={"traceback": traceback.format_exc()}
             )
-            raise he
-        except Exception as e:
-            # Log unexpected exceptions with critical level
-            self.logger.log(
-                "EdgeController",
-                "critical",
-                f"Exception during edge listing: {str(e)}",
-                extra={"traceback": traceback.format_exc()},
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Internal Server Error during edge listing.",
-            )
+            return []
 
-    def search_edges(
-        self, query_params: Dict[str, Any], limit: int = 100, offset: int = 0
-    ) -> List[EdgeResponseSchema]:
+    async def update_edge(self, edge_id: UUID, update_data: Dict[str, Any], user_id: UUID) -> Optional[Dict[str, Any]]:
         """
-        Searches for edges based on provided query parameters with pagination.
+        Update an existing edge.
 
         Args:
-            query_params (Dict[str, Any]): A dictionary of query parameters for filtering.
-            limit (int): Maximum number of edges to retrieve.
-            offset (int): Number of edges to skip for pagination.
+            edge_id (UUID): The ID of the edge to update.
+            update_data (Dict[str, Any]): The data to update.
+                Supported fields:
+                - "source_block_id" (UUID): The ID of the source block.
+                - "target_block_id" (UUID): The ID of the target block.
+            user_id (UUID): The ID of the user performing the action.
 
         Returns:
-            List[EdgeResponseSchema]: A list of edges matching the search criteria.
-
-        Raises:
-            HTTPException: If edge search fails due to server errors.
+            Optional[Dict[str, Any]]: The updated edge if successful, None otherwise.
         """
         try:
-            # Step 1: Perform Search
-            edges = self.edge_service.search_edges(
-                query_params=query_params, limit=limit, offset=offset
-            )
-            if edges is None:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Edge search failed.",
-                )
+            async with self.prisma.tx() as tx:
+                edge = await self.edge_service.update_edge(tx, edge_id, update_data.copy())
+                if not edge:
+                    raise ValueError("Failed to update edge.")
+                
+                # Audit Logging
+                audit_data = {
+                    "user_id": str(user_id),
+                    "action_type": "UPDATE",
+                    "entity_type": "edge",
+                    "entity_id": str(edge.edge_id),
+                    "details": {"update_data": update_data}
+                }
+                audit_log = await self.audit_service.create_audit_log(tx, audit_data)
+                if not audit_log:
+                    raise Exception("Failed to create audit log")
+                
+                self.logger.log("EdgeController", "info", "Edge updated successfully.", edge_id=str(edge.edge_id))
+                return edge.dict()
 
-            # Step 2: Count Total Matching Edges
-            total_count = self.edge_service.count_edges(filters=query_params)
-            if total_count is None:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to count edges.",
-                )
-
-            # Step 3: Calculate Total Pages
-            total_pages = (total_count + limit - 1) // limit if limit > 0 else 1
-
-            # Step 4: Log the search in Audit Logs
-            audit_log = {
-                "user_id": None,  # Replace with actual user ID if available
-                "action_type": "SEARCH",
-                "entity_type": "edge",
-                "entity_id": None,
-                "details": f"Edge search performed with filters: {query_params}, limit: {limit}, offset: {offset}.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            # Step 5: Log the search in ConstellationLogger
-            self.logger.log(
-                "EdgeController",
-                "info",
-                f"Edge search completed with {len(edges)} results.",
-                extra={
-                    "query_params": query_params,
-                    "limit": limit,
-                    "offset": offset,
-                    "total_count": total_count,
-                    "total_pages": total_pages,
-                },
-            )
-
-            # Note: Since we are restricted from using undefined schemas, we'll return the list along with pagination metadata as a dictionary.
-            # This can be adjusted based on how the response is handled in the API routes.
-
-            return edges
-
-        except HTTPException as he:
-            # Log HTTPExceptions with error level
+        except Exception as e:
             self.logger.log(
                 "EdgeController",
                 "error",
-                f"HTTPException during edge search: {he.detail}",
-                extra={"status_code": he.status_code, "detail": he.detail},
+                f"Exception in update_edge: {str(e)}",
+                extra={"traceback": traceback.format_exc()}
             )
-            raise he
-        except Exception as e:
-            # Log unexpected exceptions with critical level
-            self.logger.log(
-                "EdgeController",
-                "critical",
-                f"Exception during edge search: {str(e)}",
-                extra={"traceback": traceback.format_exc()},
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Internal Server Error during edge search.",
-            )
+            return None
 
-    # -------------------
-    # Edge Verification Endpoint
-    # -------------------
-
-    def verify_edge(
-        self, verification_request: EdgeVerificationRequestSchema
-    ) -> EdgeVerificationResponseSchema:
+    async def delete_edge(self, edge_id: UUID, user_id: UUID) -> bool:
         """
-        Verifies if an edge can be created between two blocks.
+        Delete an edge.
 
         Args:
-            verification_request (EdgeVerificationRequestSchema): The source and target block IDs.
+            edge_id (UUID): The ID of the edge to delete.
+            user_id (UUID): The ID of the user performing the action.
 
         Returns:
-            EdgeVerificationResponseSchema: The result of the verification.
+            bool: True if deletion was successful, False otherwise.
         """
         try:
-            # Use EdgeService to perform the verification
-            verification_result = self.edge_service.can_connect_blocks(
-                source_block_id=verification_request.source_block_id,
-                target_block_id=verification_request.target_block_id,
-            )
-
-            # Log the verification in Audit Logs
-            audit_log = {
-                "user_id": None,  # Replace with actual user ID if available
-                "action_type": "READ",
-                "entity_type": "edge",
-                "entity_id": "verification",
-                "details": f"Edge verification between {verification_request.source_block_id} and {verification_request.target_block_id}.",
-            }
-            self.audit_service.create_audit_log(audit_log)
-
-            # Log the verification event
-            self.logger.log(
-                "EdgeController",
-                "info",
-                "Edge verification performed.",
-                extra={
-                    "source_block_id": str(verification_request.source_block_id),
-                    "target_block_id": str(verification_request.target_block_id),
-                    "can_connect": verification_result.can_connect,
-                },
-            )
-            return verification_result
+            async with self.prisma.tx() as tx:
+                success = await self.edge_service.delete_edge(tx, edge_id)
+                if not success:
+                    raise ValueError("Failed to delete edge.")
+                
+                # Audit Logging
+                audit_data = {
+                    "user_id": str(user_id),
+                    "action_type": "DELETE",
+                    "entity_type": "edge",
+                    "entity_id": str(edge_id),
+                    "details": {"deletion_action": True}
+                }
+                audit_log = await self.audit_service.create_audit_log(tx, audit_data)
+                if not audit_log:
+                    raise Exception("Failed to create audit log")
+                
+                self.logger.log("EdgeController", "info", "Edge deleted successfully.", edge_id=str(edge_id))
+                return True
 
         except Exception as e:
-            # Log unexpected exceptions with critical level
             self.logger.log(
                 "EdgeController",
-                "critical",
-                f"Exception during edge verification: {str(e)}",
-                extra={"traceback": traceback.format_exc()},
+                "error",
+                f"Exception in delete_edge: {str(e)}",
+                extra={"traceback": traceback.format_exc()}
             )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Internal Server Error during edge verification.",
-            )
+            return False
+
+    async def main(self):
+        """
+        Main function to test EdgeController functionalities.
+        Demonstrates creating, retrieving, listing, updating, and deleting edges.
+        """
+        try:
+            # Test Data
+            user_id = UUID("123e4567-e89b-12d3-a456-426614174000")  # Example UUID
+
+            # Step 0: Create three blocks to create an edge
+            block_controller = BlockController(self.prisma)
+            print("\nCreating three blocks...")
+            block_data1 = {
+                "name": "Test Block1",
+                "block_type": "model",
+                "description": "This is a test block1."
+            }
+            block_data2 = {
+                "name": "Test Block2",
+                "block_type": "model",
+                "description": "This is a test block2."
+            }
+            block_data3 = {
+                "name": "Test Block3",
+                "block_type": "model",
+                "description": "This is a test block3."
+            }
+            created_block1 = await block_controller.create_block(block_data1, user_id)
+            created_block2 = await block_controller.create_block(block_data2, user_id)
+            created_block3 = await block_controller.create_block(block_data3, user_id)
+            if created_block1 and created_block2 and created_block3:
+                print(f"Created Blocks: {created_block1["block_id"]}")
+                print(f"Created Blocks: {created_block2["block_id"]}")
+                print(f"Created Blocks: {created_block3["block_id"]}")
+            else:
+                print("Failed to create Blocks.")
+
+            # Step 1: Create a new edge
+            print("\nCreating a new edge...")
+            edge_create = {
+                "source_block_id": created_block1["block_id"],
+                "target_block_id": created_block2["block_id"],
+            }
+            created_edge = await self.create_edge(edge_create, user_id)
+            if created_edge:
+                print(f"Created Edge: {created_edge["edge_id"]} - {created_edge["source_block_id"]} -> {created_edge["target_block_id"]}")
+            else:
+                print("Failed to create Edge.")
+
+            # Step 2: Retrieve the edge by ID
+            if created_edge:
+                print(f"\nRetrieving Edge with ID: {created_edge["edge_id"]}")
+                retrieved_edge = await self.get_edge(created_edge["edge_id"], user_id)
+                if retrieved_edge:
+                    print(f"Retrieved Edge: {retrieved_edge["edge_id"]} - {retrieved_edge["source_block_id"]} -> {retrieved_edge["target_block_id"]}")
+                else:
+                    print("Failed to retrieve Edge.")
+            else:
+                print("Skipping retrieval since Edge creation failed.")
+
+            # Step 3: List all edges
+            print("\nListing all edges...")
+            edges = await self.list_edges(user_id)
+            print(f"Total Edges: {len(edges)}")
+            for edge in edges:
+                print(f"- ID: {edge["edge_id"]} - {edge["source_block_id"]} -> {edge["target_block_id"]}")
+
+            # Step 4: Update the edge's description
+            if created_edge:
+                print(f"\nUpdating Edge with ID: {created_edge["edge_id"]}")
+                edge_update = {
+                    "source_block_id": created_block3["block_id"],
+                    "target_block_id": created_block1["block_id"],
+                }
+                updated_edge = await self.update_edge(created_edge["edge_id"], edge_update, user_id)
+                if updated_edge:
+                    print(f"Updated Edge: {updated_edge["edge_id"]} - {updated_edge["source_block_id"]} -> {updated_edge["target_block_id"]}")
+                else:
+                    print("Failed to update Edge.")
+            else:
+                print("Skipping update since Edge creation failed.")
+
+            # Step 5: Delete the edge
+            if created_edge:
+                print(f"\nDeleting Edge with ID: {created_edge["edge_id"]}")
+                deletion_success = await self.delete_edge(created_edge["edge_id"], user_id)
+                print(f"Edge deleted: {deletion_success}")
+            else:
+                print("Skipping deletion since Edge creation failed.")
+
+            # Step 6: List edges after deletion
+            print("\nListing edges after deletion...")
+            edges_after_deletion = await self.list_edges(user_id)
+            print(f"Total Edges: {len(edges_after_deletion)}")
+            for edge in edges_after_deletion:
+                print(f"- ID: {edge["edge_id"]} - {edge["source_block_id"]} -> {edge["target_block_id"]}")
+
+            # Step 7: Delete the blocks
+            print("\nDeleting the blocks...")
+            deletion_success1 = await block_controller.delete_block(created_block1["block_id"], user_id)
+            deletion_success2 = await block_controller.delete_block(created_block2["block_id"], user_id)
+            deletion_success3 = await block_controller.delete_block(created_block3["block_id"], user_id)
+            print(f"Blocks deleted: {deletion_success1}, {deletion_success2}, {deletion_success3}")
+
+        except Exception as e:
+            self.logger.log("EdgeController", "error", "An error occurred in main.", error=str(e))
+            print(f"An error occurred: {e}")
+        finally:
+            print("\nDisconnecting from the database...")
+            await self.prisma.disconnect()
+            print("Database disconnected.")
+
+
+# -------------------
+# Testing Utility
+# -------------------
+
+async def run_edge_controller_tests():
+    """
+    Function to run EdgeController tests.
+    """
+    prisma = Prisma()
+    print("Connecting to the database...")
+    await prisma.connect()
+    print("Database connected.")
+
+    edge_controller = EdgeController(prisma)
+    await edge_controller.main()
+
+
+if __name__ == "__main__":
+    from backend.app.features.core.controllers.block_controller import BlockController
+    asyncio.run(run_edge_controller_tests())
