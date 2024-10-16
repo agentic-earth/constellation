@@ -1,0 +1,2 @@
+Log file initialized on 2024-10-03 20:46:24.103374
+2024-10-03 20:46:24,103 - EdgeService - ERROR - An error occurred in main. - error=name 'BlockService' is not defined
