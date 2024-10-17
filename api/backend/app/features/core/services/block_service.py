@@ -28,7 +28,7 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime
 import asyncio
-from app.config import settings
+from backend.app.config import settings
 
 from prisma.errors import UniqueViolationError
 from prisma.models import Block as PrismaBlock
