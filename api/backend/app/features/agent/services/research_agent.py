@@ -5,80 +5,61 @@ Research Agent Module
 
 This module defines the ResearchAgent class, which is responsible for conducting
 research tasks within the Constellation ecosystem. It leverages the CrewAI framework
-and integrates with core services to perform paper searches and taxonomy analysis.
+to perform paper analysis and synthesis.
 
 Design Philosophy:
 - Utilize CrewAI's Agent class for consistent agent behavior and integration.
-- Leverage Core Microservice components (PipelineService and TaxonomyService) for data access and processing.
-- Maintain modularity to allow easy expansion of research capabilities.
-- Implement specific research methods that can be called by the research crew or other parts of the system.
-- Utilize ConstellationLogger for consistent and centralized logging.
-
-Key Components:
-- ResearchAgent: A specialized agent class for research tasks.
-- search_papers: Method to search for relevant papers based on a query.
-- analyze_taxonomy: Method to analyze the taxonomy of a specific paper.
-
-This module is part of the Agent Microservice and plays a crucial role in enabling
-intelligent research capabilities within the Constellation Backend.
+- Focus on the agent's core role and goal.
+- Implement tools as methods that can be used by the agent during task execution.
 """
 
 from crewai import Agent
-from crewai_tools import PDFSearchTool
-from backend.app.features.core.services.pipeline_service import PipelineService
-from backend.app.features.core.services.taxonomy_service import TaxonomyService
-from backend.app.features.core.services.vector_embedding_service import VectorEmbeddingService
-from backend.app.logger import ConstellationLogger
-from backend.app.embeddings import PDFEmbeddingService
-from typing import List, Dict
-class ResearchAgent(Agent):
-    def __init__(self, pipeline_service: PipelineService, taxonomy_service: TaxonomyService, vector_embedding_service: VectorEmbeddingService, pdf_embedding_service: PDFEmbeddingService):
+from crewai_tools import tool
+from backend.app.features.core.services.block_service import BlockService
+import json
+from typing import List, Dict, Any, ClassVar
 
-        papersearchtool = PDFSearchTool(config=dict(
-            llm=dict(
-                provider="OpenAI",
-                config=dict(
-                    model="gpt-4o-mini",
-                    temperature=0.5,
-                    top_p=1,
-                    stream=True,
-                ),
-            ),
-            embedder=dict(
-                provider="custom",
-                config=dict(
-                    embed_function=pdf_embedding_service.create_embeddings,
-                ),
-            ),
-        ))
+class ResearchAgent(Agent):
+    def __init__(self, **kwargs):
         super().__init__(
             name="Researcher",
             role="Climate Scientist",
-            goal="Conduct thorough research on weather/climate topics",
-            backstory="As a climate scientist, I am tasked with conducting research on weather and climate topics.",
+            goal="Find and analyze the most relevant papers for climate-related queries",
+            backstory="As a climate scientist, I specialize in finding and analyzing research papers to provide insights on climate topics.",
             verbose=True,
             allow_delegation=False,
-            tools=[papersearchtool]
+            tools=[self.find_similar_papers],
+            **kwargs
         )
-        self.pipeline_service = pipeline_service
-        self.taxonomy_service = taxonomy_service
-        self.pdf_embedding_service = pdf_embedding_service
-        self.vector_embedding_service = vector_embedding_service
-        self.logger = ConstellationLogger("ResearchAgent")
 
-    def find_similar_papers(self, query: str, top_k: int = 5) -> List[Dict[str, str]]:
-        # Embed the query
-        query_embedding = self.pdf_embedding_service.embed_query(query)
-        
-        # Search for similar papers
-        similar_blocks = self.vector_embedding_service.search_similar_blocks(query_embedding, top_k=top_k)
-        
-        # Format the results
-        results = []
-        for block in similar_blocks:
-            results.append({
-                "title": block.name,  # Assuming the paper title is stored in the 'name' field
-                "link": block.metadata.get("link", "No link available")  # Assuming the link is stored in metadata
-            })
-        
-        return results
+    @tool
+    async def find_similar_papers(self, query: str, top_k: int = 5) -> str:
+        """Find papers similar to the given query."""
+        try:
+            query_embedding = await self.block_service.generate_embedding(query)
+            similar_blocks = await self.block_service.search_blocks_by_vector_similarity(query_embedding, top_k=top_k)
+            return json.dumps(similar_blocks)
+        except Exception as e:
+            self.logger.error(f"Error in find_similar_papers: {str(e)}")
+            return json.dumps({"error": "Failed to find similar papers"})
+
+    # @tool("Analyze Papers")
+    # async def analyze_papers(self, papers_json: str, query: str) -> str:
+    #     """Analyze the relevance of given papers to the query."""
+    #     try:
+    #         papers = json.loads(papers_json)
+    #         analysis = f"Analysis of top {len(papers)} papers related to '{query}':\n\n"
+    #         for paper in papers:
+    #             paper_name = paper['name']
+    #             paper_description = paper.get('description', 'No description available')
+    #             similarity_score = paper['similarity']
+                
+    #             analysis += f"Paper: {paper_name}\n"
+    #             analysis += f"Relevance Score: {similarity_score:.2f}\n"
+    #             analysis += f"Description: {paper_description}\n"
+    #             analysis += f"Relevance: This paper is relevant because it discusses aspects of {query}.\n\n"
+            
+    #         return json.dumps({"analysis": analysis})
+    #     except Exception as e:
+    #         self.logger.error(f"Error in analyze_papers: {str(e)}")
+    #         return json.dumps({"error": "Failed to analyze papers"})

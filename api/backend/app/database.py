@@ -1,79 +1,101 @@
-# app/database.py
-
-import traceback
-from prisma import Prisma
 from supabase import create_client, Client
-from backend.app.logger import ConstellationLogger
 from backend.app.config import settings
+from backend.app.logger import ConstellationLogger
+from prisma import Prisma
+import traceback
+import os
 
-class Database:
-    """
-    Singleton Database Class to manage the Prisma Client and Supabase Client instances.
-    """
-    _instance = None
+logger = ConstellationLogger()
 
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(Database, cls).__new__(cls)
-            # Convert MultiHostUrl to string for Prisma
-            database_url = str(settings.DATABASE_URL)
-            cls._instance.prisma = Prisma(datasource={"url": database_url})
-            cls._instance.logger = ConstellationLogger()
-            
-            # Initialize Supabase client
-            cls._instance.supabase: Client = create_client(
-                str(settings.SUPABASE_URL),
-                settings.SUPABASE_KEY
-            )
-        return cls._instance
+supabase_client: Client | None = None
+supabase_admin_client: Client | None = None
+prisma_client = Prisma()
+def connect_supabase() -> Client:
 
-    async def connect(self):
-        """
-        Asynchronously connects the Prisma Client to the database.
-        """
-        try:
-            self.logger.log(
-                "Database",
-                "info",
-                f"Attempting to connect to database with URL: {str(settings.DATABASE_URL)}"
-            )
-            await self.prisma.connect()
-            self.logger.log(
-                "Database",
-                "info",
-                "Prisma Client connected successfully."
-            )
-        except Exception as e:
-            self.logger.log(
-                "Database",
-                "critical",
-                f"Failed to connect Prisma Client: {str(e)}",
-                extra={"traceback": traceback.format_exc()}
-            )
-            raise
+    try:
+        url: str = os.environ.get('SUPABASE_URL')
+        key: str = os.environ.get('SUPABASE_KEY')
 
-    async def disconnect(self):
-        """
-        Asynchronously disconnects the Prisma Client from the database.
-        """
-        try:
-            await self.prisma.disconnect()
-            self.logger.log(
-                "Database",
-                "info",
-                "Prisma Client disconnected successfully."
-            )
-        except Exception as e:
-            self.logger.log(
-                "Database",
-                "error",
-                f"Failed to disconnect Prisma Client: {str(e)}",
-                extra={"traceback": traceback.format_exc()}
-            )
+        if not url or not key:
+            raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set in configuration.")
 
-# Initialize the Database Singleton
-database = Database()
+        logger.log("Database", "info", f"Attempting to connect to Supabase with URL: {url}")
+        client = create_client(url, key)
+        logger.log("Database", "info", "Supabase Client connected successfully.")
+        return client
+    except Exception as e:
+        logger.log("Database", "critical", f"Failed to connect Supabase Client: {str(e)}")
+        raise
 
-# Make Supabase client easily accessible
-supabase = database.supabase
-print('connected to supabase')
+def get_supabase_client() -> Client:
+    global supabase_client
+    if supabase_client is None:
+        supabase_client = connect_supabase()
+    return supabase_client
+
+def connect_supabase_admin() -> Client:
+    try:
+        print('@'*100)
+        print(settings)
+        print('@'*100)
+        url: str = os.environ.get('SUPABASE_URL')
+        service_key: str = os.environ.get('SUPABASE_SERVICE_KEY')
+
+        if not url or not service_key:
+            raise ValueError("SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in configuration.")
+
+        logger.log("Database", "info", f"Attempting to connect to Supabase Admin with URL: {url}")
+        client = create_client(url, service_key)
+        logger.log("Database", "info", "Supabase Admin Client connected successfully.")
+        return client
+    except Exception as e:
+        logger.log("Database", "critical", f"Failed to connect Supabase Admin Client: {str(e)}")
+        raise
+
+def get_supabase_admin_client() -> Client:
+    global supabase_admin_client
+    if supabase_admin_client is None:
+        supabase_admin_client = connect_supabase_admin()
+    return supabase_admin_client
+
+async def connect_db():
+    try:
+        database_url = settings.DATABASE_URL
+        if not database_url:
+            raise ValueError("DATABASE_URL must be set in configuration.")
+
+        logger.log(
+            "Database",
+            "info",
+            f"Attempting to connect to database with URL: {database_url}"
+        )
+        await prisma_client.connect()
+        logger.log(
+            "Database",
+            "info",
+            "Prisma Client connected successfully."
+        )
+    except Exception as e:
+        logger.log(
+            "Database",
+            "critical",
+            f"Failed to connect Prisma Client: {str(e)}",
+            extra={"traceback": traceback.format_exc()}
+        )
+        raise
+
+async def disconnect_db():
+    try:
+        await prisma_client.disconnect()
+        logger.log(
+            "Database",
+            "info",
+            "Prisma Client disconnected successfully."
+        )
+    except Exception as e:
+        logger.log(
+            "Database",
+            "error",
+            f"Failed to disconnect Prisma Client: {str(e)}",
+            extra={"traceback": traceback.format_exc()}
+        )

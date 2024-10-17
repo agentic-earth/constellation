@@ -5,9 +5,12 @@ from pydantic import Field, AnyHttpUrl, PostgresDsn
 from typing import Optional
 import os
 from pathlib import Path
+import dotenv
 
 # Get the path to the root of the project
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
+
+dotenv.load_dotenv(ROOT_DIR / ".env", override=True)
 
 class Settings(BaseSettings):
     """
