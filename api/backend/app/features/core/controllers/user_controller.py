@@ -225,25 +225,16 @@ class UserController:
         try:
             async with self.prisma.tx() as tx:
                 # Step 1: Revoke all API keys
-                api_keys = await self.api_key_service.get_api_keys_by_user(
-                    prisma=tx,
-                    user_id=user_id
-                )
-                if api_keys:
-                    for api_key in api_keys:
-                        await self.api_key_service.revoke_api_key(
-                            prisma=tx,
-                            api_key_id=UUID(api_key.api_key_id)
-                        )
+                api_keys = await self.api_key_service.get_api_keys_by_user(prisma=tx, user_id=user_id)
+                for api_key in api_keys:
+                    await self.api_key_service.revoke_api_key(prisma=tx, api_key_id=UUID(api_key.api_key_id))
 
                 # Step 2: Delete user from Supabase Auth
                 deletion_success = await self.user_service.delete_user(
-                    prisma=tx,
-                    supabase_admin=self.supabase_admin,
-                    user_id=user_id
+                    prisma=tx, supabase_admin=self.supabase_admin, user_id=user_id
                 )
                 if not deletion_success:
-                    raise ValueError("Failed to delete user from authentication provider.")
+                    return {"success": False, "error": "supabase_deletion_failed"}
 
                 # Step 3: Audit Logging
                 audit_data = {
@@ -253,29 +244,16 @@ class UserController:
                     "entity_id": str(user_id),
                     "details": {"deleted_user_id": str(user_id)},
                 }
-                audit_log = await self.audit_service.create_audit_log(
-                    tx=tx,
-                    audit_data=audit_data
-                )
-                if not audit_log:
-                    self.logger.log(
-                        "UserController",
-                        "warning",
-                        "User deleted but audit log failed.",
-                        user_id=str(user_id),
-                    )
+                await self.audit_service.create_audit_log(tx=tx, audit_data=audit_data)
 
-                return True
+                return {"success": True, "message": "User deleted successfully"}
 
         except Exception as e:
             self.logger.log(
-                "UserController",
-                "error",
-                "Exception during user deletion",
-                error=str(e),
-                traceback=traceback.format_exc(),
+                "UserController", "error", "Exception during user deletion", 
+                error=str(e), traceback=traceback.format_exc()
             )
-            return False
+            return {"success": False, "error": "deletion_exception", "message": str(e)}
 
     # -------------------
     # Manage API Keys
