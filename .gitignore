@@ -3,5 +3,45 @@ __pycache__/
 *.py[cod]
 dist/
 
-# vscode
+# Ignore log files
+/logs/
+*.log
+
+# Ignore environment files
+.env
+.env.*
+
+# Ignore virtual environment
+venv/
+env/
+
+# Ignore IDE-specific files
 .vscode/
+.idea/
+
+# Ignore database files
+*.db
+*.sqlite3
+
+# Ignore compiled files
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore package directories
+node_modules/
+bower_components/
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore backup files
+*.bak
+*.swp
+*~
+
+# Ignore coverage reports
+htmlcov/
+.coverage
+.coverage.*
