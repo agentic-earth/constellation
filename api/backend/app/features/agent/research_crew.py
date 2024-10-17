@@ -9,58 +9,65 @@ sophisticated research tasks related to AI and climate modeling.
 
 Design Philosophy:
 - Utilize CrewAI for task orchestration and agent interaction.
-- Integrate seamlessly with Core Microservice components for data access and processing.
-- Maintain flexibility to accommodate various research tasks and agent configurations.
-- Ensure modularity to allow easy expansion of research capabilities.
-"""
+# - Integrate seamlessly with Core Microservice components for data access and processing.
+# - Maintain flexibility to accommodate various research tasks and agent configurations.
+# - Ensure modularity to allow easy expansion of research capabilities.
+# """
 
 import sys
 import os
-
-# Add the parent directory of 'backend' to the Python path
-# Before running, be sure to run the following command: `cd api` to get to the api directory
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),  '..', '..', '..', '..', '..')))
-
+from typing import List, Dict, Any
 from crewai import Crew, Task
 from backend.app.logger import ConstellationLogger
-from backend.app.features.core.services.pipeline_service import PipelineService
-from backend.app.features.core.services.taxonomy_service import TaxonomyService
 from backend.app.features.agent.services.research_agent import ResearchAgent
+from backend.app.features.core.services.block_service import BlockService
+import json
 
-def create_research_crew(research_topic: str, pdf_directory: str = 'api/backend/app/features/agent/services/assets'):
-    logger = ConstellationLogger().get_logger("ResearchCrew")
-    pipeline_service = PipelineService()
-    taxonomy_service = TaxonomyService()
+class ResearchCrew:
+    def __init__(self):
+        self.logger = ConstellationLogger().get_logger("ResearchCrew")
+        self.researcher = ResearchAgent()
+        self.block_service = BlockService()
 
-    researcher = ResearchAgent(pipeline_service, taxonomy_service)
-    logger.info(f'Researcher created: {researcher}')
+    def create_research_tasks(self, query: str) -> List[Task]:
+        find_papers_task = Task(
+            description=f"Find papers related to: {query}",
+            agent=self.researcher,
+            expected_output="JSON string of similar papers"
+        )
+        
+        # analyze_papers_task = Task(
+        #     description=f"Analyze the papers found in relation to: {query}",
+        #     agent=self.researcher,
+        #     expected_output="JSON string of paper analysis"
+        # )
+        
+        # return [find_papers_task, analyze_papers_task]
+        return [find_papers_task]
 
-    research_task = Task(
-        description=f'Research recent advancements in {research_topic} using the papers in {pdf_directory}. '
-                    f'Focus on latest publications, key findings, and potential applications.',
-        agent=researcher,
-        expected_output='Provide a list of recent papers on {research_topic} with their titles and links.'
-    )
-    logger.info(f'Research task created: {research_task}')
+    async def research(self, query: str) -> str:
+        tasks = self.create_research_tasks(query)
+        
+        crew = Crew(
+            agents=[self.researcher],
+            tasks=tasks,
+            verbose=True
+        )
 
-    crew = Crew(
-        agents=[researcher],
-        tasks=[research_task]
-    )
-    logger.info(f'Research Crew created with {len(crew.agents)} agents and {len(crew.tasks)} tasks')
-    return crew
-
-
-if __name__ == "__main__":
-    os.environ['OPENAI_API_KEY'] = 'sk-WCt96z3T6pan0cwlSVtv_X7hXqEdVP04VfbVNzGiJpT3BlbkFJ8vYD3dakbsZYU3w9hYOfZS_n35PEdDJDuYCQ92Q4gA'
-
-    SUPABASE_URL='https://xxikoihjvqzqjjzbjboj.supabase.co'
-    SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4aWtvaWhqdnF6cWpqemJqYm9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIzMTk1NDksImV4cCI6MjAzNzg5NTU0OX0.2LyR_GmXdn_eaJXN70kRs0KROb9JvDJHeW9VhgcfER8'
-    SUPABASE_SERVICE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4aWtvaWhqdnF6cWpqemJqYm9qIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcyMjMxOTU0OSwiZXhwIjoyMDM3ODk1NTQ5fQ.ti4Yb_T_SRGxvcYeJe3T3SmlNKEOjAg-jmHsFB_Cr6w'
-    os.environ['SUPABASE_URL'] = SUPABASE_URL
-    os.environ['SUPABASE_KEY'] = SUPABASE_KEY
-    os.environ['SUPABASE_SERVICE_KEY'] = SUPABASE_SERVICE_KEY
-
-    crew = create_research_crew('predicting weather 6 hours in advance')
-    result = crew.kickoff()
-    print(result)
+        result = crew.kickoff()
+        
+        # Process and format the result
+        try:
+            papers = json.loads(result[0])
+            analysis = json.loads(result[1])
+            
+            formatted_result = {
+                "query": query,
+                "papers": papers,
+                "analysis": analysis["analysis"]
+            }
+            
+            return json.dumps(formatted_result)
+        except Exception as e:
+            self.logger.error(f"Error processing research result: {str(e)}")
+            return json.dumps({"error": "Failed to process research result"})

@@ -1,0 +1,14 @@
+Researcher_agent:
+  description: "An agent that finds the most relevant paper to a user's query."
+  goals:
+    - "Understand the user's query."
+    - "Embed the query into a vector space."
+    - "Retrieve the most similar paper based on cosine similarity."
+    - "Provide a summary of the paper."
+  constraints:
+    - "Must use the vector embedding function provided."
+    - "Must not retrieve papers unrelated to the query."
+  tools:
+    - "VectorEmbedTool"
+    - "SimilaritySearchTool"
+    - "PaperSummaryTool"

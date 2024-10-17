@@ -1,0 +1,7 @@
+Log file initialized on 2024-10-11 03:33:50.468111
+2024-10-11 03:33:50,468 - EdgeController - INFO - Edge created successfully. - edge_id=1b47471c-e1d7-4f40-8e19-4bba91ce3d13
+2024-10-11 03:33:51,188 - EdgeController - INFO - Edge retrieved successfully. - edge_id=1b47471c-e1d7-4f40-8e19-4bba91ce3d13
+2024-10-11 03:33:51,826 - EdgeController - INFO - Listed 1 edges.
+2024-10-11 03:33:52,461 - EdgeController - INFO - Edge updated successfully. - edge_id=1b47471c-e1d7-4f40-8e19-4bba91ce3d13
+2024-10-11 03:33:52,912 - EdgeController - INFO - Edge deleted successfully. - edge_id=1b47471c-e1d7-4f40-8e19-4bba91ce3d13
+2024-10-11 03:33:53,187 - EdgeController - INFO - No edges found. - filters=None - limit=100 - offset=0
