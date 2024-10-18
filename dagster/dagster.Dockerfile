@@ -9,8 +9,12 @@ RUN pip install \
     dagster-webserver \
     dagster-postgres \
     dagster-docker \
-    pandas
-
+    pandas \
+    tensorflow \
+    tensorflow_datasets \
+    jax \
+    flax \
+    pillow
 # Set $DAGSTER_HOME and copy dagster instance and workspace YAML there
 ENV DAGSTER_HOME=/opt/dagster/dagster_home/
 

@@ -1,4 +1,6 @@
 from dagster import (
+    mem_io_manager,
+    in_process_executor,
     Any,
     DependencyDefinition,
     DynamicOut,
@@ -13,14 +15,12 @@ from dagster import (
     DagsterInvariantViolationError,
 )
 from dataclasses import dataclass
-from typing import Any as TypingAny, Dict, Tuple
+from typing import Any as TypingAny, Dict, Tuple, Optional
 
 from orchestrator.assets.ops import *
 from orchestrator.assets.jobs import *
 
-OP_DEFS = [mock_csv_data, write_csv, math_block]
-
-
+OP_DEFS = [mock_csv_data, write_csv, math_block, prefetch_data_op, get_data_op, get_dataset_info_op]
 @dataclass
 class CallableOperation:
     operation: str
@@ -125,36 +125,56 @@ def parse_and_execute_job(context: OpExecutionContext, raw_input: dict):
 
 
 @job(
-    config={
+config={
         "ops": {
             "generate_dynamic_job_configs": {
                 "config": {
                     "raw_input": {
-                        "operation": "write_csv",
+                        "operation": "prefetch_data_op",
                         "parameters": {
-                            "result": {
-                                "operation": "math_block",
+                            "dataset": {
+                                "operation": "get_data_op",
                                 "parameters": {
-                                    "data": {
-                                        "operation": "mock_csv_data",
-                                        "parameters": {},
+                                    "dataset_info": {
+                                        "operation": "get_dataset_info_op",
+                                        "parameters": {
+                                            "dataset": "/data/dataset",
+                                            "split": "train",
+                                            "tfds_data_dir": "",
+                                            "tfds_manual_dir": ""
+                                        }
                                     },
-                                    "operand": "add",
-                                    "constant": 5,
+                                    "batch_size": 32,             # Batch size for training
+                                    "batch_size_eval": 32,        # Batch size for evaluation
+                                    "image_size": 224,            # Size to which images are resized
+                                    "shuffle_buffer": 100,        # Size of the shuffle buffer
+                                    "prefetch_size": 1            # Number of batches to prefetch
                                 },
+                                "output": "train_dataset"         # Specify the output to use (train_dataset)
                             },
-                        },
+                            "n_prefetch": 2                       # Number of batches to prefetch to device
+                        }
                     }
                 }
             }
         }
-    }
+}
 )
+
 def build_execute_job():
     dynamic_configs = generate_dynamic_job_configs()
     dynamic_configs.map(parse_and_execute_job)
 
 
+@job(resource_defs={"io_manager": mem_io_manager}, executor_def=in_process_executor) 
+# Static implementation of https://github.com/google-research/vision_transformer/blob/main/vit_jax/input_pipeline.py
+# This is the listed preprocessing pipeline for the Fire Model Wangradk set up
+# I tried to get the dynamic pipline to work but was struggling with getting the outputs to work b/c of the tuple return in get_data_op
+def static_pipeline():
+    dataset_info = get_dataset_info_op()
+    train_dataset,_ = get_data_op(dataset_info)
+    prefetch_data_op(train_dataset)
+    
 @repository(name="main")
 def deploy_docker_repository():
-    return [build_execute_job]
+    return [build_execute_job, static_pipeline]
