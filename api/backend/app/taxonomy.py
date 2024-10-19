@@ -8,7 +8,7 @@ It includes base classes and specific taxonomy schemas for different paper types
 """
 
 from pydantic import BaseModel, Field, field_validator, ConfigDict
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Dict, Any, Tuple, Union
 from enum import Enum
 from uuid import UUID
 from datetime import datetime
@@ -162,6 +162,10 @@ class SatelliteSource(str, Enum):
     NA = "N/A"
 
 
+class ClimateWeatherDataSource(str, Enum):
+    ERA5 = "ERA5"
+    GHCN = "GHCN"
+    # Add other climate/weather data sources as needed
 
 class SpatialResolution(str, Enum):
     EXTREMELY_HIGH = "Extremely High (<0.1m)"
@@ -568,6 +572,11 @@ class SearchResult(BaseModel):
 
 class EOWorkflowRequest(BaseModel):
     prompt: str
+
+# Add this at the end of the file, after all class definitions
+WeatherClimateModelTaxonomy.model_rebuild()
+DatasetTaxonomy.model_rebuild()
+Taxonomy.model_rebuild()
 
 __all__ = [
     "ModelType", "Architecture", "ModelCharacteristics",
