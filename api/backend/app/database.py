@@ -1,51 +1,101 @@
-# app/database.py
-
-from backend.app.utils.helpers import supabase_manager
+from supabase import create_client, Client
 from backend.app.config import settings
+from backend.app.logger import ConstellationLogger
+from prisma import Prisma
+import traceback
+import os
 
-def get_supabase_client():
-    """
-    Get the Supabase client instance.
-    
-    Returns:
-        Client: The Supabase client for interacting with the backend.
-    """
-    return supabase_manager.get_client()
+logger = ConstellationLogger()
 
-def get_supabase_admin_client():
-    """
-    Get the Supabase admin client instance.
-    
-    Returns:
-        Client: The Supabase client with admin access.
-    """
-    # Note: You might need to implement this in SupabaseClientManager
-    # if you need different credentials for admin access
-    return supabase_manager.get_client()
+supabase_client: Client | None = None
+supabase_admin_client: Client | None = None
+prisma_client = Prisma()
+def connect_supabase() -> Client:
 
-if __name__ == "__main__":
-    print("Testing Supabase connection...")
     try:
-        client = get_supabase_client()
-        print(f"Supabase client retrieved successfully: {client}")
-        
-        if client:
-            # List all tables
-            response = client.table('blocks').select('*').limit(1).execute()
-            print("\nSuccessfully connected to Supabase.")
-            print(f"Data from 'blocks' table: {response.data}")
+        url: str = os.environ.get('SUPABASE_URL')
+        key: str = os.environ.get('SUPABASE_KEY')
 
-            # List all tables in the public schema
-            schema = client.table('').select('*').execute()
-            print("\nAvailable tables:")
-            for table in schema.data['definitions'].keys():
-                print(f"- {table}")
-        
-            # Test admin client
-            admin_client = get_supabase_admin_client()
-            print(f"\nSupabase admin client retrieved successfully: {admin_client}")
-        else:
-            print("Failed to retrieve Supabase client.")
-        
+        if not url or not key:
+            raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set in configuration.")
+
+        logger.log("Database", "info", f"Attempting to connect to Supabase with URL: {url}")
+        client = create_client(url, key)
+        logger.log("Database", "info", "Supabase Client connected successfully.")
+        return client
     except Exception as e:
-        print(f"Error connecting to Supabase: {e}")
+        logger.log("Database", "critical", f"Failed to connect Supabase Client: {str(e)}")
+        raise
+
+def get_supabase_client() -> Client:
+    global supabase_client
+    if supabase_client is None:
+        supabase_client = connect_supabase()
+    return supabase_client
+
+def connect_supabase_admin() -> Client:
+    try:
+        print('@'*100)
+        print(settings)
+        print('@'*100)
+        url: str = os.environ.get('SUPABASE_URL')
+        service_key: str = os.environ.get('SUPABASE_SERVICE_KEY')
+
+        if not url or not service_key:
+            raise ValueError("SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in configuration.")
+
+        logger.log("Database", "info", f"Attempting to connect to Supabase Admin with URL: {url}")
+        client = create_client(url, service_key)
+        logger.log("Database", "info", "Supabase Admin Client connected successfully.")
+        return client
+    except Exception as e:
+        logger.log("Database", "critical", f"Failed to connect Supabase Admin Client: {str(e)}")
+        raise
+
+def get_supabase_admin_client() -> Client:
+    global supabase_admin_client
+    if supabase_admin_client is None:
+        supabase_admin_client = connect_supabase_admin()
+    return supabase_admin_client
+
+async def connect_db():
+    try:
+        database_url = settings.DATABASE_URL
+        if not database_url:
+            raise ValueError("DATABASE_URL must be set in configuration.")
+
+        logger.log(
+            "Database",
+            "info",
+            f"Attempting to connect to database with URL: {database_url}"
+        )
+        await prisma_client.connect()
+        logger.log(
+            "Database",
+            "info",
+            "Prisma Client connected successfully."
+        )
+    except Exception as e:
+        logger.log(
+            "Database",
+            "critical",
+            f"Failed to connect Prisma Client: {str(e)}",
+            extra={"traceback": traceback.format_exc()}
+        )
+        raise
+
+async def disconnect_db():
+    try:
+        await prisma_client.disconnect()
+        logger.log(
+            "Database",
+            "info",
+            "Prisma Client disconnected successfully."
+        )
+    except Exception as e:
+        logger.log(
+            "Database",
+            "error",
+            f"Failed to disconnect Prisma Client: {str(e)}",
+            extra={"traceback": traceback.format_exc()}
+        )

@@ -1,0 +1,6 @@
+Log file initialized on 2024-10-14 18:55:33.424558
+2024-10-14 18:55:33,424 - UserService - INFO - Profile retrieved successfully by email - email=mason_lee@brown.edu
+2024-10-14 18:55:33,424 - UserService - WARNING - Attempted to register existing email - email=mason_lee@brown.edu
+2024-10-14 18:55:34,077 - UserService - INFO - User signed in successfully - user_id=802e55c2-b804-40a6-bf26-7079cb6d5b80
+2024-10-14 18:55:34,280 - UserService - INFO - Profile retrieved successfully - user_id=802e55c2-b804-40a6-bf26-7079cb6d5b80
+2024-10-14 18:55:34,618 - UserService - INFO - Profile updated successfully - user_id=802e55c2-b804-40a6-bf26-7079cb6d5b80
