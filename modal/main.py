@@ -1,6 +1,5 @@
 import modal
 from pathlib import Path
-import subprocess
 
 app = modal.App(name="modal-creator-app")
 image = modal.Image.debian_slim(python_version="3.11").pip_install(
@@ -9,8 +8,7 @@ image = modal.Image.debian_slim(python_version="3.11").pip_install(
 
 # Create mounts for the Streamlit script and models
 mounts = [
-    modal.Mount.from_local_file(Path(__file__).parent / "utils.py",  Path("/root/utils.py")),
-    modal.Mount.from_local_file(Path(__file__).parent / "config.json",  Path("/root/config.json")),
+    modal.Mount.from_local_file(Path(__file__).parent / "utils.py",  Path("/root/utils.py"))
 ]
 
 @app.function(image=image, mounts=mounts)

@@ -8,21 +8,17 @@ from pathlib import Path
 
 app = modal.App(name="{service_name}")
 image = modal.Image.debian_slim(python_version="3.11").pip_install(
-    "flask", "Pillow", "torch", "torchvision", "transformers", "boto3"
+    "flask", "Pillow", "torch", "torchvision", "transformers"
 )
 
-mounts = [
-    modal.Mount.from_local_file(Path(__file__).parent / "../config.json",  Path("/root/config.json"))
-]
-
-@app.function(image=image, mounts=mounts)
+@app.function(image=image)
 @modal.wsgi_app()
 def flask_app():
     from flask import Flask, request
 
     web_app = Flask(__name__)
 
-    from transformers import AutoModelForImageClassification, AutoImageProcessor
+    from transformers import pipeline
 
     from io import BytesIO
     from PIL import Image as PILImage
@@ -33,49 +29,28 @@ def flask_app():
     logger = logging.getLogger(__name__)
 
     logger.info("Downloading and loading Model...")
-    processor = AutoImageProcessor.from_pretrained("{hf_model_name}")  # Updated model name
-    model = AutoModelForImageClassification.from_pretrained("{hf_model_name}")  # Updated model name
+
+    # Initialize the pipeline
+    pipe = pipeline("image-classification", model="{hf_model_name}")
     logger.info("Model loaded.")
 
     @web_app.post("/infer")
     def infer():
-        import torch
-        import boto3
-        import json
-        import os
-
-        with open('config.json') as config_file:
-            config = json.load(config_file)
-
-        access_key = config["AWS_ACCESS_KEY_ID"]
-        secret_key = config["AWS_SECRET_ACCESS_KEY"]
-        bucket_name = config["BUCKET_NAME"]
-        region = config["REGION"]
-
-        # Read the uploaded image file
-        s3_key = request.form.get('s3_key')
-
-        s3_client = boto3.client('s3', aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        region_name=region)
+        images = request.files.getlist('images')
+        if not images:
+            return {{"error": "No images provided."}}
         
-        s3_client.download_file(bucket_name, s3_key, "pre.pt")
+        try:
+            images_list = []
+            for img in images:
+                image = PILImage.open(BytesIO(img.read()))
+                images_list.append(image)
 
-        inputs = torch.load("pre.pt")
-
-        os.remove("pre.pt")
+            output = pipe(images_list)
+            return {{"ouptut": output}}
         
-        # Run the image through the model
-        with torch.no_grad():
-            outputs = model(**inputs)
-
-        # Get the predicted class
-        logits = outputs.logits
-
-        predicted_class_idx = logits.argmax(-1).item()
-        output = model.config.id2label[predicted_class_idx]
-
-        return {{"output": output}}  
+        except Exception as e:
+            return {{"error": "Model inference failed"}}
 
     return web_app
 """
