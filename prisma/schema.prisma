@@ -26,25 +26,42 @@ model AuditLog {
 }
 
 model Block {
-  block_id                                          String                          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  name                                              String                          @unique @db.VarChar(255)
-  block_type                                        BlockTypeEnum
-  description                                       String?
-  created_at                                        DateTime                        @default(now()) @db.Timestamptz(6)
-  updated_at                                        DateTime                        @default(now()) @db.Timestamptz(6)
-  vector                                            Unsupported("vector")?
-  current_version_id                                String?                         @db.Uuid
-  EdgeVersion_Block_current_version_idToEdgeVersion EdgeVersion?                    @relation("Block_current_version_idToEdgeVersion", fields: [current_version_id], references: [version_id], onUpdate: NoAction, map: "fk_block_current_version")
-  BlockCategory                                     BlockCategory[]
-  Edge_Edge_source_block_idToBlock                  Edge[]                          @relation("Edge_source_block_idToBlock")
-  Edge_Edge_target_block_idToBlock                  Edge[]                          @relation("Edge_target_block_idToBlock")
-  EdgeVerification                                  EdgeVerification[]
-  EdgeVerificationBlockRelation                     EdgeVerificationBlockRelation[]
-  EdgeVersion_EdgeVersion_block_idToBlock           EdgeVersion[]                   @relation("EdgeVersion_block_idToBlock")
-  PipelineBlock                                     PipelineBlock[]
+  block_id                                            String                          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                                                String                          @unique @db.VarChar(255)
+  block_type                                          BlockTypeEnum
+  description                                         String?
+  created_at                                          DateTime                        @default(now()) @db.Timestamptz(6)
+  updated_at                                          DateTime                        @default(now()) @db.Timestamptz(6)
+  vector                                              Unsupported("vector")?
+  current_version_id                                  String?                         @db.Uuid
+  EdgeVersion_Block_current_version_idToEdgeVersion   EdgeVersion?                    @relation("Block_current_version_idToEdgeVersion", fields: [current_version_id], references: [version_id], onUpdate: NoAction, map: "fk_block_current_version")
+  BlockCategory                                       BlockCategory[]
+  Edge_Edge_source_block_idToBlock                    Edge[]                          @relation("Edge_source_block_idToBlock")
+  Edge_Edge_target_block_idToBlock                    Edge[]                          @relation("Edge_target_block_idToBlock")
+  EdgeVerification                                    EdgeVerification[]
+  EdgeVerificationBlockRelation                       EdgeVerificationBlockRelation[]
+  EdgeVersion_EdgeVersion_block_idToBlock             EdgeVersion[]                   @relation("EdgeVersion_block_idToBlock")
+  PipelineBlock                                       PipelineBlock[]
+  paper                                               Paper?
 
   @@index([vector], map: "idx_blocks_vector")
 }
+
+model Paper {
+  paper_id    String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  pdf_url     String   @db.VarChar(512) @default("")
+  title       String   @db.VarChar(255) @default("")
+  abstract    String   @db.Text @default("")
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  block       Block    @relation(fields: [block_id], references: [block_id])
+  block_id    String   @unique @db.Uuid
+
+  @@index([title], map: "idx_paper_title")
+}
+
+
 
 model BlockCategory {
   block_category_id String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
