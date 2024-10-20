@@ -2,6 +2,7 @@ import os
 import subprocess
 import shutil
 from fastapi import HTTPException
+import uuid
 
 def generate_main_py(hf_model_name, service_name):
     content = f"""import modal
@@ -58,8 +59,26 @@ def flask_app():
     with open(f"{service_name}/main.py", "w") as f:
         f.write(content)
 
+def check_service_deployed(service_name):
 
-def deploy_model_service(hf_model_name, service_name):
+    try:
+        subprocess.check_output(['modal', 'app', 'history', service_name], stderr=subprocess.STDOUT)
+
+        return True
+    except subprocess.CalledProcessError as e:
+        return False
+
+
+def get_service_code(hf_model_name):
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, hf_model_name))
+
+def deploy_model_service(hf_model_name):
+
+    service_name = get_service_code(hf_model_name)
+
+    if check_service_deployed(service_name):
+        return {"message": f"{hf_model_name} has already been deployed.", 
+            "endpoint":  f"https://wdorji--{service_name}-flask-app.modal.run/infer"}
     
     # Create the directory if it doesn't exist
     os.makedirs(service_name, exist_ok=True)
@@ -73,14 +92,20 @@ def deploy_model_service(hf_model_name, service_name):
    
     #delete directory and its contents
     shutil.rmtree(service_name)
-    return {"message": f"https://wdorji--{service_name}-flask-app.modal.run/infer"}
+    return {"message": f"{hf_model_name} has been deployed succesfully!", 
+            "endpoint":  f"https://wdorji--{service_name}-flask-app.modal.run/infer"}
 
 
-def delete_model_service(service_name):
+def delete_model_service(hf_model_name):
+
+    service_name = get_service_code(hf_model_name)
+
+    if not check_service_deployed(service_name):
+        return {"message": f"{hf_model_name} has not been deployed yet."}
     
     try:
         subprocess.check_output(['modal', 'app', 'stop', service_name], stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, detail=f"Issue with deleting {service_name} service on modal: {e.output.decode()}")
+        raise HTTPException(status_code=500, detail=f"Issue with deleting {hf_model_name} deployment: {e.output.decode()}")
 
-    return  {"message": f"{service_name} service has been deleted succesfully!"}
+    return  {"message": f"{service_name} has been deleted succesfully!"}

@@ -5,12 +5,12 @@ app = FastAPI()
 
 
 @app.post("/deploy")
-async def deploy(model_name: str, service_name: str):
-    output = deploy_model_service(model_name, service_name)
+async def deploy(model_name: str):
+    output = deploy_model_service(model_name)
     return output
 
 
 @app.post("/delete")
-async def delete(service_name: str):
-    output = delete_model_service(service_name)
+async def delete(model_name: str):
+    output = delete_model_service(model_name)
     return output

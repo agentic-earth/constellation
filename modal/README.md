@@ -14,10 +14,10 @@ docker run -p 8000:8000 modal-api:latest
    Use the output endpoint to deploy the model:
 
    ```
-   http://127.0.0.1:8000/deploy/?model_name=EdBianchi/vit-fire-detection&service_name=fire-model
+   http://127.0.0.1:8000/deploy/?model_name=EdBianchi/vit-fire-detection
    ```
 
-   In the query params of the POST request, specify the "model_name" which is the hugging face name and "service_name". Eg. model_name as EdBianchi/vit-fire-detection and service_name could be anything like fire-model as long as its different from other model service names.
+   In the query params of the POST request, specify the "model_name" which is the hugging face name. Eg. model_name as EdBianchi/vit-fire-detection
 
 2. **Invoke the Model**  
     If successfully deployed, it will return the endpoint to invoke the model:
@@ -34,7 +34,7 @@ docker run -p 8000:8000 modal-api:latest
    To delete the model endpoint, use:
 
    ```
-   http://127.0.0.1:8000/deploy/?service_name=88rising
+   http://127.0.0.1:8000/deploy/?model_name=EdBianchi/vit-fire-detection
    ```
 
-   In the query params of the POST request, specify the "service_name" which was used previously to deploy the model
+   In the query params of the POST request, specify the "model_name" previously deployed
