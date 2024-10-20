@@ -107,23 +107,28 @@ def generate_dynamic_job_configs(context: OpExecutionContext):
 
 
 @op
-def parse_and_execute_job(context: OpExecutionContext, raw_input: dict):
+def parse_and_execute_job(context: OpExecutionContext, instructions: list):
     # Dynamically generate a job based on the input
-    job, run_config = define_composite_job(name="dynamic_job", raw_input=raw_input)
-    context.log.info(f"Created dynamic job: {job.name}")
+    job_list = []
+    for instruction in instructions:
+        job, run_config = define_composite_job(
+            name="dynamic_job", raw_input=instruction
+        )
+        context.log.info(f"Created dynamic job: {job.name}")
+        job_list.append((job, run_config))
 
-    context.log.info(f"Executing dynamic job with run_config: {run_config}")
+    for job, run_config in job_list:
+        context.log.info(f"Executing dynamic job with run_config: {run_config}")
+        result = job.execute_in_process(run_config=run_config)
 
-    result = job.execute_in_process(run_config=run_config)
+        for event in result.all_events:
+            context.log.info(f"Event: {event.message}")
 
-    for event in result.all_events:
-        context.log.info(f"Event: {event.message}")
-
-    try:
-        dynamic_result = result.output_value()
-        context.log.info(f"Dynamic job result: {dynamic_result}")
-    except DagsterInvariantViolationError:
-        context.log.info("Dynamic job executed without outputs.")
+        try:
+            dynamic_result = result.output_value()
+            context.log.info(f"Dynamic job result: {dynamic_result}")
+        except DagsterInvariantViolationError:
+            context.log.info("Dynamic job executed without outputs.")
 
 
 @job(
@@ -165,16 +170,6 @@ def parse_and_execute_job(context: OpExecutionContext, raw_input: dict):
 def build_execute_job():
     dynamic_configs = generate_dynamic_job_configs()
     dynamic_configs.map(parse_and_execute_job)
-
-
-# @job(resource_defs={"io_manager": mem_io_manager}, executor_def=in_process_executor)
-# # Static implementation of https://github.com/google-research/vision_transformer/blob/main/vit_jax/input_pipeline.py
-# # This is the listed preprocessing pipeline for the Fire Model Wangradk set up
-# # I tried to get the dynamic pipline to work but was struggling with getting the outputs to work b/c of the tuple return in get_data_op
-# def static_pipeline():
-#     dataset_info = get_dataset_info_op()
-#     train_dataset, _ = get_data_op(dataset_info)
-#     prefetch_data_op(train_dataset)
 
 
 @repository(name="main")
