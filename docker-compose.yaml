@@ -78,6 +78,8 @@ services:
     build:
       context: ./dagster
       dockerfile: ./dagster.Dockerfile
+      args:
+        - PYTHON_VERSION=3.9-slim
     entrypoint:
       - dagster-daemon
       - run
@@ -102,6 +104,8 @@ services:
     build:
       context: ./dagster
       dockerfile: ./api.Dockerfile
+      args:
+        - PYTHON_VERSION=3.9-slim
     container_name: dagster_api
     expose:
       - "8001"
@@ -121,6 +125,8 @@ services:
     build:
       context: ./api
       dockerfile: ./Dockerfile
+      args:
+        - PYTHON_VERSION=3.10-slim
     container_name: main_api
     expose:
       - "8000"
