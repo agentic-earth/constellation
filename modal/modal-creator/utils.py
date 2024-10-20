@@ -1,6 +1,7 @@
 import os
 import subprocess
 import shutil
+from fastapi import HTTPException
 
 def generate_main_py(hf_model_name, service_name):
     content = f"""import modal
@@ -59,6 +60,7 @@ def flask_app():
 
 
 def deploy_model_service(hf_model_name, service_name):
+    
     # Create the directory if it doesn't exist
     os.makedirs(service_name, exist_ok=True)
     generate_main_py(hf_model_name, service_name)
@@ -66,9 +68,10 @@ def deploy_model_service(hf_model_name, service_name):
     try:
         subprocess.check_output(['modal', 'deploy', f'{service_name}/main.py'], stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
-        return {"error": f"Issue with deploying model on modal: {e.output.decode()}"}
+        raise HTTPException(status_code=500, detail=f"Issue with deploying model on modal: {e.output.decode()}")
+
    
-   #delete directory and its contents
+    #delete directory and its contents
     shutil.rmtree(service_name)
     return {"message": f"https://wdorji--{service_name}-flask-app.modal.run/infer"}
 
@@ -78,5 +81,6 @@ def delete_model_service(service_name):
     try:
         subprocess.check_output(['modal', 'app', 'stop', service_name], stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
-        return {"error": f"Issue with deleting {service_name} service on modal: {e.output.decode()}"}
+        raise HTTPException(status_code=500, detail=f"Issue with deleting {service_name} service on modal: {e.output.decode()}")
+
     return  {"message": f"{service_name} service has been deleted succesfully!"}
