@@ -16,22 +16,24 @@ async def run_dagster_job_with_config():
         "ops": {
             "generate_dynamic_job_configs": {
                 "config": {
-                    "raw_input": {
-                        "operation": "write_csv",
-                        "parameters": {
-                            "result": {
-                                "operation": "math_block",
-                                "parameters": {
-                                    "constant": 5,
-                                    "data": {
-                                        "operation": "mock_csv_data",
-                                        "parameters": {},
+                    "instructions": [
+                        {
+                            "operation": "write_csv",
+                            "parameters": {
+                                "result": {
+                                    "operation": "math_block",
+                                    "parameters": {
+                                        "constant": 5,
+                                        "data": {
+                                            "operation": "mock_csv_data",
+                                            "parameters": {},
+                                        },
+                                        "operand": "add",
                                     },
-                                    "operand": "add",
-                                },
-                            }
-                        },
-                    }
+                                }
+                            },
+                        }
+                    ]
                 }
             }
         }

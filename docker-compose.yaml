@@ -140,6 +140,25 @@ services:
       - dagster_postgresql
       - dagster_assets
 
+  model_api:
+    build:
+      context: ./modal
+      dockerfile: ./Dockerfile
+      args:
+        - PYTHON_VERSION=3.10-slim
+    container_name: model_api
+    expose:
+      - "8002"
+    ports:
+      - "8002:8002"
+    environment:
+      API_HOME: /opt/api/app
+    networks:
+      - dagster_network
+    depends_on:
+      - dagster_postgresql
+      - dagster_assets
+
 networks:
   dagster_network:
     driver: bridge

@@ -1,0 +1,2 @@
+MODEL_ENDPOINT = "http://model_api:8000"
+MAX_IN_MEMORY = 200_000

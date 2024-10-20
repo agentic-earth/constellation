@@ -30,4 +30,4 @@ EXPOSE 8000
 
 # Run the application
 # FIXME: Remove the --reload flag for production
-CMD ["poetry", "run", "uvicorn", "modal-creator.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["poetry", "run", "uvicorn", "modal_creator.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
