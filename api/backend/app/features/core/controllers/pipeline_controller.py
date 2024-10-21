@@ -245,34 +245,36 @@ class PipelineController:
             bool: True if deletion was successful, False otherwise.
         """
         try:
-            # Delete the pipeline using the PipelineService
-            deletion_success = self.pipeline_service.delete_pipeline(pipeline_id)
-            if not deletion_success:
-                raise ValueError("Failed to delete pipeline.")
+            # Start a transaction
+            async with self.prisma.tx() as tx:
+                # Delete the pipeline using the PipelineService
+                deletion_success = await self.pipeline_service.delete_pipeline(tx, pipeline_id)
+                if not deletion_success:
+                    raise ValueError("Failed to delete pipeline.")
 
-            # Log the deletion in Audit Logs
-            audit_log = {
-                "user_id": str(user_id),
-                "action_type": "DELETE",
-                "entity_type": "pipeline",
-                "entity_id": str(pipeline_id),
-                "details": {
-                    "pipeline_id": str(pipeline_id),
-                },
-            }
-            audit_log = await self.audit_service.create_audit_log(tx, audit_log)
-            if not audit_log:
-                raise Exception("Failed to create audit log for pipeline deletion")
+                # Log the deletion in Audit Logs
+                audit_log = {
+                    "user_id": str(user_id),
+                    "action_type": "DELETE",
+                    "entity_type": "pipeline",
+                    "entity_id": str(pipeline_id),
+                    "details": {
+                        "pipeline_id": str(pipeline_id),
+                    },
+                }
+                audit_log = await self.audit_service.create_audit_log(tx, audit_log)
+                if not audit_log:
+                    raise Exception("Failed to create audit log for pipeline deletion")
 
-            # Log the deletion event
-            self.logger.log(
-                "PipelineController",
-                "info",
-                "Pipeline deleted successfully.",
-                extra={"pipeline_id": str(pipeline_id)},
-            )
-            return True
-    
+                # Log the deletion event
+                self.logger.log(
+                    "PipelineController",
+                    "info",
+                    "Pipeline deleted successfully.",
+                    extra={"pipeline_id": str(pipeline_id)},
+                )
+                return True
+        
         except Exception as e:
             # Log unexpected exceptions with critical level
             self.logger.log(
@@ -285,6 +287,7 @@ class PipelineController:
                 },
             )
             return False
+
 
     async def list_pipelines(self, user_id: UUID, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """

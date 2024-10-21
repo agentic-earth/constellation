@@ -278,9 +278,9 @@ class EdgeController:
             created_block2 = await block_controller.create_block(block_data2, user_id)
             created_block3 = await block_controller.create_block(block_data3, user_id)
             if created_block1 and created_block2 and created_block3:
-                print(f"Created Blocks: {created_block1["block_id"]}")
-                print(f"Created Blocks: {created_block2["block_id"]}")
-                print(f"Created Blocks: {created_block3["block_id"]}")
+                print(f"Created Blocks: {created_block1['block_id']}")
+                print(f"Created Blocks: {created_block2['block_id']}")
+                print(f"Created Blocks: {created_block3['block_id']}")
             else:
                 print("Failed to create Blocks.")
 
@@ -292,16 +292,16 @@ class EdgeController:
             }
             created_edge = await self.create_edge(edge_create, user_id)
             if created_edge:
-                print(f"Created Edge: {created_edge["edge_id"]} - {created_edge["source_block_id"]} -> {created_edge["target_block_id"]}")
+                print(f"Created Edge: {created_edge['edge_id']} - {created_edge['source_block_id']} -> {created_edge['target_block_id']}")
             else:
                 print("Failed to create Edge.")
 
             # Step 2: Retrieve the edge by ID
             if created_edge:
-                print(f"\nRetrieving Edge with ID: {created_edge["edge_id"]}")
+                print(f"\nRetrieving Edge with ID: {created_edge['edge_id']}")
                 retrieved_edge = await self.get_edge(created_edge["edge_id"], user_id)
                 if retrieved_edge:
-                    print(f"Retrieved Edge: {retrieved_edge["edge_id"]} - {retrieved_edge["source_block_id"]} -> {retrieved_edge["target_block_id"]}")
+                    print(f"Retrieved Edge: {retrieved_edge['edge_id']} - {retrieved_edge['source_block_id']} -> {retrieved_edge['target_block_id']}")
                 else:
                     print("Failed to retrieve Edge.")
             else:
@@ -312,18 +312,18 @@ class EdgeController:
             edges = await self.list_edges(user_id)
             print(f"Total Edges: {len(edges)}")
             for edge in edges:
-                print(f"- ID: {edge["edge_id"]} - {edge["source_block_id"]} -> {edge["target_block_id"]}")
+                print(f"- ID: {edge['edge_id']} - {edge['source_block_id']} -> {edge['target_block_id']}")
 
             # Step 4: Update the edge's description
             if created_edge:
-                print(f"\nUpdating Edge with ID: {created_edge["edge_id"]}")
+                print(f"\nUpdating Edge with ID: {created_edge['edge_id']}")
                 edge_update = {
                     "source_block_id": created_block3["block_id"],
                     "target_block_id": created_block1["block_id"],
                 }
                 updated_edge = await self.update_edge(created_edge["edge_id"], edge_update, user_id)
                 if updated_edge:
-                    print(f"Updated Edge: {updated_edge["edge_id"]} - {updated_edge["source_block_id"]} -> {updated_edge["target_block_id"]}")
+                    print(f"Updated Edge: {updated_edge['edge_id']} - {updated_edge['source_block_id']} -> {updated_edge['target_block_id']}")
                 else:
                     print("Failed to update Edge.")
             else:
@@ -331,8 +331,8 @@ class EdgeController:
 
             # Step 5: Delete the edge
             if created_edge:
-                print(f"\nDeleting Edge with ID: {created_edge["edge_id"]}")
-                deletion_success = await self.delete_edge(created_edge["edge_id"], user_id)
+                print(f"\nDeleting Edge with ID: {created_edge['edge_id']}")
+                deletion_success = await self.delete_edge(created_edge['edge_id'], user_id)
                 print(f"Edge deleted: {deletion_success}")
             else:
                 print("Skipping deletion since Edge creation failed.")
@@ -342,11 +342,11 @@ class EdgeController:
             edges_after_deletion = await self.list_edges(user_id)
             print(f"Total Edges: {len(edges_after_deletion)}")
             for edge in edges_after_deletion:
-                print(f"- ID: {edge["edge_id"]} - {edge["source_block_id"]} -> {edge["target_block_id"]}")
+                print(f"- ID: {edge['edge_id']} - {edge['source_block_id']} -> {edge['target_block_id']}")
 
             # Step 7: Delete the blocks
             print("\nDeleting the blocks...")
-            deletion_success1 = await block_controller.delete_block(created_block1["block_id"], user_id)
+            deletion_success1 = await block_controller.delete_block(created_block1['block_id'], user_id)
             deletion_success2 = await block_controller.delete_block(created_block2["block_id"], user_id)
             deletion_success3 = await block_controller.delete_block(created_block3["block_id"], user_id)
             print(f"Blocks deleted: {deletion_success1}, {deletion_success2}, {deletion_success3}")

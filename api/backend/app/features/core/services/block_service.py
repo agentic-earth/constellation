@@ -29,6 +29,7 @@ from uuid import UUID, uuid4
 from datetime import datetime
 import asyncio
 from backend.app.config import settings
+from sentence_transformers import SentenceTransformer
 
 from prisma.errors import UniqueViolationError
 from prisma.models import Block as PrismaBlock
