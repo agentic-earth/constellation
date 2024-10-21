@@ -417,7 +417,7 @@ async def main():
         print(f"  Abstract: {created_paper.abstract}")
         print(f"  Created At: {created_paper.created_at}")
         print(f"  Updated At: {created_paper.updated_at}")
-        print(f"  Associated Block ID: {created_paper.block.block_id}\n")
+        print(f"  Associated Block ID: {created_paper.block_id}\n")
     else:
         print("Failed to create paper.\n")
         await prisma.disconnect()
