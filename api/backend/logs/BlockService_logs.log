@@ -1,8 +1,0 @@
-Log file initialized on 2024-10-16 16:21:44.963663
-2024-10-16 16:21:44,963 - BlockService - INFO - Block created successfully. - block_id=a4067ef3-e789-432c-b226-70d10f84e2d6 - block_name=TestBlock3
-2024-10-16 16:21:45,028 - BlockService - INFO - Block created successfully. - block_id=5d2acf3e-91cb-4ca3-a4f8-1f0f0ce2e34c - block_name=TestBlock5
-2024-10-16 16:21:45,157 - BlockService - INFO - Vector associated with block successfully. - block_id=5d2acf3e-91cb-4ca3-a4f8-1f0f0ce2e34c
-2024-10-16 16:21:45,282 - BlockService - INFO - Block retrieved successfully. - block_id=5d2acf3e-91cb-4ca3-a4f8-1f0f0ce2e34c - block_name=TestBlock5
-2024-10-16 16:21:45,416 - BlockService - INFO - Block retrieved successfully by name. - block_id=5d2acf3e-91cb-4ca3-a4f8-1f0f0ce2e34c - block_name=TestBlock5
-2024-10-16 16:21:45,541 - BlockService - INFO - Block updated successfully. - block_id=5d2acf3e-91cb-4ca3-a4f8-1f0f0ce2e34c - updated_fields=['description', 'updated_at']
-2024-10-16 16:21:46,179 - BlockService - INFO - Block deleted successfully. - block_id=5d2acf3e-91cb-4ca3-a4f8-1f0f0ce2e34c

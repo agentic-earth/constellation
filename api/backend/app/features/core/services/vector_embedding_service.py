@@ -23,8 +23,11 @@ import asyncio
 from typing import List, Dict, Optional
 from haystack.components.embedders import OpenAITextEmbedder, OpenAIDocumentEmbedder
 from haystack import Document
+from haystack.utils import Secret
 import os
 from backend.app.logger import ConstellationLogger  # Assuming the logger is similar to BlockService
+import PyPDF2
+
 
 class VectorEmbeddingService:
     def __init__(self, api_key: Optional[str] = None):
@@ -39,8 +42,8 @@ class VectorEmbeddingService:
         if not self.api_key:
             raise ValueError("API key must be provided or set in the OPENAI_API_KEY environment variable.")
 
-        self.text_embedder = OpenAITextEmbedder(api_key=self.api_key)
-        self.document_embedder = OpenAIDocumentEmbedder(api_key=self.api_key)
+        self.text_embedder = OpenAITextEmbedder(api_key=Secret.from_token(self.api_key))
+        self.document_embedder = OpenAIDocumentEmbedder(api_key=Secret.from_token(self.api_key))
 
     async def generate_text_embedding(self, text: str) -> List[float]:
         """
@@ -72,7 +75,8 @@ class VectorEmbeddingService:
             List[float]: The generated vector embedding.
         """
         try:
-            document = Document(content=None, meta={"name": pdf_file_path}, file_path=pdf_file_path)
+            content = self._pdf_to_text(pdf_file_path)
+            document = Document(content=content, meta={"name": pdf_file_path})
             result = self.document_embedder.run([document])
             embedding = result["documents"][0].embedding
             self.logger.log("VectorEmbeddingService", "info", "Document embedding generated successfully.", document_name=pdf_file_path)
@@ -80,6 +84,23 @@ class VectorEmbeddingService:
         except Exception as e:
             self.logger.log("VectorEmbeddingService", "error", "Failed to generate document embedding", error=str(e))
             raise
+
+    def _pdf_to_text(self, pdf_path: str) -> str:
+        """
+        Internal method to extract text from a PDF file.
+
+        Args:
+            pdf_path (str): Path to the PDF file.
+
+        Returns:
+            str: Extracted text from the PDF.
+        """
+        with open(pdf_path, 'rb') as file:
+            reader = PyPDF2.PdfReader(file)
+            text = ""
+            for page in reader.pages:
+                text += page.extract_text()
+        return text
 
 async def main():
     """
