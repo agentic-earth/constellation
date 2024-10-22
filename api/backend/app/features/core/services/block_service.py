@@ -31,14 +31,31 @@ import asyncio
 
 from prisma.errors import UniqueViolationError
 from prisma.models import Block as PrismaBlock
+from prisma.models import BlockVector as PrismaBlockVector
 from prisma import Prisma
 from backend.app.logger import ConstellationLogger
 from backend.app.config import settings
 import traceback
+from haystack_integrations.document_stores.pgvector import PgvectorDocumentStore
+from haystack_integrations.components.retrievers.pgvector import PgvectorEmbeddingRetriever
+from haystack.document_stores.types import DuplicatePolicy
+from haystack import Document
+from haystack.utils import Secret
+
+# for test
+from backend.app.features.core.services.vector_embedding_service import VectorEmbeddingService
 
 class BlockService:
     def __init__(self):
         self.logger = ConstellationLogger()
+        self.document_store = PgvectorDocumentStore(
+            connection_string=Secret.from_env_var("DATABASE_URL"),
+            table_name="BlockVector",
+            embedding_dimension=1536,
+            vector_function="cosine_similarity",
+            search_strategy="hnsw",
+            )
+        self.retriever = PgvectorEmbeddingRetriever(document_store=self.document_store)
 
     async def create_block(self, tx: Prisma, block_data: Dict[str, Any], vector: Optional[List[float]] = None) -> Optional[PrismaBlock]:
         """
@@ -73,22 +90,30 @@ class BlockService:
             return None
 
         if vector:
-            # Associate vector using raw SQL
-            vector_success = await self.set_block_vector(tx, created_block.block_id, vector)
-            if vector_success:
-                self.logger.log(
-                    "BlockService",
-                    "info",
-                    "Vector associated with block successfully.",
-                    block_id=created_block.block_id
-                )
-            else:
-                self.logger.log(
-                    "BlockService",
-                    "warning",
-                    "Failed to associate vector with block.",
-                    block_id=created_block.block_id
-                )
+            try:
+                documents = [Document(id=created_block.block_id, embedding=vector)]
+                self.document_store.write_documents(documents, policy=DuplicatePolicy.OVERWRITE)
+                self.logger.log("BlockService", "info", f"Vector created for block {created_block.block_id}")
+            except Exception as e:
+                self.logger.log("BlockService", "error", f"Failed to set vector", error=str(e), traceback=traceback.format_exc())
+                raise e
+
+            # # Associate vector using raw SQL
+            # vector_success = await self.set_block_vector(tx, created_block.block_id, vector)
+            # if vector_success:
+            #     self.logger.log(
+            #         "BlockService",
+            #         "info",
+            #         "Vector associated with block successfully.",
+            #         block_id=created_block.block_id
+            #     )
+            # else:
+            #     self.logger.log(
+            #         "BlockService",
+            #         "warning",
+            #         "Failed to associate vector with block.",
+            #         block_id=created_block.block_id
+            #     )
 
         return created_block
 
@@ -199,22 +224,24 @@ class BlockService:
             return None
 
         if vector:
-            # Update vector using raw SQL
-            vector_success = await self.set_block_vector(tx, updated_block.block_id, vector)
-            if vector_success:
-                self.logger.log(
-                    "BlockService",
-                    "info",
-                    "Vector updated successfully.",
-                    block_id=updated_block.block_id
-                )
-            else:
-                self.logger.log(
-                    "BlockService",
-                    "warning",
-                    "Failed to update vector.",
-                    block_id=updated_block.block_id
-                )
+            set_vector = await self.set_block_vector(tx, block_id=updated_block.block_id, vector=vector)
+            
+            # # Update vector using raw SQL
+            # vector_success = await self.set_block_vector(tx, updated_block.block_id, vector)
+            # if vector_success:
+            #     self.logger.log(
+            #         "BlockService",
+            #         "info",
+            #         "Vector updated successfully.",
+            #         block_id=updated_block.block_id
+            #     )
+            # else:
+            #     self.logger.log(
+            #         "BlockService",
+            #         "warning",
+            #         "Failed to update vector.",
+            #         block_id=updated_block.block_id
+            #     )
 
         return updated_block
 
@@ -257,23 +284,31 @@ class BlockService:
             bool: True if operation was successful, False otherwise.
         """
         try:
-            # Convert the vector list to a PostgreSQL array string
-            vector_str = ','.join(map(str, vector))
-
-            # Execute raw SQL to update the 'vector' field
-            raw_query = f"""
-                UPDATE "Block"
-                SET vector = ARRAY[{vector_str}]::vector, updated_at = NOW()
-                WHERE block_id = '{block_id}';
-            """
-
-            # await tx.block.query_raw(raw_query)
-            await tx.execute_raw(raw_query)
-
+            documents = [Document(id=block_id, embedding=vector)]
+            self.document_store.write_documents(documents, policy=DuplicatePolicy.OVERWRITE)
+            self.logger.log("BlockService", "info", f"Vector created for block {block_id}")
             return True
         except Exception as e:
-            self.logger.log("BlockService", "error", "Failed to set block vector", error=str(e), extra=traceback.format_exc())
+            self.logger.log("BlockService", "error", f"Failed to set vector", error=str(e), traceback=traceback.format_exc())
             return False
+        # try:
+        #     # Convert the vector list to a PostgreSQL array string
+        #     vector_str = ','.join(map(str, vector))
+
+        #     # Execute raw SQL to update the 'vector' field
+        #     raw_query = f"""
+        #         UPDATE "Block"
+        #         SET vector = ARRAY[{vector_str}]::vector, updated_at = NOW()
+        #         WHERE block_id = '{block_id}';
+        #     """
+
+        #     # await tx.block.query_raw(raw_query)
+        #     await tx.execute_raw(raw_query)
+
+        #     return True
+        # except Exception as e:
+        #     self.logger.log("BlockService", "error", "Failed to set block vector", error=str(e), extra=traceback.format_exc())
+        #     return False
 
     async def get_block_vector(self, tx: Prisma, block_id: str) -> Optional[List[float]]:
         """
@@ -287,24 +322,37 @@ class BlockService:
             Optional[List[float]]: The vector representation, or None if not found.
         """
         try:
-            query = f"""
-                SELECT vector::text AS vector_text
-                FROM "Block"
-                WHERE block_id = '{block_id}';
-            """
-            result = await tx.query_raw(query)
-            
-            if result and result[0]['vector_text']:
-                # Parse the PostgreSQL array string into a list of floats
-                vector_text = result[0]['vector_text']
-                # Use regex to extract all float values
-                vector_values = re.findall(r'-?\d+(?:\.\d+)?', vector_text)
-                # Convert each value to float
-                return [float(value) for value in vector_values]
-            # return None
+            filters = {
+                "field": "id",
+                "operator": "==",
+                "value": block_id
+            }
+            documents = self.document_store.filter_documents(filters=filters)
+            self.logger.log("BlockService", "info", f"Retrieved block vector - {documents[0].embedding[:5]}... truncated")
+            return documents[0].embedding
         except Exception as e:
             self.logger.log("BlockService", "error", f"Failed to retrieve block vector - error={str(e)}")
             return None
+
+        # try:
+        #     query = f"""
+        #         SELECT vector::text AS vector_text
+        #         FROM "Block"
+        #         WHERE block_id = '{block_id}';
+        #     """
+        #     result = await tx.query_raw(query)
+            
+        #     if result and result[0]['vector_text']:
+        #         # Parse the PostgreSQL array string into a list of floats
+        #         vector_text = result[0]['vector_text']
+        #         # Use regex to extract all float values
+        #         vector_values = re.findall(r'-?\d+(?:\.\d+)?', vector_text)
+        #         # Convert each value to float
+        #         return [float(value) for value in vector_values]
+        #     # return None
+        # except Exception as e:
+        #     self.logger.log("BlockService", "error", f"Failed to retrieve block vector - error={str(e)}")
+        #     return None
 
     async def search_blocks_by_vector_similarity(self, tx: Prisma, query_vector: List[float], top_k: int = 5) -> List[Dict[str, Any]]:
         """
@@ -319,30 +367,42 @@ class BlockService:
             List[Dict[str, Any]]: List of similar blocks with their similarity scores.
         """
         try:
-            vector_str = ','.join(map(str, query_vector))
-            query = f"""
-                SELECT b.block_id, b.name, b.block_type, b.description, 
-                       1 - (b.vector <=> ARRAY[{vector_str}]::vector) as similarity
-                FROM "Block" b
-                WHERE b.vector IS NOT NULL
-                ORDER BY similarity DESC
-                LIMIT {top_k};
-            """
-            results = await tx.query_raw(query)
+            docs = self.retriever.run(
+                query_embedding=query_vector, 
+                top_k=top_k, 
+                vector_function="cosine_similarity"
+            )
+
+            result = []
+            for doc in docs["documents"]:
+                result.append(doc.to_dict())
+            return result
+
+            # vector_str = ','.join(map(str, query_vector))
+            # query = f"""
+            #     SELECT b.block_id, b.name, b.block_type, b.description, 
+            #            1 - (b.vector <=> ARRAY[{vector_str}]::vector) as similarity
+            #     FROM "Block" b
+            #     WHERE b.vector IS NOT NULL
+            #     ORDER BY similarity DESC
+            #     LIMIT {top_k};
+            # """
+            # results = await tx.query_raw(query)
             
-            return [
-                {
-                    "block_id": str(row['block_id']),
-                    "name": row['name'],
-                    "block_type": row['block_type'],
-                    "description": row['description'],
-                    "similarity": float(row['similarity'])
-                }
-                for row in results
-            ]
+            # return [
+            #     {
+            #         "block_id": str(row['block_id']),
+            #         "name": row['name'],
+            #         "block_type": row['block_type'],
+            #         "description": row['description'],
+            #         "similarity": float(row['similarity'])
+            #     }
+            #     for row in results
+            # ]
         except Exception as e:
             self.logger.log("BlockService", "error", "Failed to perform vector similarity search", error=str(e))
-            return []
+            self.logger.log("BlockService", "error", "Failed to perform vector similarity search", extra=traceback.format_exc())
+            return None
 
     async def get_all_vectors(self, tx: Prisma) -> List[List[float]]:
         """
@@ -390,30 +450,33 @@ async def main():
     block_service = BlockService()
 
     try:
-        async with prisma.tx() as tx:
+        async with prisma.tx(timeout=10000) as tx:
             # Step 1: Create a new block without vector
             print("\nCreating a new block without vector...")
             new_block_data = {
-                "name": "TestBlock3",
+                "name": "TestBlock1",
                 "block_type": "dataset",
                 "description": "This is a test block without vector."
             }
-            created_block = await block_service.create_block(tx, new_block_data)
+            block1_vector = await VectorEmbeddingService().generate_text_embedding("There are over 7,000 languages spoken around the world today.")
+            created_block = await block_service.create_block(tx, new_block_data, vector=block1_vector)
             if created_block:
-                print(f"Created block: {created_block}")
+                print(f"Created block: {created_block.block_id}")
             else:
                 print(f"Failed to create block '{new_block_data['name']}'.")
+
             # Step 2: Create a new block with vector
             print("\nCreating a new block with vector...")
             new_block_with_vector_data = {
-                "name": "TestBlock5",
+                "name": "TestBlock3",
                 "block_type": "model",  
                 "description": "This is a test block with vector."
             }
-            test_vector = [0.1, 0.2, 0.3, 0.4, 0.5]  # Example vector
-            created_block_with_vector = await block_service.create_block(tx, new_block_with_vector_data, vector=test_vector)
+
+            block2_vector = await VectorEmbeddingService().generate_text_embedding("Elephants have been observed to behave in a way that indicates a high level of self-awareness, such as recognizing themselves in mirrors.")
+            created_block_with_vector = await block_service.create_block(tx, new_block_with_vector_data, vector=block2_vector)
             if created_block_with_vector:
-                print(f"Created block with vector: {created_block_with_vector}")
+                print(f"Created block with vector: {created_block_with_vector.block_id}")
             else:
                 print(f"Failed to create block '{new_block_with_vector_data['name']}'.")
 
@@ -438,20 +501,22 @@ async def main():
 
                 # Step 6: Associate a new vector to the block
                 print(f"\nAssociating a new vector to block with ID: {block_id}")
-                new_vector = [0.5, 0.4, 0.3, 0.2, 0.1]
-                vector_success = await block_service.set_block_vector(tx, block_id, new_vector)
+                update_block2_vector = await VectorEmbeddingService().generate_text_embedding("In certain parts of the world, like the Maldives, Puerto Rico, and San Diego, you can witness the phenomenon of bioluminescent waves.")
+                vector_success = await block_service.set_block_vector(tx, block_id, update_block2_vector)
                 print(f"Vector associated: {vector_success}")
 
                 # Step 7: Retrieve block vector
                 print(f"\nRetrieving vector for block with ID: {block_id}")
                 block_vector = await block_service.get_block_vector(tx, block_id)
-                print(f"Retrieved vector: {block_vector}")
+                print(f"Retrieved vector: {block_vector[:5]}... truncated")
 
                 # Step 8: Perform a vector similarity search
                 print("\nPerforming vector similarity search...")
-                query_vector = [0.1, 0.2, 0.3, 0.4, 0.5]
+                query_vector = await VectorEmbeddingService().generate_text_embedding("languages")
                 similar_blocks = await block_service.search_blocks_by_vector_similarity(tx, query_vector, top_k=5)
-                print(f"Similar blocks: {similar_blocks}")
+                print(f"Similar blocks: \n")
+                print(f"1. id: {similar_blocks[0]["id"]}, score: {similar_blocks[0]["score"]}\n")
+                print(f"2. id: {similar_blocks[1]["id"]}, score: {similar_blocks[1]["score"]}")
 
                 # Step 9: Delete block
                 print(f"\nDeleting block with ID: {block_id}")

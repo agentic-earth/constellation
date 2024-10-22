@@ -56,6 +56,7 @@ class BlockController:
         """
         try:
             # Step 0: Generate vector embedding if given text_to_vector
+            # generate embedding outside the transaction to avoid transaction timeout.
             text_to_vector = block_data.pop("text_to_vector", None)
             vector = None
             if text_to_vector:
@@ -63,13 +64,7 @@ class BlockController:
                 self.logger.log("BlockController", "info", f"Vector length: {len(vector)}")
 
             async with self.prisma.tx(timeout=10000) as tx:
-                # text_to_vector = block_data.pop("text_to_vector", None)
                 taxonomy = block_data.pop("taxonomy", None)
-
-                # Step 0: Generate vector embedding if given text_to_vector
-                # vector = None
-                # if text_to_vector:
-                #     vector = await self.vector_embedding_service.generate_text_embedding(text_to_vector)
 
                 # Step 1: Create Block
                 created_block = await self.block_service.create_block(tx=tx, block_data=block_data, vector=vector)
@@ -153,6 +148,7 @@ class BlockController:
         """
         try:
             # Step 0: Generate vector embedding if given `text_to_vector` in `update_data`
+            # generate embedding outside the transaction to avoid transaction timeout.
             text_to_vector = update_data.pop("text_to_vector", None)
             vector = None
             if text_to_vector:
@@ -283,10 +279,12 @@ class BlockController:
 
     async def search_blocks_by_vector_similarity(self, query: str, user_id: UUID, top_k: int=5) -> Optional[List[Dict[str, Any]]]:
         try:
-            async with self.prisma.tx() as tx:
-                # Step 1: generate vector embedding for the query
-                query_vector = await self.vector_embedding_service.generate_text_embedding(query)
+            # Step 1: generate vector embedding for the query
+            query_vector = await self.vector_embedding_service.generate_text_embedding(query)
+            if not query_vector:
+                raise ValueError("Failed to generate vector for the query.")
 
+            async with self.prisma.tx() as tx:
                 # Step 2: Call block service
                 blocks = await self.block_service.search_blocks_by_vector_similarity(tx, query_vector, top_k=top_k)
 
@@ -298,7 +296,7 @@ class BlockController:
                     "user_id": str(user_id),
                     "action_type": "READ",  # Use 'READ' for searches
                     "entity_type": "block",  # If 'block_search' is not in enum, use 'block'
-                    "entity_id": blocks[0].block_id if blocks else str(UUID(int=0)),  # TODO: temporary using first block id
+                    "entity_id": blocks[0]["id"] if blocks else str(UUID(int=0)),  # TODO: temporary using first block id
                     "details": {
                         "results_count": len(blocks)
                     }
@@ -310,7 +308,7 @@ class BlockController:
                 if not audit_log:
                     raise Exception("Failed to create audit log for block search by vector")
                 
-                return [block.dict() for block in blocks]
+                return blocks
         except Exception as e:
             print(f"An error occurred during search blocks by vector similarity: {e}")
             import traceback
@@ -356,7 +354,7 @@ async def main():
                     ]
                 }
             },
-            "text_to_vector": "This is text to vector"
+            "text_to_vector": "In certain parts of the world, like the Maldives, Puerto Rico, and San Diego, you can witness the phenomenon of bioluminescent waves."
             # "metadata": {  # Removed as it's not part of the Prisma schema
             #     "vector": [0.1] * 512  # Example 512-dimensional vector
             # }
@@ -364,6 +362,37 @@ async def main():
         created_block = await controller.create_block(create_schema, user_id)
         if created_block:
             print(f"Block Created: {created_block}")
+        else:
+            print("Block creation failed.")
+
+        # Step 1.5: Create a second block for testing search by vector similarity
+        create_schema = {
+            "name": "WildfireDataset",
+            "block_type": "dataset",  # Ensure this matches the enum in Prisma
+            "description": "An example dataset on wildfire for testing",
+            # "created_by": user_id,  # This is added in the create_block method
+            "taxonomy": {
+                "general": {
+                    "categories": [
+                        {"name": "Climate Data"},
+                        {"name": "Forest Analysis"}
+                    ]
+                },
+                "specific": {
+                    "categories": [
+                        {"name": "Satellite Imagery", "parent_name": "Climate Data"},
+                        {"name": "Forest Data", "parent_name": "Forest Analysis"}
+                    ]
+                }
+            },
+            "text_to_vector": "Elephants have been observed to behave in a way that indicates a high level of self-awareness, such as recognizing themselves in mirrors."
+            # "metadata": {  # Removed as it's not part of the Prisma schema
+            #     "vector": [0.1] * 512  # Example 512-dimensional vector
+            # }
+        }
+        created_block2 = await controller.create_block(create_schema, user_id)
+        if created_block2:
+            print(f"Block Created: {created_block2}")
         else:
             print("Block creation failed.")
 
@@ -404,7 +433,7 @@ async def main():
                         ]
                     }
                 },
-                "text_to_vector": "Different one"
+                "text_to_vector": "There are over 7,000 languages spoken around the world today."
             }
             updated_block = await controller.update_block(created_block['block_id'], update_schema, user_id)
             if updated_block:
@@ -435,12 +464,29 @@ async def main():
         else:
             print("No blocks found matching the search criteria.")
 
-        # Step 5: Delete the block
+        # Step 5: Perform a serach based on vector similarity
+        print("\nStep 5: Performing a serach based on vector similarity...")
+        query = "language"
+        vector_search_results = await controller.search_blocks_by_vector_similarity(query, user_id, top_k=5)
+        if vector_search_results:
+            print(f"Found {len(vector_search_results)} block(s):")
+            for blk in vector_search_results:
+                print(f"block id: {blk["id"]}, similarity score: {blk["score"]}")
+        else:
+            print("No blocks found. Should not happen")
+
+        # Step 6: Delete the blocks
         if created_block:
             print("\nStep 5: Deleting the created block...")
             deletion_success = await controller.delete_block(created_block['block_id'], user_id)
             if deletion_success:
                 print(f"Block Deleted: {created_block['block_id']}")
+            else:
+                print("Block deletion failed.")
+        if created_block2:
+            deletion_success = await controller.delete_block(created_block2['block_id'], user_id)
+            if deletion_success:
+                print(f"Block Deleted: {created_block2['block_id']}")
             else:
                 print("Block deletion failed.")
     except Exception as e:

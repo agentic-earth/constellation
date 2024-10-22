@@ -45,7 +45,7 @@ class VectorEmbeddingService:
         self.text_embedder = OpenAITextEmbedder(api_key=Secret.from_token(self.api_key))
         self.document_embedder = OpenAIDocumentEmbedder(api_key=Secret.from_token(self.api_key))
 
-    async def generate_text_embedding(self, text: str) -> List[float]:
+    async def generate_text_embedding(self, text: str) -> Optional[List[float]]:
         """
         Generates a vector embedding for the provided text.
 
@@ -53,7 +53,7 @@ class VectorEmbeddingService:
             text (str): The text to generate an embedding for.
 
         Returns:
-            List[float]: The generated vector embedding.
+            Optional[List[float]]: The generated vector embedding. None on exception.
         """
         try:
             result = self.text_embedder.run(text)
@@ -62,9 +62,9 @@ class VectorEmbeddingService:
             return embedding
         except Exception as e:
             self.logger.log("VectorEmbeddingService", "error", "Failed to generate text embedding", error=str(e))
-            raise
+            return None
 
-    async def generate_document_embedding(self, pdf_file_path: str) -> List[float]:
+    async def generate_document_embedding(self, pdf_file_path: str) -> Optional[List[float]]:
         """
         Generates a vector embedding for the content of a PDF document.
 
@@ -72,7 +72,7 @@ class VectorEmbeddingService:
             pdf_file_path (str): The path to the PDF file.
 
         Returns:
-            List[float]: The generated vector embedding.
+            Optional[List[float]]: The generated vector embedding. None on exception.
         """
         try:
             content = self._pdf_to_text(pdf_file_path)
@@ -83,7 +83,7 @@ class VectorEmbeddingService:
             return embedding
         except Exception as e:
             self.logger.log("VectorEmbeddingService", "error", "Failed to generate document embedding", error=str(e))
-            raise
+            return None
 
     def _pdf_to_text(self, pdf_path: str) -> str:
         """
