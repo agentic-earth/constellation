@@ -1,3 +1,7 @@
+import sys
+sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api")
+sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api/backend")
+
 import asyncio
 from backend.app.features.agent.tools.vector_embed_tool import VectorEmbedTool
 from backend.app.features.agent.tools.similarity_search_tool import SimilaritySearchTool

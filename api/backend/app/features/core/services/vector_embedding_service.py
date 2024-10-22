@@ -124,7 +124,7 @@ async def main():
         print(f"Failed to generate text embedding: {e}")
 
     # Generate document embedding
-    pdf_path = "sample.pdf"  # Assuming a sample PDF exists at this location
+    pdf_path = "/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api/backend/app/features/agent/scraped_papers/70 years of machine learning in geoscience in review.pdf"  # Assuming a sample PDF exists at this location
     try:
         document_embedding = await embedding_service.generate_document_embedding(pdf_path)
         print(f"Generated document embedding: {document_embedding[:5]}... (truncated)")  # Showing only first 5 values for brevity

@@ -22,14 +22,17 @@ def arxiv_scraper(topics, max_results=100, start_date=None, end_date=None):
             
             for entry in root.findall('{http://www.w3.org/2005/Atom}entry'):
                 title = entry.find('{http://www.w3.org/2005/Atom}title').text
+                abstract = entry.find('{http://www.w3.org/2005/Atom}summary').text
                 pdf_url = entry.find('{http://www.w3.org/2005/Atom}link[@title="pdf"]')
                 pdf_url = pdf_url.attrib['href'] if pdf_url is not None else None
                 
                 paper_data = {
                     'title': title,
+                    'abstract': abstract,
                     'pdf_url': pdf_url
                 }
-                save_paper_data(paper_data)
+                # save_paper_data(paper_data)
+                print(paper_data)
         
         time.sleep(3)  # Respect arXiv's rate limit
 
