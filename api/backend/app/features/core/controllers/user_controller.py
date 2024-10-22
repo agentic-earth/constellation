@@ -213,6 +213,7 @@ class UserController:
                 "message": "An error occurred during profile update.",
             }
 
+
     # -------------------
     # Delete User
     # -------------------
