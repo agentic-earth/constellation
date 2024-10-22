@@ -12,3 +12,8 @@ Researcher_agent:
     - "VectorEmbedTool"
     - "SimilaritySearchTool"
     - "PaperSummaryTool"
+    
+Developer_agent:
+  description: "An expert in navigating and extracting insights from GitHub repositories."
+  goals:
+    - "Search and analyze the specified GitHub repository for relevant information."
