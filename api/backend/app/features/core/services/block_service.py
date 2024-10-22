@@ -28,7 +28,7 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime
 import asyncio
-from app.config import settings
+from backend.app.config import settings
 
 from prisma.errors import UniqueViolationError
 from prisma.models import Block as PrismaBlock
@@ -84,7 +84,7 @@ class BlockService:
                 block_data['block_type'] = str(block_data['block_type']) 
 
             # Create block via Prisma
-            created_block = await tx.block.create(data=block_data)
+            created_block = await tx.block.create(data=block_data)  
             self.logger.log(
                 "BlockService",
                 "info",
@@ -95,6 +95,7 @@ class BlockService:
         except Exception as e:
             self.logger.log("BlockService", "error", f"Failed to create block", error=str(e), traceback=traceback.format_exc())
             return None
+        
 
         if vector:
             # Associate vector using raw SQL
