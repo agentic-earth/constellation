@@ -36,6 +36,8 @@ from prisma import Prisma
 from backend.app.logger import ConstellationLogger
 from backend.app.config import settings
 import traceback
+
+# haystack pgvector
 from haystack_integrations.document_stores.pgvector import PgvectorDocumentStore
 from haystack_integrations.components.retrievers.pgvector import PgvectorEmbeddingRetriever
 from haystack.document_stores.types import DuplicatePolicy
@@ -96,7 +98,7 @@ class BlockService:
                 self.logger.log("BlockService", "info", f"Vector created for block {created_block.block_id}")
             except Exception as e:
                 self.logger.log("BlockService", "error", f"Failed to set vector", error=str(e), traceback=traceback.format_exc())
-                raise e
+                return None
 
             # # Associate vector using raw SQL
             # vector_success = await self.set_block_vector(tx, created_block.block_id, vector)
