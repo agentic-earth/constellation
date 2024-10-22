@@ -1,8 +1,0 @@
-Log file initialized on 2024-10-14 18:55:32.754424
-2024-10-14 18:55:32,754 - Database - INFO - Attempting to connect to database with URL: DATABASE_URL
-2024-10-14 18:55:33,185 - Database - INFO - Prisma Client connected successfully.
-2024-10-14 18:55:33,185 - Database - INFO - Attempting to connect to Supabase with URL: 
-2024-10-14 18:55:33,191 - Database - INFO - Supabase Client connected successfully.
-2024-10-14 18:55:33,192 - Database - INFO - Attempting to connect to Supabase Admin with URL: 
-2024-10-14 18:55:33,198 - Database - INFO - Supabase Admin Client connected successfully.
-2024-10-14 18:55:37,162 - Database - INFO - Prisma Client disconnected successfully.

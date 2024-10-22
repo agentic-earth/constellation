@@ -20,11 +20,10 @@ python-jose = "^3.3.0"
 passlib = "^1.7.4"
 pandas = "^2.2.3"
 prisma = "^0.15.0"
-crewai = {extras = ["tools"], version = "^0.70.1"}
-sentence-transformers = "^2.2.0"
 PyPDF2 = "^3.0.0"
 scikit-learn = "^1.0.2"
 numpy = "^1.22.0"
+pgvector-haystack = "^1.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
