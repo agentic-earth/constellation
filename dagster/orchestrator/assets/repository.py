@@ -20,8 +20,7 @@ from typing import Any as TypingAny, Dict, Tuple, Optional
 from orchestrator.assets.ops import *
 from orchestrator.assets.jobs import *
 
-OP_DEFS = [mock_csv_data, write_csv, math_block, import_from_google_drive]
-
+OP_DEFS = [import_from_google_drive]
 
 @dataclass
 class CallableOperation:
@@ -136,32 +135,14 @@ def parse_and_execute_job(context: OpExecutionContext, instructions: list):
         "ops": {
             "generate_dynamic_job_configs": {
                 "config": {
-                    "raw_input": {
-                        "operation": "prefetch_data_op",
-                        "parameters": {
-                            "dataset": {
-                                "operation": "get_data_op",
-                                "parameters": {
-                                    "dataset_info": {
-                                        "operation": "get_dataset_info_op",
-                                        "parameters": {
-                                            "dataset": "/data/dataset",
-                                            "split": "train",
-                                            "tfds_data_dir": "",
-                                            "tfds_manual_dir": "",
-                                        },
-                                    },
-                                    "batch_size": 32,  # Batch size for training
-                                    "batch_size_eval": 32,  # Batch size for evaluation
-                                    "image_size": 224,  # Size to which images are resized
-                                    "shuffle_buffer": 100,  # Size of the shuffle buffer
-                                    "prefetch_size": 1,  # Number of batches to prefetch
-                                },
-                                "output": "train_dataset",  # Specify the output to use (train_dataset)
+                    "raw_input": [
+                        {  # Wrap the dictionary in a list
+                            "operation": "import_zip_from_google_drive",
+                            "parameters": {
+                                "file_id": "1ulPG5mev9EuznRtOjjNgIZRcRrqfzreJ", #Test Directory of photos from before I went to college... lol
                             },
-                            "n_prefetch": 2,  # Number of batches to prefetch to device
-                        },
-                    }
+                        }
+                    ],
                 }
             }
         }
@@ -171,7 +152,20 @@ def build_execute_job():
     dynamic_configs = generate_dynamic_job_configs()
     dynamic_configs.map(parse_and_execute_job)
 
+@job(
+    config={
+        "ops": {
+            "import_zip_from_google_drive": {
+                "inputs": {
+                    "file_id": {"value": "1ulPG5mev9EuznRtOjjNgIZRcRrqfzreJ"}  # Correctly pass the file_id under inputs
+                }
+            }
+        }
+    }
+)
+def test_import_from_google_drive_job():
+    import_from_google_drive()
 
 @repository(name="main")
 def deploy_docker_repository():
-    return [build_execute_job]
+    return [build_execute_job,test_import_from_google_drive_job]

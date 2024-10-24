@@ -11,6 +11,7 @@ fastapi = "^0.115.0"
 uvicorn = "^0.30.6"
 dagster = "^1.8.8"
 pandas = "^2.2.3"
+gdown = "^4.7.1"
 asyncio = "*"
 
 

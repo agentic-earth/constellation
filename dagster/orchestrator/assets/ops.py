@@ -7,6 +7,7 @@ import os
 import sys
 
 from orchestrator.assets.constants import *
+import gdown
 
 # Adjust resource limits if not on macOS
 if sys.platform != "darwin":
@@ -24,40 +25,40 @@ if sys.platform != "darwin":
 def import_from_google_drive(
     context: OpExecutionContext, file_id: str
 ) -> dict[str, Any]:
-    # Import the data from Google Drive
-    download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
-
-    # Make a request to download the file
-    response = requests.get(download_url)
-
-    if response.status_code == 200:
-        # Save the file
-        with open("download.zip", "wb") as f:
-            f.write(response.content)
-        context.log.info("Downloaded file successfully.")
+    # Import the data from Google Drive using gdown
+    context.log.info("Starting import_from_google_drive...")
+    download_url = f"https://drive.google.com/uc?id={file_id}"
+    try:
+        # Download the file using gdown
+        output = "download.zip"
+        gdown.download(download_url, output, quiet=False)
+        context.log.info("Downloaded file successfully using gdown.")
 
         # Unzip the file
-        with zipfile.ZipFile("download.zip", "r") as zip_ref:
+        with zipfile.ZipFile(output, "r") as zip_ref:
             zip_ref.extractall("data")
 
-        # Save file to data to dict structure
+        # Save files to a dictionary structure
         data_dict = {}
         for root, dirs, files in os.walk("data"):
             for file in files:
                 file_path = os.path.join(root, file)
+                relative_path = os.path.relpath(file_path, "data")
+                
+                # Log the file structure
+                context.log.info(f"Extracted file: {relative_path}")
+
+                # Read the file in binary mode and store it in the dictionary
                 with open(file_path, "rb") as f:
-                    relative_path = os.path.relpath(file_path, "data")
                     data_dict[relative_path] = f.read()
 
         context.log.info("Loaded files into dictionary.")
         return data_dict
 
-    else:
-        context.log.error(
-            f"Failed to download file. Status code: {response.status_code}"
-        )
+    except Exception as e:
+        context.log.error(f"An error occurred: {e}")
+        return {}
 
-    return {}
 
 
 @op(name="deploy_model", ins={"model": In(str)})
