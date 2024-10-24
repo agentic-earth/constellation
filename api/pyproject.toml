@@ -25,6 +25,7 @@ sentence-transformers = "^2.2.0"
 PyPDF2 = "^3.0.0"
 scikit-learn = "^1.0.2"
 numpy = "^1.22.0"
+gdown = "^4.7.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"

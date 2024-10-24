@@ -10,6 +10,9 @@ RUN pip install \
     dagster-postgres \
     dagster-docker \
     pandas 
+
+RUN pip install gdown
+
 # Set $DAGSTER_HOME and copy dagster instance and workspace YAML there
 ENV DAGSTER_HOME=/opt/dagster/dagster_home/
 

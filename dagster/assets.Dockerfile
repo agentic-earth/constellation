@@ -12,7 +12,9 @@ RUN pip install \
     dagster \
     dagster-postgres \
     dagster-docker \
-    pandas
+    pandas 
+    
+RUN pip install gdown
 
 # Set the working directory
 WORKDIR /opt/dagster/app
