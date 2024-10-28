@@ -110,6 +110,10 @@ def delete_model_service(hf_model_name):
     return  {"message": f"{service_name} has been deleted succesfully!"}
 
 def post_model_inference(service_name, data):
+    if not check_service_deployed(service_name):
+        return {"message": f"{service_name} has not been deployed yet."}
+
+
     endpoint = f"https://wdorji--{service_name}-flask-app.modal.run/infer"
     response = requests.post(endpoint, json={"images": data["data"]})
     return response.json()
