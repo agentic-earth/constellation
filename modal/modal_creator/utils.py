@@ -1,6 +1,8 @@
 import os
 import subprocess
 import shutil
+
+import requests
 from fastapi import HTTPException
 import uuid
 
@@ -38,17 +40,13 @@ def flask_app():
 
     @web_app.post("/infer")
     def infer():
-        images = request.files.getlist('images')
+        data = request.json
+        images = data.get('images')
         if not images:
             return {{"error": "No images provided."}}
         
         try:
-            images_list = []
-            for img in images:
-                image = PILImage.open(BytesIO(img.read()))
-                images_list.append(image)
-
-            output = pipe(images_list)
+            output = pipe(images)
             return {{"ouptut": output}}
         
         except Exception as e:
@@ -78,7 +76,7 @@ def deploy_model_service(hf_model_name):
 
     if check_service_deployed(service_name):
         return {"message": f"{hf_model_name} has already been deployed.", 
-            "endpoint":  f"https://wdorji--{service_name}-flask-app.modal.run/infer"}
+            "endpoint":  f"https://wdorji--{service_name}-flask-app.modal.run/infer", "service_name": service_name}
     
     # Create the directory if it doesn't exist
     os.makedirs(service_name, exist_ok=True)
@@ -93,7 +91,8 @@ def deploy_model_service(hf_model_name):
     #delete directory and its contents
     shutil.rmtree(service_name)
     return {"message": f"{hf_model_name} has been deployed succesfully!", 
-            "endpoint":  f"https://wdorji--{service_name}-flask-app.modal.run/infer"}
+            "endpoint":  f"https://wdorji--{service_name}-flask-app.modal.run/infer",
+            "service_name": service_name}
 
 
 def delete_model_service(hf_model_name):
@@ -109,3 +108,8 @@ def delete_model_service(hf_model_name):
         raise HTTPException(status_code=500, detail=f"Issue with deleting {hf_model_name} deployment: {e.output.decode()}")
 
     return  {"message": f"{service_name} has been deleted succesfully!"}
+
+def post_model_inference(service_name, data):
+    endpoint = f"https://wdorji--{service_name}-flask-app.modal.run/infer"
+    response = requests.post(endpoint, json={"images": data["data"]})
+    return response.json()

@@ -22,6 +22,8 @@ COPY . .
 
 # Install the modal CLI 
 RUN pip install modal
+RUN pip install requests
+
 # Authenticate
 RUN modal token set --token-id ak-GJnX5RxgeF3Qw8vx4bw7tE --token-secret as-Zamgcpei8gVnaEEu3kdFzl
 
