@@ -20,7 +20,14 @@ from typing import Any as TypingAny, Dict, Tuple, Optional
 from orchestrator.assets.ops import *
 from orchestrator.assets.jobs import *
 
-OP_DEFS = [import_from_google_drive]
+OP_DEFS = [
+    import_from_google_drive,
+    deploy_model,
+    delete_model,
+    dict_to_list,
+    model_inference,
+]
+
 
 @dataclass
 class CallableOperation:
@@ -90,9 +97,15 @@ def define_composite_job(name: str, raw_input: dict) -> Tuple[JobDefinition, Dic
     run_config = {}
     deps, run_config = generate_dependencies_and_run_config(instruction)
 
+    filtered_op_defs = [
+        op
+        for op in OP_DEFS
+        if op.name in [key.name.split(" ")[0] for key in deps.keys()]
+    ]
+
     graph = GraphDefinition(
         name=name,
-        node_defs=OP_DEFS,
+        node_defs=filtered_op_defs,
         dependencies=deps,
     )
 
@@ -137,9 +150,9 @@ def parse_and_execute_job(context: OpExecutionContext, instructions: list):
                 "config": {
                     "raw_input": [
                         {  # Wrap the dictionary in a list
-                            "operation": "import_zip_from_google_drive",
+                            "operation": "import_from_google_drive",
                             "parameters": {
-                                "file_id": "1ulPG5mev9EuznRtOjjNgIZRcRrqfzreJ", #Test Directory of photos from before I went to college... lol
+                                "file_id": "1ulPG5mev9EuznRtOjjNgIZRcRrqfzreJ",  # Test Directory of photos from before I went to college... lol
                             },
                         }
                     ],
@@ -152,12 +165,15 @@ def build_execute_job():
     dynamic_configs = generate_dynamic_job_configs()
     dynamic_configs.map(parse_and_execute_job)
 
+
 @job(
     config={
         "ops": {
-            "import_zip_from_google_drive": {
+            "import_from_google_drive": {
                 "inputs": {
-                    "file_id": {"value": "1ulPG5mev9EuznRtOjjNgIZRcRrqfzreJ"}  # Correctly pass the file_id under inputs
+                    "file_id": {
+                        "value": "1ulPG5mev9EuznRtOjjNgIZRcRrqfzreJ"
+                    }  # Correctly pass the file_id under inputs
                 }
             }
         }
@@ -166,6 +182,7 @@ def build_execute_job():
 def test_import_from_google_drive_job():
     import_from_google_drive()
 
+
 @repository(name="main")
 def deploy_docker_repository():
-    return [build_execute_job,test_import_from_google_drive_job]
+    return [build_execute_job, test_import_from_google_drive_job]

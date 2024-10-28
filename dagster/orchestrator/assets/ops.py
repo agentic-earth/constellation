@@ -1,3 +1,4 @@
+import base64
 from dagster import Any, In, OpExecutionContext, Out, op
 import requests
 import pandas as pd
@@ -6,7 +7,6 @@ import zipfile
 import os
 import sys
 
-from orchestrator.assets.constants import *
 import gdown
 
 # Adjust resource limits if not on macOS
@@ -16,9 +16,12 @@ if sys.platform != "darwin":
     low, high = resource.getrlimit(resource.RLIMIT_NOFILE)
     resource.setrlimit(resource.RLIMIT_NOFILE, (high, high))
 
+# Constants
+MAX_IN_MEMORY = 200_000
+
 
 @op(
-    name="import_zip_from_google_drive",
+    name="import_from_google_drive",
     ins={"file_id": In(str)},
     out=Out(dict[str, Any]),
 )
@@ -44,15 +47,12 @@ def import_from_google_drive(
             for file in files:
                 file_path = os.path.join(root, file)
                 relative_path = os.path.relpath(file_path, "data")
-                
-                # Log the file structure
-                context.log.info(f"Extracted file: {relative_path}")
 
                 # Read the file in binary mode and store it in the dictionary
                 with open(file_path, "rb") as f:
                     data_dict[relative_path] = f.read()
 
-        context.log.info("Loaded files into dictionary.")
+        context.log.info(f"Loaded {len(data_dict.values())} files into dictionary.")
         return data_dict
 
     except Exception as e:
@@ -60,17 +60,26 @@ def import_from_google_drive(
         return {}
 
 
+@op(
+    name="dict_to_list",
+    ins={"data": In(dict[str, Any])},
+    out=Out(list[bytes]),
+)
+def dict_to_list(context: OpExecutionContext, data: dict[str, Any]) -> list[bytes]:
+    return list(data.values())
+
 
 @op(name="deploy_model", ins={"model": In(str)})
 def deploy_model(context: OpExecutionContext, model: str) -> None:
     context.log.info(f"Deploying model: {model}")
 
     # Define the endpoint and payload
-    MODEL_ENDPOINT = f"{MODEL_ENDPOINT}/deploy"
-    payload = {"model_name": model, "service_name": f"{model}-service"}
+    MODEL_ENDPOINT = "http://model_api:8000"
+    endpoint = f"{MODEL_ENDPOINT}/deploy?model_name={model}"
+    payload = {"model_name": model}
 
     # Make a POST request to the endpoint
-    response = requests.post(MODEL_ENDPOINT, json=payload)
+    response = requests.post(endpoint, json=payload)
 
     if response.status_code == 200:
         context.log.info(f"Model deployed successfully: {response.json()}")
@@ -78,18 +87,22 @@ def deploy_model(context: OpExecutionContext, model: str) -> None:
         context.log.error(
             f"Failed to deploy model. Status code: {response.status_code}, Response: {response.text}"
         )
+        raise Exception(
+            f"Failed to deploy model. Status code: {response.status_code}, Response: {response.text}"
+        )
 
 
-@op(name="delete_model", ins={"service_name": In(str)})
-def delete_model(context: OpExecutionContext, service_name: str) -> None:
-    context.log.info(f"Deleting model service: {service_name}")
+@op(name="delete_model", ins={"model": In(str)})
+def delete_model(context: OpExecutionContext, model: str) -> None:
+    context.log.info(f"Deleting model service: {model}")
 
     # Define the endpoint and payload
-    MODEL_ENDPOINT = f"{MODEL_ENDPOINT}/delete"
-    payload = {"service_name": service_name}
+    MODEL_ENDPOINT = "http://model_api:8000"
+    endpoint = f"{MODEL_ENDPOINT}/delete?model_name={model}"
+    payload = {"model_name": model}
 
     # Make a POST request to the endpoint
-    response = requests.post(MODEL_ENDPOINT, json=payload)
+    response = requests.post(endpoint, json=payload)
 
     if response.status_code == 200:
         context.log.info(f"Model service deleted successfully: {response.json()}")
@@ -100,6 +113,36 @@ def delete_model(context: OpExecutionContext, service_name: str) -> None:
 
 
 # Model infrence
+@op(
+    name="model_inference",
+    ins={"data": In(list[bytes]), "model": In(str)},
+    out=Out(dict[str, Any]),
+)
+def model_inference(
+    context: OpExecutionContext,
+    data: list[bytes],
+    model: str,
+) -> dict[str, Any]:
+    context.log.info(f"Running inference on {len(data)} images")
+    MODEL_ENDPOINT = f"http://model_api:8000"
+    endpoint = f"{MODEL_ENDPOINT}/infer?model_name={model}"
+    batches = [data[i : min(len(data) - 1, i + 2)] for i in range(0, len(data), 2)]
+
+    results = []
+    for batch in batches:
+        payload = {"data": [base64.b64encode(image).decode("utf-8") for image in batch]}
+        response = requests.post(endpoint, json=payload)
+        context.log.info(f"Response: {response.text}")
+        results.append(response.json().get("output"))
+
+    if len(results) == len(batches):
+        context.log.info(f"Model inference successful: {results}")
+        return {"results": results}
+    else:
+        context.log.error(
+            f"Failed to run model inference. Status code: {response.status_code}, Response: {response.text}"
+        )
+        return {}
 
 
 @op(name="mock_csv_data", out=Out())
