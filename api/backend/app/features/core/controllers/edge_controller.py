@@ -73,7 +73,7 @@ class EdgeController:
             )
             return None
 
-    async def get_edge(self, edge_id: UUID, user_id: UUID) -> Optional[Dict[str, Any]]:
+    async def get_edge_by_id(self, edge_id: UUID, user_id: UUID) -> Optional[Dict[str, Any]]:
         """
         Retrieve an edge by its ID.
 
@@ -299,7 +299,7 @@ class EdgeController:
             # Step 2: Retrieve the edge by ID
             if created_edge:
                 print(f"\nRetrieving Edge with ID: {created_edge["edge_id"]}")
-                retrieved_edge = await self.get_edge(created_edge["edge_id"], user_id)
+                retrieved_edge = await self.get_edge_by_id(created_edge["edge_id"], user_id)
                 if retrieved_edge:
                     print(f"Retrieved Edge: {retrieved_edge["edge_id"]} - {retrieved_edge["source_block_id"]} -> {retrieved_edge["target_block_id"]}")
                 else:

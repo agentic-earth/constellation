@@ -150,20 +150,25 @@ class EdgeService:
             # always add updated_at
             update_data['updated_at'] = datetime.now(timezone.utc)
 
-            # TODO: make sure that update_data only contains edge schema keys
-
             updated_edge = await tx.edge.update(
                 where={"edge_id": str(edge_id)},
                 data=update_data
             )
-
-            self.logger.log(
-                "EdgeService",
-                "info",
-                "Edge updated successfully.",
-                edge_id=updated_edge.edge_id,
-                updated_fields=list(update_data.keys())
-            )
+            if updated_edge:
+                self.logger.log(
+                    "EdgeService",
+                    "info",
+                    "Edge updated successfully.",
+                    edge_id=updated_edge.edge_id,
+                    updated_fields=list(update_data.keys())
+                )
+            else:
+                self.logger.log(
+                    "EdgeService",
+                    "warning",
+                    "Edge not found for update.",
+                    edge_id=str(edge_id)
+                )
 
             return updated_edge
         except Exception as e:
