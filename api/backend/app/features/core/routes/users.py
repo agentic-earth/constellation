@@ -23,7 +23,7 @@ from typing import List, Optional
 from uuid import UUID
 from backend.app.features.core.controllers.user_controller import UserController
 from backend.app.schemas import (
-    UserCreateSchema,
+    UserCreateInput,
     UserUpdateSchema,
     UserResponseSchema,
     TokenSchema,
@@ -50,12 +50,18 @@ user_controller = UserController()
 
 
 @router.post("/register", response_model=UserResponseSchema, status_code=201)
-def register_user(user: UserCreateSchema):
+def register_user(user: UserCreateInput):
     """
     Register a new user with hashed password.
+
+    Args:
+        user (UserCreateInput): The data required to create a new user.
+
+    Returns:
+        UserResponseSchema: The created user's data.
     """
     user.password_hash = get_password_hash(user.password)
-    created_user = user_controller.create_user(user)
+    created_user = user_controller.register_user(user.email, user.password_hash, user.username)
     if not created_user:
         raise HTTPException(status_code=400, detail="User registration failed.")
     return created_user
@@ -67,7 +73,7 @@ def register_user(user: UserCreateSchema):
 
 
 @router.post("/login", response_model=TokenSchema)
-def login_for_access_token(form_data: UserCreateSchema):
+def login_for_access_token(form_data: UserCreateInput):
     """
     Authenticate user and return access token.
     """
@@ -98,7 +104,7 @@ def read_users_me(current_user: UserResponseSchema = Depends(get_current_active_
 
 @router.post("/", response_model=UserResponseSchema, status_code=201)
 def create_user(
-    user: UserCreateSchema,
+    user: UserCreateInput,
     current_user: UserResponseSchema = Depends(get_current_active_user),
 ):
     """

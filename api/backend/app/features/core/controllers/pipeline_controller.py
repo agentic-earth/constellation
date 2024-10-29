@@ -90,7 +90,7 @@ class PipelineController:
 
                 # Log the creation in Audit Logs
                 audit_log = {
-                    "user_id": pipeline_data.created_by,
+                    "user_id": str(user_id),
                     "action_type": "CREATE",
                     "entity_type": "pipeline",
                     "entity_id": str(pipeline.pipeline_id),
@@ -184,7 +184,6 @@ class PipelineController:
                 Expected keys:
                     - 'name': str
                     - 'description': str
-                    - 'updated_by': UUID
             user_id (UUID): The UUID of the user updating the pipeline.
 
         Returns:
@@ -245,33 +244,34 @@ class PipelineController:
             bool: True if deletion was successful, False otherwise.
         """
         try:
-            # Delete the pipeline using the PipelineService
-            deletion_success = self.pipeline_service.delete_pipeline(pipeline_id)
-            if not deletion_success:
-                raise ValueError("Failed to delete pipeline.")
+            async with self.prisma.tx() as tx:
+                # Delete the pipeline using the PipelineService
+                deletion_success = await self.pipeline_service.delete_pipeline(tx, pipeline_id)
+                if not deletion_success:
+                    raise ValueError("Failed to delete pipeline.")
 
-            # Log the deletion in Audit Logs
-            audit_log = {
-                "user_id": str(user_id),
-                "action_type": "DELETE",
-                "entity_type": "pipeline",
-                "entity_id": str(pipeline_id),
-                "details": {
-                    "pipeline_id": str(pipeline_id),
-                },
-            }
-            audit_log = await self.audit_service.create_audit_log(tx, audit_log)
-            if not audit_log:
-                raise Exception("Failed to create audit log for pipeline deletion")
+                # Log the deletion in Audit Logs
+                audit_log = {
+                    "user_id": str(user_id),
+                    "action_type": "DELETE",
+                    "entity_type": "pipeline",
+                    "entity_id": str(pipeline_id),
+                    "details": {
+                        "pipeline_id": str(pipeline_id),
+                    },
+                }
+                audit_log = await self.audit_service.create_audit_log(tx, audit_log)
+                if not audit_log:
+                    raise Exception("Failed to create audit log for pipeline deletion")
 
-            # Log the deletion event
-            self.logger.log(
-                "PipelineController",
-                "info",
-                "Pipeline deleted successfully.",
-                extra={"pipeline_id": str(pipeline_id)},
-            )
-            return True
+                # Log the deletion event
+                self.logger.log(
+                    "PipelineController",
+                    "info",
+                    "Pipeline deleted successfully.",
+                    extra={"pipeline_id": str(pipeline_id)},
+                )
+                return True
     
         except Exception as e:
             # Log unexpected exceptions with critical level
@@ -286,13 +286,16 @@ class PipelineController:
             )
             return False
 
-    async def list_pipelines(self, user_id: UUID, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    async def list_pipelines(self, user_id: UUID, filters: Optional[Dict[str, Any]] = None, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
         """
-        Lists pipelines with optional filtering.
+        Lists pipelines with optional filtering and pagination.
 
         Args:
             user_id (UUID): The UUID of the user listing the pipelines.
             filters (Optional[Dict[str, Any]]): Key-value pairs to filter the pipelines.
+                Supported filters: 'name', 'user_id'.
+            limit (int): The maximum number of pipelines to return.
+            offset (int): The number of pipelines to skip before returning the results.
 
         Returns:
             List[Dict[str, Any]]: A list of pipelines if successful, empty list otherwise.
