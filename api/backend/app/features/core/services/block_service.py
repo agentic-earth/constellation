@@ -131,7 +131,7 @@ class BlockService:
             Optional[PrismaBlock]: The retrieved block, or None if not found.
         """
         try:
-            block = await tx.block.find_unique(where={"block_id": str(block_id)})
+            block = await tx.block.find_unique(where={"block_id": str(block_id)}, include={"paper": True})
 
             if block:
                 self.logger.log(
@@ -166,7 +166,7 @@ class BlockService:
             Optional[PrismaBlock]: The retrieved block, or None if not found.
         """
         try:
-            block = await tx.block.find_unique(where={"name": name})
+            block = await tx.block.find_unique(where={"name": name}, include={"paper": True})
 
             if block:
                 self.logger.log(
