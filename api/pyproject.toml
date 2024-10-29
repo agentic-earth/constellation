@@ -23,7 +23,9 @@ prisma = "^0.15.0"
 PyPDF2 = "^3.0.0"
 scikit-learn = "^1.0.2"
 numpy = "^1.22.0"
+crewai = "^0.76.2"
 pgvector-haystack = "^1.0.0"
+sentence-transformers = "^3.2.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"

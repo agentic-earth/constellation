@@ -336,7 +336,27 @@ class BlockService:
             self.logger.log("BlockService", "error", f"Failed to retrieve block vector - error={str(e)}")
             return None
 
-    async def search_blocks_by_vector_similarity(self, query_vector: List[float], top_k: int = 10) -> List[Dict[str, Any]]:
+        # try:
+        #     query = f"""
+        #         SELECT vector::text AS vector_text
+        #         FROM "Block"
+        #         WHERE block_id = '{block_id}';
+        #     """
+        #     result = await tx.query_raw(query)
+            
+        #     if result and result[0]['vector_text']:
+        #         # Parse the PostgreSQL array string into a list of floats
+        #         vector_text = result[0]['vector_text']
+        #         # Use regex to extract all float values
+        #         vector_values = re.findall(r'-?\d+(?:\.\d+)?', vector_text)
+        #         # Convert each value to float
+        #         return [float(value) for value in vector_values]
+        #     # return None
+        # except Exception as e:
+        #     self.logger.log("BlockService", "error", f"Failed to retrieve block vector - error={str(e)}")
+        #     return None
+
+    async def search_blocks_by_vector_similarity(self, tx: Prisma, query_vector: List[float], top_k: int = 5) -> List[Dict[str, Any]]:
         """
         Performs a vector similarity search on blocks.
 
@@ -349,17 +369,24 @@ class BlockService:
             List[Dict[str, Any]]: List of similar blocks with their similarity scores.
         """
         try:
-            vector_str = ','.join(map(str, query_vector))
-            # <=> is the Euclidean Distance operator in PostgreSQL, whereas <#> is the vector Cosine similarity operator.
-            query = f"""
-                SELECT b.block_id, b.name, b.block_type, b.description, 
-                       1 - (b.vector <#> ARRAY[{vector_str}]::vector) AS similarity
-                FROM "Block" b
-                WHERE b.vector IS NOT NULL
-                ORDER BY similarity DESC
-                LIMIT {top_k};
-            """
-            results = await tx.query_raw(query)
+            docs = self.retriever.run(
+                query_embedding=query_vector, 
+                top_k=top_k, 
+                vector_function="cosine_similarity"
+            )
+
+            return [doc.to_dict() for doc in docs["documents"]]
+
+            # vector_str = ','.join(map(str, query_vector))
+            # query = f"""
+            #     SELECT b.block_id, b.name, b.block_type, b.description, 
+            #            1 - (b.vector <=> ARRAY[{vector_str}]::vector) as similarity
+            #     FROM "Block" b
+            #     WHERE b.vector IS NOT NULL
+            #     ORDER BY similarity DESC
+            #     LIMIT {top_k};
+            # """
+            # results = await tx.query_raw(query)
             
             # return [
             #     {
