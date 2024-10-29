@@ -1,2 +1,70 @@
-Log file initialized on 2024-10-09 15:08:38.706953
-2024-10-09 15:08:38,707 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.taxonomy`
+Log file initialized on 2024-10-25 17:13:57.767840
+2024-10-25 17:13:57,768 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text` - traceback=Traceback (most recent call last):
+  File "/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api/backend/app/features/core/services/block_service.py", line 82, in create_block
+    created_block = await tx.block.create(data=block_data)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/justinxiao/Library/Caches/pypoetry/virtualenvs/backend-sisOokqP-py3.12/lib/python3.12/site-packages/prisma/actions.py", line 2243, in create
+    resp = await self._client._execute(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/justinxiao/Library/Caches/pypoetry/virtualenvs/backend-sisOokqP-py3.12/lib/python3.12/site-packages/prisma/_base_client.py", line 543, in _execute
+    return await self._engine.query(builder.build(), tx_id=self._tx_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/justinxiao/Library/Caches/pypoetry/virtualenvs/backend-sisOokqP-py3.12/lib/python3.12/site-packages/prisma/engine/_query.py", line 402, in query
+    return await self.request(
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/justinxiao/Library/Caches/pypoetry/virtualenvs/backend-sisOokqP-py3.12/lib/python3.12/site-packages/prisma/engine/_http.py", line 233, in request
+    return self._process_response_data(data=data, response=response)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/justinxiao/Library/Caches/pypoetry/virtualenvs/backend-sisOokqP-py3.12/lib/python3.12/site-packages/prisma/engine/_http.py", line 87, in _process_response_data
+    return utils.handle_response_errors(response, errors_data)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/justinxiao/Library/Caches/pypoetry/virtualenvs/backend-sisOokqP-py3.12/lib/python3.12/site-packages/prisma/engine/utils.py", line 175, in handle_response_errors
+    raise exc(error)
+prisma.errors.FieldNotFoundError: Could not find field at `createOneBlock.data.text`
+
+2024-10-25 17:13:57,771 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text` - traceback=Traceback (most recent call last):
+  File "/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api/backend/app/features/core/services/block_service.py", line 82, in create_block
+    created_block = await tx.block.create(data=block_data)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/justinxiao/Library/Caches/pypoetry/virtualenvs/backend-sisOokqP-py3.12/lib/python3.12/site-packages/prisma/actions.py", line 2243, in create
+    resp = await self._client._execute(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/justinxiao/Library/Caches/pypoetry/virtualenvs/backend-sisOokqP-py3.12/lib/python3.12/site-packages/prisma/_base_client.py", line 543, in _execute
+    return await self._engine.query(builder.build(), tx_id=self._tx_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/justinxiao/Library/Caches/pypoetry/virtualenvs/backend-sisOokqP-py3.12/lib/python3.12/site-packages/prisma/engine/_query.py", line 402, in query
+    return await self.request(
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/justinxiao/Library/Caches/pypoetry/virtualenvs/backend-sisOokqP-py3.12/lib/python3.12/site-packages/prisma/engine/_http.py", line 233, in request
+    return self._process_response_data(data=data, response=response)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/justinxiao/Library/Caches/pypoetry/virtualenvs/backend-sisOokqP-py3.12/lib/python3.12/site-packages/prisma/engine/_http.py", line 87, in _process_response_data
+    return utils.handle_response_errors(response, errors_data)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/justinxiao/Library/Caches/pypoetry/virtualenvs/backend-sisOokqP-py3.12/lib/python3.12/site-packages/prisma/engine/utils.py", line 175, in handle_response_errors
+    raise exc(error)
+prisma.errors.FieldNotFoundError: Could not find field at `createOneBlock.data.text`
+
+2024-10-25 17:13:57,773 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text` - traceback=Traceback (most recent call last):
+  File "/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api/backend/app/features/core/services/block_service.py", line 82, in create_block
+    created_block = await tx.block.create(data=block_data)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/justinxiao/Library/Caches/pypoetry/virtualenvs/backend-sisOokqP-py3.12/lib/python3.12/site-packages/prisma/actions.py", line 2243, in create
+    resp = await self._client._execute(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/justinxiao/Library/Caches/pypoetry/virtualenvs/backend-sisOokqP-py3.12/lib/python3.12/site-packages/prisma/_base_client.py", line 543, in _execute
+    return await self._engine.query(builder.build(), tx_id=self._tx_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/justinxiao/Library/Caches/pypoetry/virtualenvs/backend-sisOokqP-py3.12/lib/python3.12/site-packages/prisma/engine/_query.py", line 402, in query
+    return await self.request(
+           ^^^^^^^^^^^^^^^^^^^
+  File "/Users/justinxiao/Library/Caches/pypoetry/virtualenvs/backend-sisOokqP-py3.12/lib/python3.12/site-packages/prisma/engine/_http.py", line 233, in request
+    return self._process_response_data(data=data, response=response)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/justinxiao/Library/Caches/pypoetry/virtualenvs/backend-sisOokqP-py3.12/lib/python3.12/site-packages/prisma/engine/_http.py", line 87, in _process_response_data
+    return utils.handle_response_errors(response, errors_data)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/justinxiao/Library/Caches/pypoetry/virtualenvs/backend-sisOokqP-py3.12/lib/python3.12/site-packages/prisma/engine/utils.py", line 175, in handle_response_errors
+    raise exc(error)
+prisma.errors.FieldNotFoundError: Could not find field at `createOneBlock.data.text`
+
