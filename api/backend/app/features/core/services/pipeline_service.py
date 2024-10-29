@@ -241,12 +241,14 @@ class PipelineService:
             self.logger.log("PipelineService", "error", "Error searching pipelines.", error=str(e))
             return []
 
-    async def list_pipelines(self, tx: Prisma, limit: int = 100, offset: int = 0) -> List[PrismaPipeline]:
+    async def list_pipelines(self, tx: Prisma, filters: Optional[Dict[str, Any]] = None, limit: int = 100, offset: int = 0) -> List[PrismaPipeline]:
         """
-        Lists all pipelines with pagination.
+        Lists all pipelines with pagination and optional filtering.
 
         Args:
             prisma (Prisma): The Prisma client instance.
+            filters (Optional[Dict[str, Any]]): Key-value pairs to filter the pipelines.
+                Supported filters: 'name', 'user_id'.
             limit (int): The maximum number of pipelines to return.
             offset (int): The number of pipelines to skip.
 
@@ -255,6 +257,7 @@ class PipelineService:
         """
         try:
             pipelines = await tx.pipeline.find_many(
+                where=filters,
                 skip=offset,
                 take=limit,
                 include={

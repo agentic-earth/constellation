@@ -28,6 +28,7 @@ from backend.app.features.core.services.block_service import BlockService
 from backend.app.features.core.services.taxonomy_service import TaxonomyService
 from backend.app.features.core.services.audit_service import AuditService
 from backend.app.features.core.services.vector_embedding_service import VectorEmbeddingService
+from backend.app.features.core.services.paper_service import PaperService
 from backend.app.utils.serialization_utils import align_dict_with_model  # Ensure this import is present
 import asyncio
 from prisma import Prisma
@@ -41,11 +42,13 @@ class BlockController:
         self.taxonomy_service = TaxonomyService()
         self.audit_service = AuditService()
         self.vector_embedding_service = VectorEmbeddingService(api_key)
+        self.paper_service = PaperService()
         self.logger = ConstellationLogger()
 
     async def create_block(self, block_data: Dict[str, Any], user_id: UUID) -> Optional[Dict[str, Any]]:
         """
         Creates a new block along with its taxonomy and audit log within a transaction.
+        Also, creates a new paper if block_type == paper
 
         Args:
             block_data (Dict[str, Any]): Data for creating the block.
@@ -54,6 +57,9 @@ class BlockController:
                 - description: str
                 - taxonomy: Optional[Dict[str, Any]]
                 - text_to_vector: Optional[string] for vectorization
+                - pdf_url: string, url of the paper if block_type == paper
+                - title: string, title of the paper if block_type == paper
+                - abstract: string, abstract of the paper if block_type == paper, should be used to generate vector embedding
             user_id (UUID): ID of the user performing the operation.
 
         Returns:
@@ -63,7 +69,13 @@ class BlockController:
             # Step 0: Generate vector embedding if given text_to_vector
             # generate embedding outside the transaction to avoid transaction timeout.
             text_to_vector = block_data.pop("text_to_vector", None)
+
+            # vectorize abstract for paper block
+            if block_data["block_type"] == "paper":
+                text_to_vector = block_data["abstract"]
             vector = None
+
+            # generate embedding if given one
             if text_to_vector:
                 vector = await self.vector_embedding_service.generate_text_embedding(text_to_vector)
                 self.logger.log("BlockController", "info", f"Vector length: {len(vector)}")
@@ -85,6 +97,12 @@ class BlockController:
                     )
                     if not taxonomy_success:
                         raise ValueError("Failed to create taxonomy for block.")
+                
+                # Step 2.5: Create paper if block_type is paper
+                if created_block.block_type == "paper":
+                    created_paper = await self.paper_service.create_paper(tx=tx, paper_data=block_data, block_id=created_block.block_id)
+                    if not created_paper:
+                        raise ValueError("Failed to create block with paper.")
 
                 # Step 3: Audit Logging
                 audit_log = {
@@ -145,6 +163,9 @@ class BlockController:
                 - description: str
                 - taxonomy: Optional[Dict[str, Any]]
                 - text_to_vector: Optional[List[float]] for vectorization
+                - pdf_url: string, url of the paper if block_type == paper
+                - title: string, title of the paper if block_type == paper
+                - abstract: string, abstract of the paper if block_type == paper, should be used to generate vector embedding
             user_id (UUID): UUID of the user performing the update.
 
         Returns:
@@ -154,7 +175,11 @@ class BlockController:
             # Step 0: Generate vector embedding if given `text_to_vector` in `update_data`
             # generate embedding outside the transaction to avoid transaction timeout.
             text_to_vector = update_data.pop("text_to_vector", None)
+
+            if update_data.get("block_type", None) == "paper":  
+                text_to_vector = update_data.get("abstract", None)
             vector = None
+
             if text_to_vector:
                 vector = await self.vector_embedding_service.generate_text_embedding(text_to_vector)
 
@@ -239,7 +264,7 @@ class BlockController:
             print(traceback.format_exc())
             return False
 
-    async def search_blocks(self, search_filters: Dict[str, Any], user_id: UUID) -> Optional[List[Dict[str, Any]]]:
+    async def search_blocks_by_filters(self, search_filters: Dict[str, Any], user_id: UUID) -> Optional[List[Dict[str, Any]]]:
         """
         Wrapper method to perform search and handle audit logging.
 

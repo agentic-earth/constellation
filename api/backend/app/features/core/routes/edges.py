@@ -22,51 +22,48 @@ from fastapi import APIRouter, HTTPException, Depends, Query, status
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from backend.app.features.core.controllers.edge_controller import EdgeController
-from backend.app.schemas import (
-    EdgeCreateSchema,
-    EdgeUpdateSchema,
-    EdgeResponseSchema,
-    EdgeVerificationRequestSchema,
-    EdgeVerificationResponseSchema
+
+from prisma.partials import (
+    EdgeBasicInfo,
+    EdgeBasicInfoWithID,
+    EdgeUpdate
 )
+
 from backend.app.dependencies import get_edge_controller
 
-router = APIRouter(
-    prefix="/edges",
-    tags=["Edges"],
-    responses={404: {"description": "Not found"}},
-)
+router = APIRouter()
 
 # -------------------
 # Edge Endpoints
 # -------------------
 
-@router.post("/", response_model=EdgeResponseSchema, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=EdgeBasicInfo, status_code=status.HTTP_201_CREATED)
 async def create_edge(
-    edge: EdgeCreateSchema,
+    edge: EdgeBasicInfo,
+    user_id: UUID,
     controller: EdgeController = Depends(get_edge_controller)
 ):
     """
     Create a new edge.
 
     Args:
-        edge (EdgeCreateSchema): The data required to create a new edge.
+        edge (EdgeBasicInfo): The data required to create a new edge.
+        user_id (UUID): The ID of the user performing the action.
         controller (EdgeController): The injected EdgeController instance.
 
     Returns:
-        EdgeResponseSchema: The created edge's data.
+        EdgeBasicInfo: The created edge's data.
     """
-    try:
-        created_edge = await controller.create_edge(edge)
-        return created_edge
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Internal Server Error during edge creation.")
+    edge_data = edge.model_dump(exclude_none=True)
+    created_edge = await controller.create_edge(edge_data, user_id)
+    if not created_edge:
+        raise HTTPException(status_code=400, detail="Edge creation failed.")
+    return created_edge
 
-@router.get("/{edge_id}", response_model=EdgeResponseSchema)
+@router.get("/{edge_id}", response_model=EdgeBasicInfoWithID)
 async def get_edge(
     edge_id: UUID,
+    user_id: UUID,
     controller: EdgeController = Depends(get_edge_controller)
 ):
     """
@@ -77,20 +74,18 @@ async def get_edge(
         controller (EdgeController): The injected EdgeController instance.
 
     Returns:
-        EdgeResponseSchema: The edge's data if found.
+        EdgeBasicInfoWithID: The edge's data if found.
     """
-    try:
-        edge = await controller.get_edge_by_id(edge_id)
-        return edge
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Internal Server Error during edge retrieval.")
+    edge = await controller.get_edge_by_id(edge_id, user_id)
+    if not edge:
+        raise HTTPException(status_code=404, detail="Edge not found.")
+    return edge
 
-@router.put("/{edge_id}", response_model=EdgeResponseSchema)
+@router.put("/{edge_id}", response_model=EdgeBasicInfo)
 async def update_edge(
     edge_id: UUID,
-    edge_update: EdgeUpdateSchema,
+    edge_update: EdgeUpdate,
+    user_id: UUID,
     controller: EdgeController = Depends(get_edge_controller)
 ):
     """
@@ -102,19 +97,18 @@ async def update_edge(
         controller (EdgeController): The injected EdgeController instance.
 
     Returns:
-        EdgeResponseSchema: The updated edge's data if successful.
+        EdgeBasicInfo: The updated edge's data if successful.
     """
-    try:
-        updated_edge = await controller.update_edge(edge_id, edge_update)
-        return updated_edge
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Internal Server Error during edge update.")
+    edge_update_data = edge_update.model_dump(exclude_none=True)
+    updated_edge = await controller.update_edge(edge_id, edge_update_data, user_id)
+    if not updated_edge:
+        raise HTTPException(status_code=400, detail="Edge update failed.")
+    return updated_edge
 
 @router.delete("/{edge_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_edge(
     edge_id: UUID,
+    user_id: UUID,
     controller: EdgeController = Depends(get_edge_controller)
 ):
     """
@@ -127,130 +121,92 @@ async def delete_edge(
     Returns:
         HTTP 204 No Content: If deletion was successful.
     """
-    try:
-        await controller.delete_edge(edge_id)
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Internal Server Error during edge deletion.")
+    success = await controller.delete_edge(edge_id, user_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Edge deletion failed.")
     return
 
-@router.get("/", response_model=List[EdgeResponseSchema])
-async def list_edges(
-    name: Optional[str] = Query(None, description="Filter edges by name"),
-    block_id: Optional[UUID] = Query(None, description="Filter edges by associated block ID"),
-    controller: EdgeController = Depends(get_edge_controller)
-):
-    """
-    List edges with optional filtering by name and associated block.
+# @router.get("/", response_model=List[EdgeBasicInfoWithID])
+# async def list_edges(
+#     user_id: UUID,
+#     filters: Optional[Dict[str, Any]] = Query(None, description="Filters to apply"),
+#     limit: Optional[int] = Query(100, description="Maximum number of edges to retrieve"),
+#     offset: Optional[int] = Query(0, description="Number of edges to skip"),
+#     controller: EdgeController = Depends(get_edge_controller)
+# ):
+#     """
+#     List edges with optional filtering by name and associated block.
 
-    Args:
-        name (Optional[str]): Filter edges by name.
-        block_id (Optional[UUID]): Filter edges by associated block ID.
-        controller (EdgeController): The injected EdgeController instance.
+#     Args:
+#         filters (Optional[Dict[str, Any]]): Filters to apply.
+#             Supported filters:
+#                 - 'source_block_id': UUID
+#                 - 'target_block_id': UUID
+#                 - 'name_contains': string
+#         limit (Optional[int]): Maximum number of edges to retrieve.
+#         offset (Optional[int]): Number of edges to skip.
+#         controller (EdgeController): The injected EdgeController instance.
 
-    Returns:
-        List[EdgeResponseSchema]: A list of edges matching the filters.
-    """
-    try:
-        filters: Dict[str, Any] = {}
-        if name:
-            filters["name"] = name
-        if block_id:
-            filters["block_id"] = str(block_id)  # Adjust based on actual schema
-        edges = await controller.list_edges(filters)
-        return edges
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Internal Server Error during edge listing.")
+#     Returns:
+#         List[EdgeBasicInfoWithID]: A list of edges matching the filters.
+#     """
+#     edges = await controller.list_edges(filters, user_id, limit, offset)
+#     return edges
 
 # -------------------
 # Complex Edge Operations Endpoints
 # -------------------
 
-@router.post("/{edge_id}/assign-version/", status_code=status.HTTP_200_OK)
-async def assign_version(
-    edge_id: UUID,
-    version_id: UUID,
-    controller: EdgeController = Depends(get_edge_controller)
-):
-    """
-    Assign a specific version to an edge.
+# @router.post("/{edge_id}/assign-version/", status_code=status.HTTP_200_OK)
+# async def assign_version(
+#     edge_id: UUID,
+#     version_id: UUID,
+#     user_id: UUID,
+#     controller: EdgeController = Depends(get_edge_controller)
+# ):
+#     """
+#     Assign a specific version to an edge.
 
-    Args:
-        edge_id (UUID): The UUID of the edge.
-        version_id (UUID): The UUID of the version to assign.
-        controller (EdgeController): The injected EdgeController instance.
+#     Args:
+#         edge_id (UUID): The UUID of the edge.
+#         version_id (UUID): The UUID of the version to assign.
+#         user_id (UUID): The ID of the user performing the action.
+#         controller (EdgeController): The injected EdgeController instance.
 
-    Returns:
-        dict: A message indicating the result of the operation.
-    """
-    try:
-        success = await controller.assign_version_to_edge(edge_id, version_id)
-        return {"message": "Version assigned to edge successfully."}
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Internal Server Error during version assignment.")
+#     Returns:
+#         dict: A message indicating the result of the operation.
+#     """
+#     try:
+#         success = await controller.assign_version_to_edge(edge_id, version_id)
+#         return {"message": "Version assigned to edge successfully."}
+#     except HTTPException as he:
+#         raise he
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail="Internal Server Error during version assignment.")
 
 # -------------------
 # Edge Verification Endpoint
 # -------------------
 
-@router.post("/verify/", response_model=EdgeVerificationResponseSchema, status_code=status.HTTP_200_OK)
-async def verify_edge(
-    verification_request: EdgeVerificationRequestSchema,
-    controller: EdgeController = Depends(get_edge_controller)
-):
-    """
-    Verify if an edge can be created between two blocks.
+# @router.post("/verify/", response_model=EdgeVerificationResponseSchema, status_code=status.HTTP_200_OK)
+# async def verify_edge(
+#     verification_request: EdgeVerificationRequestSchema,
+#     controller: EdgeController = Depends(get_edge_controller)
+# ):
+#     """
+#     Verify if an edge can be created between two blocks.
 
-    Args:
-        verification_request (EdgeVerificationRequestSchema): The source and target block IDs.
-        controller (EdgeController): The injected EdgeController instance.
+#     Args:
+#         verification_request (EdgeVerificationRequestSchema): The source and target block IDs.
+#         controller (EdgeController): The injected EdgeController instance.
 
-    Returns:
-        EdgeVerificationResponseSchema: The result of the verification.
-    """
-    try:
-        verification_result = await controller.verify_edge(verification_request)
-        return verification_result
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Internal Server Error during edge verification.")
-
-# -------------------
-# Edge Search Endpoint
-# -------------------
-
-@router.get("/search/", response_model=List[EdgeResponseSchema])
-async def search_edges(
-    name: Optional[str] = Query(None, description="Filter by edge name"),
-    taxonomy: Optional[List[str]] = Query(None, description="Filter by taxonomy categories"),
-    controller: EdgeController = Depends(get_edge_controller)
-):
-    """
-    Search for edges based on name and taxonomy categories.
-
-    Args:
-        name (Optional[str]): Filter edges by name.
-        taxonomy (Optional[List[str]]): Filter edges by taxonomy categories.
-        controller (EdgeController): The injected EdgeController instance.
-
-    Returns:
-        List[EdgeResponseSchema]: A list of edges matching the search criteria.
-    """
-    try:
-        query: Dict[str, Any] = {}
-        if name:
-            query["name"] = name
-        if taxonomy:
-            query["taxonomy"] = taxonomy  # Adjust based on actual schema
-        edges = await controller.search_edges(query)
-        return edges
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Internal Server Error during edge search.")
+#     Returns:
+#         EdgeVerificationResponseSchema: The result of the verification.
+#     """
+#     try:
+#         verification_result = await controller.verify_edge(verification_request)
+#         return verification_result
+#     except HTTPException as he:
+#         raise he
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail="Internal Server Error during edge verification.")
