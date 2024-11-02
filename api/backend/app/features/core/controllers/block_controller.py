@@ -310,6 +310,7 @@ class BlockController:
         try:
             # Step 1: generate vector embedding for the query
             query_vector = await self.vector_embedding_service.generate_text_embedding(query)
+            print(f"Query vector: {query_vector[0:5]}... (truncated)")
             if not query_vector:
                 raise ValueError("Failed to generate vector for the query.")
 

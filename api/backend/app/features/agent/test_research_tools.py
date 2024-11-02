@@ -1,4 +1,5 @@
 import sys
+
 sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api")
 sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api/backend")
 
@@ -8,6 +9,8 @@ from backend.app.config import Settings
 from backend.app.features.agent.tools.vector_embed_tool import VectorEmbedTool
 from backend.app.features.agent.tools.similarity_search_tool import SimilaritySearchTool
 from backend.app.features.core.services.block_service import BlockService
+from backend.app.features.agent.crews.research_crew import ResearchCrew
+from backend.app.features.agent.crews.dev_crew import DevCrew
 
 
 async def test_tools():
@@ -15,6 +18,8 @@ async def test_tools():
     settings = Settings()
     # await block_service.connect()
     prisma = Prisma(datasource={"url": str(settings.DATABASE_URL)})
+    research_crew = ResearchCrew()
+    dev_crew = DevCrew()
     await prisma.connect()
     print("Connected to db")
 
@@ -73,6 +78,13 @@ async def test_tools():
                     print(f"id: {block['id']} \nContent: {block['content']} \nSimilarity: {block['score']}\n")
             else:
                 print("No similar blocks found.")
+
+            print("\nTesting Research Crew:")
+               # Get the crew instance
+            crew_instance = research_crew.create_research_crew()
+
+            # Run the crew
+            crew_instance.kickoff()
 
     except Exception as e:
         print(f"An error occurred: {e}")

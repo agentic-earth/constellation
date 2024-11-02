@@ -1,5 +1,5 @@
-Log file initialized on 2024-10-25 17:13:57.767840
-2024-10-25 17:13:57,768 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text` - traceback=Traceback (most recent call last):
+Log file initialized on 2024-10-29 17:53:22.130353
+2024-10-29 17:53:22,130 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text` - traceback=Traceback (most recent call last):
   File "/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api/backend/app/features/core/services/block_service.py", line 82, in create_block
     created_block = await tx.block.create(data=block_data)
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -22,7 +22,7 @@ Log file initialized on 2024-10-25 17:13:57.767840
     raise exc(error)
 prisma.errors.FieldNotFoundError: Could not find field at `createOneBlock.data.text`
 
-2024-10-25 17:13:57,771 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text` - traceback=Traceback (most recent call last):
+2024-10-29 17:53:22,132 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text` - traceback=Traceback (most recent call last):
   File "/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api/backend/app/features/core/services/block_service.py", line 82, in create_block
     created_block = await tx.block.create(data=block_data)
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -45,7 +45,7 @@ prisma.errors.FieldNotFoundError: Could not find field at `createOneBlock.data.t
     raise exc(error)
 prisma.errors.FieldNotFoundError: Could not find field at `createOneBlock.data.text`
 
-2024-10-25 17:13:57,773 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text` - traceback=Traceback (most recent call last):
+2024-10-29 17:53:22,134 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text` - traceback=Traceback (most recent call last):
   File "/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api/backend/app/features/core/services/block_service.py", line 82, in create_block
     created_block = await tx.block.create(data=block_data)
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
