@@ -93,10 +93,10 @@ class AuditService:
             create_data = {
                 "log_id": str(uuid4()),
                 "user_id": str(audit_data["user_id"]),
-                "action_type": PrismaActionTypeEnum[audit_data["action_type"]],
-                "entity_type": PrismaAuditEntityTypeEnum[audit_data["entity_type"]],
+                "action_type": str(PrismaActionTypeEnum[audit_data["action_type"]]),
+                "entity_type": str(PrismaAuditEntityTypeEnum[audit_data["entity_type"]]),
                 "entity_id": str(audit_data["entity_id"]),
-                "timestamp": datetime.now(timezone.utc),
+                "timestamp": str(datetime.now(timezone.utc)),
                 "details": json.dumps(details)  # Ensure this is a dict
             }
 

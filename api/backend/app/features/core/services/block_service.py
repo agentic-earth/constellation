@@ -26,7 +26,7 @@ while providing a clean API for block operations.
 import re
 from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 import asyncio
 
 from prisma.errors import UniqueViolationError
@@ -72,8 +72,8 @@ class BlockService:
             Optional[PrismaBlock]: The created or existing block.
         """
         block_data['block_id'] = str(uuid4())
-        block_data['created_at'] = datetime.utcnow()
-        block_data['updated_at'] = datetime.utcnow()
+        block_data['created_at'] = datetime.now(timezone.utc)
+        block_data['updated_at'] = datetime.now(timezone.utc)
         try:
             # Remove 'vector' from block_data since it's unsupported by Prisma
             block_data.pop('vector', None)

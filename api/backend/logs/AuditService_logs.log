@@ -1,3 +1,3 @@
-Log file initialized on 2024-10-09 15:08:38.986861
-2024-10-09 15:08:38,987 - AuditService - INFO - Audit log created successfully. - log_id=ae388ad8-1b88-413c-83b3-56fcdae4795e - action_type=READ - entity_type=block - entity_id=ccc9810d-0acb-4901-a1d9-2ac8021d8a2c
-2024-10-09 15:08:39,440 - AuditService - INFO - Audit log created successfully. - log_id=f12a6864-6eb7-4e5e-a3d3-512f0fa694a7 - action_type=READ - entity_type=block - entity_id=e0563fc3-fd00-4408-b91a-95e76b67ee88
+Log file initialized on 2024-10-29 17:04:29.688911
+2024-10-29 17:04:29,692 - AuditService - INFO - Audit log data is valid. - extra={'audit_create_data': {'log_id': 'e887361e-d648-48bf-9890-c69d943edbab', 'user_id': '36906826-9558-4631-b4a6-c34d6109856d', 'action_type': 'READ', 'entity_type': 'block', 'entity_id': 'cb8ac065-949d-4782-9cc3-87752fd8c604', 'timestamp': datetime.datetime(2024, 10, 29, 21, 4, 29, 685708, tzinfo=datetime.timezone.utc), 'details': '{"results_count": 4}'}}
+2024-10-29 17:04:29,904 - AuditService - INFO - Audit log created successfully. - log_id=e887361e-d648-48bf-9890-c69d943edbab - action_type=READ - entity_type=block - entity_id=cb8ac065-949d-4782-9cc3-87752fd8c604

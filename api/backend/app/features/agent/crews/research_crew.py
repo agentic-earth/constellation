@@ -8,8 +8,8 @@ from backend.app.features.agent.tools.similarity_search_tool import SimilaritySe
 class ResearchCrew:
     '''Research Crew'''
 
-    agents_config = "agents_config.yaml"
-    tasks_config = "tasks_config.yaml"
+    agents_config = "agents.yaml"
+    tasks_config = "tasks.yaml"
     llm = ChatOpenAI(model="gpt-4o")
 
     @agent
@@ -34,7 +34,7 @@ class ResearchCrew:
         )
     
     @crew
-    def research_crew(self) -> Crew:
+    def create_research_crew(self) -> Crew:
         return Crew(
             agents=[self.research_agent],
             tasks=[self.research_task],
