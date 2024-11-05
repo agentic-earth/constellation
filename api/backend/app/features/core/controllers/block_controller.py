@@ -29,7 +29,7 @@ import asyncio
 from prisma import Prisma
 from backend.app.logger import ConstellationLogger
 from prisma.models import AuditLog as PrismaAuditLog
-
+import traceback
 class BlockController:
     def __init__(self, prisma: Prisma, api_key: Optional[str] = None):
         self.prisma = prisma
@@ -51,7 +51,7 @@ class BlockController:
                 - block_type: BlockTypeEnum
                 - description: str
                 - taxonomy: Optional[Dict[str, Any]]
-                - text_to_vector: Optional[string] for vectorization
+                - content: Optional[str] for vectorization
                 - pdf_url: string, url of the paper if block_type == paper
                 - title: string, title of the paper if block_type == paper
                 - abstract: string, abstract of the paper if block_type == paper, should be used to generate vector embedding
@@ -63,20 +63,24 @@ class BlockController:
         try:
             # Step 0: Generate vector embedding if given text_to_vector
             # generate embedding outside the transaction to avoid transaction timeout.
-            text_to_vector = block_data.pop("text_to_vector", None)
+            content = block_data.pop("content", None)
 
             # vectorize abstract for paper block
             if block_data["block_type"] == "paper":
-                text_to_vector = block_data["abstract"]
+                content = block_data["abstract"]
             vector = None
 
             # generate embedding if given one
-            if text_to_vector:
-                vector = await self.vector_embedding_service.generate_text_embedding(text_to_vector)
-                self.logger.log("BlockController", "info", f"Vector length: {len(vector)}")
+            if content:
+                vector = await self.vector_embedding_service.generate_text_embedding(content)
 
             async with self.prisma.tx(timeout=10000) as tx:
                 taxonomy = block_data.pop("taxonomy", None)
+                paper_data = {
+                    "pdf_url": block_data.pop("pdf_url", ""),
+                    "title": block_data.pop("title", ""),
+                    "abstract": block_data.pop("abstract", ""),
+                }
 
                 # Step 1: Create Block
                 created_block = await self.block_service.create_block(tx=tx, block_data=block_data, vector=vector)
@@ -95,7 +99,7 @@ class BlockController:
                 
                 # Step 2.5: Create paper if block_type is paper
                 if created_block.block_type == "paper":
-                    created_paper = await self.paper_service.create_paper(tx=tx, paper_data=block_data, block_id=created_block.block_id)
+                    created_paper = await self.paper_service.create_paper(tx=tx, paper_data=paper_data, block_id=created_block.block_id)
                     if not created_paper:
                         raise ValueError("Failed to create block with paper.")
 
@@ -117,9 +121,7 @@ class BlockController:
                 return created_block.dict()
 
         except Exception as e:
-            print(f"An error occurred during block creation: {e}")
-            import traceback
-            print(traceback.format_exc())
+            self.logger.log("BlockController", "error", "Failed to create block", error=str(e), extra=traceback.format_exc())
             return None
 
     async def get_block_by_id(self, block_id: UUID, user_id: UUID) -> Optional[Dict[str, Any]]:
@@ -142,14 +144,14 @@ class BlockController:
                     print(f"Block with ID {block_id} not found.")
                     return None
         except Exception as e:
-            print(f"An error occurred during block retrieval: {e}")
-            import traceback
-            print(traceback.format_exc())
+            self.logger.log("BlockController", "error", "Failed to retrieve block", error=str(e), extra=traceback.format_exc())
             return None
 
     async def update_block(self, block_id: UUID, update_data: Dict[str, Any], user_id: UUID) -> Optional[Dict[str, Any]]:
         """
         Updates an existing block's details and taxonomy within a transaction.
+        Also, updates the vector embedding if given `content` in `update_data`
+        **Cannot update paper blocks**
 
         Args:
             block_id (UUID): UUID of the block to update.
@@ -158,7 +160,7 @@ class BlockController:
                 - block_type: BlockTypeEnum
                 - description: str
                 - taxonomy: Optional[Dict[str, Any]]
-                - text_to_vector: Optional[List[float]] for vectorization
+                - content: Optional[str] for vectorization
                 - pdf_url: string, url of the paper if block_type == paper
                 - title: string, title of the paper if block_type == paper
                 - abstract: string, abstract of the paper if block_type == paper, should be used to generate vector embedding
@@ -168,16 +170,16 @@ class BlockController:
             Optional[Dict[str, Any]]: The updated block data if successful, None otherwise.
         """
         try:
-            # Step 0: Generate vector embedding if given `text_to_vector` in `update_data`
+            # Step 0: Generate vector embedding if given `content` in `update_data`
             # generate embedding outside the transaction to avoid transaction timeout.
-            text_to_vector = update_data.pop("text_to_vector", None)
+            content = update_data.pop("content", None)
 
             if update_data.get("block_type", None) == "paper":  
-                text_to_vector = update_data.get("abstract", None)
+                content = update_data.get("abstract", None)
             vector = None
 
-            if text_to_vector:
-                vector = await self.vector_embedding_service.generate_text_embedding(text_to_vector)
+            if content:
+                vector = await self.vector_embedding_service.generate_text_embedding(content)
 
             async with self.prisma.tx() as tx:
                 taxonomy = update_data.pop('taxonomy', None)
@@ -215,9 +217,7 @@ class BlockController:
                 return updated_block.dict()
 
         except Exception as e:
-            print(f"An error occurred during block update: {e}")
-            import traceback
-            print(traceback.format_exc())
+            self.logger.log("BlockController", "error", "Failed to update block", error=str(e), extra=traceback.format_exc())
             return None
 
     async def delete_block(self, block_id: UUID, user_id: UUID) -> bool:
@@ -255,9 +255,7 @@ class BlockController:
 
                 return True
         except Exception as e:
-            print(f"An error occurred during block deletion: {e}")
-            import traceback
-            print(traceback.format_exc())
+            self.logger.log("BlockController", "error", "Failed to delete block", error=str(e), extra=traceback.format_exc())
             return False
 
     async def search_blocks_by_filters(self, search_filters: Dict[str, Any], user_id: UUID) -> Optional[List[Dict[str, Any]]]:
@@ -297,9 +295,7 @@ class BlockController:
 
                 return [block.dict() for block in blocks]
         except Exception as e:
-            print(f"An error occurred during search blocks: {e}")
-            import traceback
-            print(traceback.format_exc())
+            self.logger.log("BlockController", "error", "Failed to search blocks", error=str(e), extra=traceback.format_exc())
             return None
 
     async def search_blocks_by_vector_similarity(self, query: str, user_id: UUID, top_k: int=5) -> Optional[List[Dict[str, Any]]]:
@@ -321,7 +317,7 @@ class BlockController:
                     "user_id": str(user_id),
                     "action_type": "READ",  # Use 'READ' for searches
                     "entity_type": "block",  # If 'block_search' is not in enum, use 'block'
-                    "entity_id": blocks[0]["id"] if blocks else str(UUID(int=0)),  # TODO: temporary using first block id
+                    "entity_id": blocks[0].block_id if blocks else str(UUID(int=0)),  # TODO: temporary using first block id
                     "details": {
                         "results_count": len(blocks)
                     }
@@ -333,11 +329,9 @@ class BlockController:
                 if not audit_log:
                     raise Exception("Failed to create audit log for block search by vector")
                 
-                return blocks
+                return [block.dict() for block in blocks]
         except Exception as e:
-            print(f"An error occurred during search blocks by vector similarity: {e}")
-            import traceback
-            print(traceback.format_exc())
+            self.logger.log("BlockController", "error", "Failed to search blocks by vector similarity", error=str(e), extra=traceback.format_exc())
             return None
 
 # -------------------
@@ -379,7 +373,7 @@ async def main():
                     ]
                 }
             },
-            "text_to_vector": "In certain parts of the world, like the Maldives, Puerto Rico, and San Diego, you can witness the phenomenon of bioluminescent waves."
+            "content": "In certain parts of the world, like the Maldives, Puerto Rico, and San Diego, you can witness the phenomenon of bioluminescent waves."
             # "metadata": {  # Removed as it's not part of the Prisma schema
             #     "vector": [0.1] * 512  # Example 512-dimensional vector
             # }
@@ -410,7 +404,7 @@ async def main():
                     ]
                 }
             },
-            "text_to_vector": "Elephants have been observed to behave in a way that indicates a high level of self-awareness, such as recognizing themselves in mirrors."
+            "content": "Elephants have been observed to behave in a way that indicates a high level of self-awareness, such as recognizing themselves in mirrors."
             # "metadata": {  # Removed as it's not part of the Prisma schema
             #     "vector": [0.1] * 512  # Example 512-dimensional vector
             # }
@@ -458,7 +452,7 @@ async def main():
                         ]
                     }
                 },
-                "text_to_vector": "There are over 7,000 languages spoken around the world today."
+                "content": "There are over 7,000 languages spoken around the world today."
             }
             updated_block = await controller.update_block(created_block['block_id'], update_schema, user_id)
             if updated_block:
