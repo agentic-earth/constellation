@@ -26,6 +26,7 @@ numpy = "^1.22.0"
 crewai = "^0.76.2"
 pgvector-haystack = "^1.0.0"
 sentence-transformers = "^3.2.1"
+langchain-openai = "^0.2.5"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
