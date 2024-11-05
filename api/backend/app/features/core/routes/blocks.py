@@ -1,12 +1,15 @@
 # routes/blocks.py
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from uuid import UUID
 
 from prisma.partials import (
     BlockBasicInfo,
     BlockBasicInfoWithID,
+    BlockVectorContent,
+    PaperBasicInfo,
+    BlockUpdateInfo
 )
 
 from backend.app.features.core.controllers.block_controller import BlockController
@@ -22,10 +25,16 @@ router = APIRouter()
 async def create_block(
     block: BlockBasicInfo,
     user_id: UUID,
+    vector_content: Optional[BlockVectorContent] = None,
+    paper: Optional[PaperBasicInfo] = None,
     controller: BlockController = Depends(get_block_controller)
 ):
     block_data = block.dict(exclude_unset=True)
-    created_block = await controller.create_block(block_data, user_id)
+    vector_content_data = vector_content.dict(exclude_unset=True) if vector_content else {}
+    paper_data = paper.dict(exclude_unset=True) if paper else {}
+    combined_data = {**block_data, **vector_content_data, **paper_data}
+
+    created_block = await controller.create_block(combined_data, user_id)
     if not created_block:
         raise HTTPException(status_code=400, detail="Block creation failed.")
     return created_block
@@ -44,12 +53,16 @@ async def get_block(
 @router.put("/{block_id}", response_model=BlockBasicInfo)
 async def update_block(
     block_id: UUID,
-    update_data: BlockBasicInfo,
+    update_data: BlockUpdateInfo,
     user_id: UUID,
+    vector_content: Optional[BlockVectorContent] = None,
     controller: BlockController = Depends(get_block_controller)
 ):
     update_dict = update_data.dict(exclude_unset=True)
-    updated_block = await controller.update_block(block_id, update_dict, user_id)
+    vector_content_data = vector_content.dict(exclude_unset=True) if vector_content else {}
+    combined_data = {**update_dict, **vector_content_data}
+    
+    updated_block = await controller.update_block(block_id, combined_data, user_id)
     if not updated_block:
         raise HTTPException(status_code=400, detail="Block update failed.")
     return updated_block
