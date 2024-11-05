@@ -16,10 +16,9 @@ from backend.app.features.agent.crews.dev_crew import DevCrew
 async def test_tools():
     block_service = BlockService()
     settings = Settings()
-    # await block_service.connect()
     prisma = Prisma(datasource={"url": str(settings.DATABASE_URL)})
     research_crew = ResearchCrew()
-    dev_crew = DevCrew()
+    # dev_crew = DevCrew()
     await prisma.connect()
     print("Connected to db")
 
