@@ -1,6 +1,6 @@
 from backend.app.features.agent.tools.vector_embed_tool import VectorEmbedTool
 from backend.app.features.agent.tools.similarity_search_tool import SimilaritySearchTool
-from crewai import Crew, Agent, Process, Task
+from crewai import Agent, Task, Crew, Process
 from langchain_openai import ChatOpenAI
 import yaml
 
@@ -30,21 +30,22 @@ class ResearchCrew:
     def research_task(self) -> Task:
         return Task(
             # config=self.tasks_config["find_similar_paper"],
-            description="Find the most similar paper to the user's query and provide a summary.",
+            description="Find the most similar paper to the background of human inputs and provide a summary of the paper, and also you should find the link to the GitHub repository of the paper.",
             prompt_context='You are a researcher looking for similar papers to a given query.',
             agent=self.research_agent_,
-            process=Process.sequential,
-            expected_output="JSON string of similar papers",
-            verbose=True
-        )
-    
-    def create_research_crew(self) -> Crew:
-        return Crew(
-            agents=[self.research_agent_],
-            tasks=[self.research_task_],
+            # process=Process.sequential,
+            # expected_output="JSON string of similar papers",
             verbose=True,
+            human_input=True,
         )
     
-if __name__ == "__main__":
-    crew = ResearchCrew()
-    crew.create_research_crew().kickoff()
+    # def create_research_crew(self) -> Crew:
+    #     return Crew(
+    #         agents=[self.research_agent_],
+    #         tasks=[self.research_task_],
+    #         verbose=True,
+    #     )
+    
+# if __name__ == "__main__":
+#     crew = ResearchCrew()
+#     crew.create_research_crew().kickoff()

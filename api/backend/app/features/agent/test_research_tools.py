@@ -1,5 +1,7 @@
 import sys
 
+from backend.app.features.agent.crews.crew_process import CrewProcess
+
 sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api")
 sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api/backend")
 
@@ -17,7 +19,7 @@ async def test_tools():
     block_service = BlockService()
     settings = Settings()
     prisma = Prisma(datasource={"url": str(settings.DATABASE_URL)})
-    research_crew = ResearchCrew()
+    crew_process = CrewProcess()
     # dev_crew = DevCrew()
     await prisma.connect()
     print("Connected to db")
@@ -80,10 +82,9 @@ async def test_tools():
 
             print("\nTesting Research Crew:")
                # Get the crew instance
-            crew_instance = research_crew.create_research_crew()
-
+            crew = crew_process.make_crews()
             # Run the crew
-            crew_instance.kickoff()
+            crew.kickoff()
 
     except Exception as e:
         print(f"An error occurred: {e}")

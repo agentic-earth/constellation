@@ -1,5 +1,4 @@
 from crewai import Crew, Agent, Process, Task
-from crewai.project import CrewBase, agent, crew, task
 from langchain_openai import ChatOpenAI
 
 @CrewBase
