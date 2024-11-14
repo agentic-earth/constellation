@@ -12,7 +12,7 @@ from pathlib import Path
 
 app = modal.App(name="{service_name}")
 image = modal.Image.debian_slim(python_version="3.11").pip_install(
-    "flask", "Pillow", "torch", "torchvision", "transformers"
+    "flask", "Pillow", "torch", "torchvision", "transformers", "tensorflow", "tf-keras"
 )
 
 @app.function(image=image)
@@ -22,7 +22,7 @@ def flask_app():
 
     web_app = Flask(__name__)
 
-    from transformers import pipeline
+    from transformers import pipeline, AutoModelForImageClassification, AutoImageProcessor
 
     from io import BytesIO
     from PIL import Image as PILImage
@@ -35,7 +35,14 @@ def flask_app():
     logger.info("Downloading and loading Model...")
 
     # Initialize the pipeline
-    pipe = pipeline("image-classification", model="{hf_model_name}")
+
+    try:
+        pipe = pipeline("image-classification", model="{hf_model_name}")
+    except:#if pytorch is not supported, try tensorflow instead
+        logger.info("Trying to load using tensorflow.")
+        model = AutoModelForImageClassification.from_pretrained("{hf_model_name}", from_tf=True)
+        processor = AutoImageProcessor.from_pretrained("{hf_model_name}")
+        pipe = pipeline("image-classification", model=model, image_processor=processor)
     logger.info("Model loaded.")
 
     @web_app.post("/infer")
@@ -47,7 +54,7 @@ def flask_app():
         
         try:
             output = pipe(images)
-            return {{"ouptut": output}}
+            return {{"output": output}}
         
         except Exception as e:
             return {{"error": "Model inference failed"}}
