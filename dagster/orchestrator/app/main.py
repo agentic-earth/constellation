@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 import requests
 
 app = FastAPI()
@@ -7,35 +7,21 @@ DAGSTER_GRAPHQL_URL = "http://dagster_webserver:3000/graphql"
 
 
 @app.post("/execute")
-async def run_dagster_job_with_config():
+async def run_dagster_job_with_config(request: Request):
     """
     Run a Dagster job with a specific config for ops.
     """
+
+    # Parse the request body
+    instructions = await request.json().get("instructions")
+
+    if not instructions or not isinstance(instructions, list):
+        raise HTTPException(status_code=400, detail="No instructions provided")
+
     # Define the custom configuration for the ops
     job_config = {
         "ops": {
-            "generate_dynamic_job_configs": {
-                "config": {
-                    "instructions": [
-                        {
-                            "operation": "write_csv",
-                            "parameters": {
-                                "result": {
-                                    "operation": "math_block",
-                                    "parameters": {
-                                        "constant": 5,
-                                        "data": {
-                                            "operation": "mock_csv_data",
-                                            "parameters": {},
-                                        },
-                                        "operand": "add",
-                                    },
-                                }
-                            },
-                        }
-                    ]
-                }
-            }
+            "generate_dynamic_job_configs": {"config": {"instructions": instructions}}
         }
     }
 
@@ -76,7 +62,6 @@ async def run_dagster_job_with_config():
     try:
         response = requests.post(DAGSTER_GRAPHQL_URL, json=graphql_query)
         response_data = response.json()
-        print(response_data)
 
         # Check if the job was successfully launched
         if (
