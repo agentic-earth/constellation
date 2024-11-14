@@ -3,7 +3,7 @@ from modal_creator.utils import deploy_model_service, delete_model_service, post
 
 app = FastAPI()
 
-@app.post("/deploy")
+@app.get("/deploy")
 async def deploy(model_name: str):
     output = deploy_model_service(model_name)
     return output
@@ -17,7 +17,7 @@ async def infer(model_name: str, data: dict):
     return output
 
 
-@app.post("/delete")
+@app.delete("/delete")
 async def delete(model_name: str):
     output = delete_model_service(model_name)
     return output

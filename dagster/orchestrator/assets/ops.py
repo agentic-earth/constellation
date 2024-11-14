@@ -79,7 +79,7 @@ def deploy_model(context: OpExecutionContext, model: str) -> None:
     payload = {"model_name": model}
 
     # Make a POST request to the endpoint
-    response = requests.post(endpoint, json=payload)
+    response = requests.get(endpoint, json=payload)
 
     if response.status_code == 200:
         context.log.info(f"Model deployed successfully: {response.json()}")
@@ -102,7 +102,7 @@ def delete_model(context: OpExecutionContext, model: str) -> None:
     payload = {"model_name": model}
 
     # Make a POST request to the endpoint
-    response = requests.post(endpoint, json=payload)
+    response = requests.delete(endpoint, json=payload)
 
     if response.status_code == 200:
         context.log.info(f"Model service deleted successfully: {response.json()}")
@@ -126,7 +126,9 @@ def model_inference(
     context.log.info(f"Running inference on {len(data)} images")
     MODEL_ENDPOINT = f"http://model_api:8000"
     endpoint = f"{MODEL_ENDPOINT}/infer?model_name={model}"
-    batches = [data[i : min(len(data) - 1, i + 2)] for i in range(0, len(data), 2)]
+    batch_size = 2
+    batches = [data[i : min(len(data), i + batch_size)] for i in range(0, len(data), batch_size)]
+
 
     results = []
     for batch in batches:
