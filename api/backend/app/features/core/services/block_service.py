@@ -377,7 +377,7 @@ class BlockService:
 
             blocks = []
 
-            for doc in docs["documents"]:
+            for doc in docs['documents']:
                 block = await self.get_block_by_id(tx, doc.id)
                 blocks.append(block)
 
@@ -519,8 +519,8 @@ async def main():
                 query_vector = await VectorEmbeddingService().generate_text_embedding("languages")
                 similar_blocks = await block_service.search_blocks_by_vector_similarity(tx, query_vector, top_k=5)
                 print(f"Similar blocks: \n")
-                print(f"1. id: {similar_blocks[0]["id"]}, score: {similar_blocks[0]["score"]}\n")
-                print(f"2. id: {similar_blocks[1]["id"]}, score: {similar_blocks[1]["score"]}")
+                print(f"1. id: {similar_blocks[0]['id']}, score: {similar_blocks[0]['score']}\n")
+                print(f"2. id: {similar_blocks[1]['id']}, score: {similar_blocks[1]['score']}")
 
                 # Step 9: Delete block
                 print(f"\nDeleting block with ID: {block_id}")

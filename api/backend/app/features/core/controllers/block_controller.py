@@ -66,8 +66,8 @@ class BlockController:
             content = block_data.pop("content", None)
 
             # vectorize abstract for paper block
-            if block_data["block_type"] == "paper":
-                content = block_data["abstract"]
+            if block_data['block_type'] == "paper":
+                content = block_data['abstract']
             vector = None
 
             # generate embedding if given one
@@ -109,7 +109,7 @@ class BlockController:
                     "action_type": "CREATE",
                     "entity_type": "block",  # Should be lowercase as per Prisma enum
                     "entity_id": str(created_block.block_id),
-                    "details": {"block_name": block_data["name"]}
+                    "details": {"block_name": block_data['name']}
                     # Removed 'users' field
                 }
                 # Align the audit_log without relation fields
@@ -427,7 +427,7 @@ async def main():
         
         if created_block:
             block_service = BlockService()
-            vector = await block_service.get_block_vector(prisma, created_block["block_id"])
+            vector = await block_service.get_block_vector(prisma, created_block['block_id'])
             if vector:
                 print(f"Vector: {vector[0:5]}... (truncated)")
             else:
@@ -456,14 +456,14 @@ async def main():
             }
             updated_block = await controller.update_block(created_block['block_id'], update_schema, user_id)
             if updated_block:
-                print(f"Block Updated: {updated_block['block_id']}, New Name: {updated_block['name']}, New vector: {updated_block.get("vector")}")
+                print(f"Block Updated: {updated_block['block_id']}, New Name: {updated_block['name']}, New vector: {updated_block.get('vector')}")
                 # print(f"Updated Taxonomy: {updated_block['taxonomy']}")
             else:
                 print("Block update failed.")
 
             if updated_block:
                 block_service = BlockService()
-                vector = await block_service.get_block_vector(prisma, updated_block["block_id"])
+                vector = await block_service.get_block_vector(prisma, updated_block['block_id'])
                 if vector:
                     print(f"Vector: {vector[0:5]}... (truncated)")
                 else:
@@ -472,8 +472,8 @@ async def main():
         # Step 4: Perform a search based on taxonomy filters
         print("\nStep 4: Performing a search for blocks with 'Climate Data' category and block type 'model'...")
         search_filters = {
-            "category_names": ["Climate Data"],
-            "block_types": ["model"]
+            "category_names": ['Climate Data'],
+            "block_types": ['model']
         }
         search_results = await controller.search_blocks(search_filters, user_id)
         if search_results:
@@ -490,7 +490,7 @@ async def main():
         if vector_search_results:
             print(f"Found {len(vector_search_results)} block(s):")
             for blk in vector_search_results:
-                print(f"block id: {blk["id"]}, similarity score: {blk["score"]}")
+                print(f"block id: {blk['id']}, similarity score: {blk['score']}")
         else:
             print("No blocks found. Should not happen")
 

@@ -71,6 +71,7 @@ from backend.app.features.core.routes import blocks, edges, pipelines
 from backend.app.database import connect_db, disconnect_db, prisma_client
 from backend.app.logger import ConstellationLogger
 # from backend.app.utils.helpers import SupabaseClientManager
+from fastapi.middleware.cors import CORSMiddleware
 
 logger = ConstellationLogger()
 
@@ -78,6 +79,14 @@ app = FastAPI(
     title="Constellation API",
     description="API for managing Users, Blocks, Edges, Pipelines, and Audit Logs.",
     version="1.0.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3001"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 @app.on_event("startup")
