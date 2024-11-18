@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
 from dagster import (
     mem_io_manager,
     in_process_executor,
@@ -26,6 +30,8 @@ OP_DEFS = [
     delete_model,
     dict_to_list,
     model_inference,
+    mock_csv_data,
+    write_csv,
 ]
 
 

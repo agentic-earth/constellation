@@ -1,3 +1,8 @@
+
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
 import base64
 from dagster import Any, In, OpExecutionContext, Out, op
 import requests
@@ -6,18 +11,7 @@ import operator
 import zipfile
 import os
 import sys
-
 import gdown
-
-# Adjust resource limits if not on macOS
-if sys.platform != "darwin":
-    import resource
-
-    low, high = resource.getrlimit(resource.RLIMIT_NOFILE)
-    resource.setrlimit(resource.RLIMIT_NOFILE, (high, high))
-
-# Constants
-MAX_IN_MEMORY = 200_000
 
 
 @op(
@@ -183,4 +177,8 @@ def math_block(
     constant: float,
     data: pd.DataFrame,
 ) -> pd.DataFrame:
-    operand = getattr(operator, operand)
+    operation_func = getattr(operator, operand)
+    context.log.info(f"Applying operation '{operand}' with constant {constant} to DataFrame.")
+    result_df = data.map(lambda x: operation_func(x, constant))
+    context.log.info(f"Resulting DataFrame:\n{result_df}")
+    return result_df
