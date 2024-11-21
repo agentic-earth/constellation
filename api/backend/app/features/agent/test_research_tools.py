@@ -29,7 +29,7 @@ async def test_tools():
             query = "climate change mitigation strategies"
             vector = await VectorEmbedTool.arun({"query": query})
             print(f"Vector embedding for '{query}':")
-            print(vector[:5])  
+            print(vector)  
 
             sample_papers = [
                 {
@@ -74,7 +74,8 @@ async def test_tools():
 
             print("\nTesting Research Crew:")
             # Get the crew instance
-            crew = crew_process.make_crews("Find papers related to climate change")
+            crew = crew_process.make_crews("climate change")
+            print("Crew created")
             # Run the crew
             crew.kickoff()
 
