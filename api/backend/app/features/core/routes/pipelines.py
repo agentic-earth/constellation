@@ -161,9 +161,7 @@ async def list_pipelines(
 # -------------------
 
 
-@router.post(
-    "/with-dependencies/", response_model=PipelineBasicInfo, status_code=201
-)
+@router.post("/with-dependencies/", response_model=PipelineBasicInfo, status_code=201)
 async def create_pipeline_with_dependencies(
     pipeline: PipelineBasicInfo,
     user_id: UUID,
