@@ -356,7 +356,7 @@ class BlockService:
         #     self.logger.log("BlockService", "error", f"Failed to retrieve block vector - error={str(e)}")
         #     return None
 
-    async def search_blocks_by_vector_similarity(self, tx: Prisma, query_vector: List[float], top_k: int = 5) -> List[Dict[str, Any]]:
+    async def search_blocks_by_vector_similarity(self, query_vector: List[float], top_k: int = 5) -> List[Dict[str, Any]]:
         """
         Performs a vector similarity search on blocks.
 
