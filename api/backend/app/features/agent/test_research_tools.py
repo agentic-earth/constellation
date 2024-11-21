@@ -27,28 +27,22 @@ async def test_tools():
 
             # Test VectorEmbedTool
             query = "climate change mitigation strategies"
-            vector = await VectorEmbedTool.func(query)
+            vector = await VectorEmbedTool.arun({"query": query})
             print(f"Vector embedding for '{query}':")
             print(vector[:5])  
 
             sample_papers = [
                 {
-                    "name": "Climate Change Mitigation Strategies",
-                    "text": "This paper discusses various strategies for mitigating climate change, including renewable energy adoption, carbon capture technologies, and policy interventions.",
-                    "block_type": "paper",
-                    "description": "An overview of climate change mitigation approaches"
+                    "title":"Machine learning for Earth System Science (ESS): A survey, status and\n  future directions for South Asia",
+                    "abstract":"  This survey focuses on the current problems in Earth systems science where\nmachine learning algorithms can be applied. It provides an overview of previous\nwork, ongoing work at the Ministry of Earth Sciences, Gov. of India, and future\napplications of ML algorithms to some significant earth science problems. We\nprovide a comparison of previous work with this survey, a mind map of\nmultidimensional areas related to machine learning and a Gartner's hype cycle\nfor machine learning in Earth system science (ESS). We mainly focus on the\ncritical components in Earth Sciences, including atmospheric, Ocean,\nSeismology, and biosphere, and cover AI/ML applications to statistical\ndownscaling and forecasting problems.\n",
+                    "pdf_url":"http://arxiv.org/pdf/2112.12966v1",
+                    "block_type":"paper"
                 },
                 {
-                    "name": "Impact of Rising Sea Levels",
-                    "text": "This study examines the potential consequences of rising sea levels on coastal communities and ecosystems, proposing adaptation measures.",
-                    "block_type": "paper",
-                    "description": "Analysis of sea level rise impacts and adaptation strategies"
-                },
-                {
-                    "name": "Renewable Energy Technologies",
-                    "text": "An in-depth look at current and emerging renewable energy technologies, their efficiencies, and potential for large-scale implementation.",
-                    "block_type": "paper",
-                    "description": "Overview of renewable energy technologies and their potential"
+                    "title":"Will Artificial Intelligence supersede Earth System and Climate Models?",
+                    "abstract":"  We outline a perspective of an entirely new research branch in Earth and\nclimate sciences, where deep neural networks and Earth system models are\ndismantled as individual methodological approaches and reassembled as learning,\nself-validating, and interpretable Earth system model-network hybrids.\nFollowing this path, we coin the term \"Neural Earth System Modelling\" (NESYM)\nand highlight the necessity of a transdisciplinary discussion platform,\nbringing together Earth and climate scientists, big data analysts, and AI\nexperts. We examine the concurrent potential and pitfalls of Neural Earth\nSystem Modelling and discuss the open question whether artificial intelligence\nwill not only infuse Earth system modelling, but ultimately render them\nobsolete.\n",
+                    "pdf_url":"http://arxiv.org/pdf/2101.09126v1",
+                    "block_type":"paper"
                 }
             ]
 
@@ -57,19 +51,19 @@ async def test_tools():
             for paper in sample_papers:
                 created_block = await block_service.create_block(tx, paper)
                 if created_block:
-                    print(f"Created block: {created_block.name}")
+                    print(f"Created block: {created_block}")
                     # Retrieve and print the vector for each created block
                     block_vector = await block_service.get_block_vector(tx, created_block.block_id)
                     if block_vector:
-                        print(f"Vector for {created_block.name}: {block_vector[:5]}")
+                        print(f"Vector for {created_block}: {block_vector[:5]}")
                     else:
-                        print(f"No vector found for {created_block.name}")
+                        print(f"No vector found for {created_block}")
                 else:
-                    print(f"Failed to create block for {paper['name']}")
+                    print(f"Failed to create block for {paper['title']}")
 
             # Test SimilaritySearchTool
             print("\nTesting SimilaritySearchTool:")
-            similar_blocks = await SimilaritySearchTool.func(tx, vector)
+            similar_blocks = await SimilaritySearchTool.arun({"vector": vector})
             if similar_blocks:
                 print("Similar blocks found:")
                 for block in similar_blocks:

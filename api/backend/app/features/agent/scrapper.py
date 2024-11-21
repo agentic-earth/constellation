@@ -123,8 +123,4 @@ if __name__ == "__main__":
     else:
         paper_data = scraper.arxiv_scraper(topics, max_results=10, start_date="2023-01-01", end_date="2024-10-12")
         scraper.save_paper_data_json(paper_data)
-
-    
-    print("Connected to db")
-
     asyncio.run(scraper.store_paper_data(paper_data))
