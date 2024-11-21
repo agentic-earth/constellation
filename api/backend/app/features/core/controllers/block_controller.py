@@ -481,18 +481,18 @@ async def main():
                     print("Vector retrieval failed")
 
         # Step 4: Perform a search based on taxonomy filters
-        print("\nStep 4: Performing a search for blocks with 'Climate Data' category and block type 'model'...")
-        search_filters = {
-            "category_names": ["Climate Data"],
-            "block_types": ["model"]
-        }
-        search_results = await controller.search_blocks(search_filters, user_id)
-        if search_results:
-            print(f"Found {len(search_results)} block(s):")
-            for blk in search_results:
-                print(f"- Block ID: {blk['block_id']}, Name: {blk['name']}, Type: {blk['block_type']}")
-        else:
-            print("No blocks found matching the search criteria.")
+        # print("\nStep 4: Performing a search for blocks with 'Climate Data' category and block type 'model'...")
+        # search_filters = {
+        #     "category_names": ["Climate Data"],
+        #     "block_types": ["model"]
+        # }
+        # search_results = await controller.search_blocks(search_filters, user_id)
+        # if search_results:
+        #     print(f"Found {len(search_results)} block(s):")
+        #     for blk in search_results:
+        #         print(f"- Block ID: {blk['block_id']}, Name: {blk['name']}, Type: {blk['block_type']}")
+        # else:
+        #     print("No blocks found matching the search criteria.")
 
         # Step 5: Perform a serach based on vector similarity
         print("\nStep 5: Performing a serach based on vector similarity...")

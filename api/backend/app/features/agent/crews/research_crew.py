@@ -24,6 +24,9 @@ class ResearchCrew:
                 VectorEmbedTool,
             ],
             llm=self.llm,
+            goal="Find the most similar paper to the background of human inputs and provide a summary of the paper, and also you should find the link to the GitHub repository of the paper.",
+            role="Researcher",
+            backstory="You are a researcher looking for similar papers to a given query.",
             verbose=True,
         )
     

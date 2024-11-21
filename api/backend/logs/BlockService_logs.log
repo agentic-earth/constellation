@@ -1,5 +1,5 @@
-Log file initialized on 2024-11-05 16:31:19.210602
-2024-11-05 16:31:19,211 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text` - traceback=Traceback (most recent call last):
+Log file initialized on 2024-11-20 23:11:48.335565
+2024-11-20 23:11:48,336 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text` - traceback=Traceback (most recent call last):
   File "C:\Users\JXPARATROOPER\Desktop\CourseCode\CSCI 2340\constellation-backend\api\backend\app\features\core\services\block_service.py", line 82, in create_block
     created_block = await tx.block.create(data=block_data)
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -22,7 +22,7 @@ Log file initialized on 2024-11-05 16:31:19.210602
     raise exc(error)
 prisma.errors.FieldNotFoundError: Could not find field at `createOneBlock.data.text`
 
-2024-11-05 16:31:19,215 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text` - traceback=Traceback (most recent call last):
+2024-11-20 23:11:48,340 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text` - traceback=Traceback (most recent call last):
   File "C:\Users\JXPARATROOPER\Desktop\CourseCode\CSCI 2340\constellation-backend\api\backend\app\features\core\services\block_service.py", line 82, in create_block
     created_block = await tx.block.create(data=block_data)
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -45,7 +45,7 @@ prisma.errors.FieldNotFoundError: Could not find field at `createOneBlock.data.t
     raise exc(error)
 prisma.errors.FieldNotFoundError: Could not find field at `createOneBlock.data.text`
 
-2024-11-05 16:31:19,219 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text` - traceback=Traceback (most recent call last):
+2024-11-20 23:11:48,344 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text` - traceback=Traceback (most recent call last):
   File "C:\Users\JXPARATROOPER\Desktop\CourseCode\CSCI 2340\constellation-backend\api\backend\app\features\core\services\block_service.py", line 82, in create_block
     created_block = await tx.block.create(data=block_data)
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -67,4 +67,17 @@ prisma.errors.FieldNotFoundError: Could not find field at `createOneBlock.data.t
   File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\engine\utils.py", line 175, in handle_response_errors
     raise exc(error)
 prisma.errors.FieldNotFoundError: Could not find field at `createOneBlock.data.text`
+
+2024-11-20 23:11:48,345 - BlockService - ERROR - Failed to perform vector similarity search - error=object of type 'Prisma' has no len()
+2024-11-20 23:11:48,363 - BlockService - ERROR - Failed to perform vector similarity search - extra=Traceback (most recent call last):
+  File "C:\Users\JXPARATROOPER\Desktop\CourseCode\CSCI 2340\constellation-backend\api\backend\app\features\core\services\block_service.py", line 372, in search_blocks_by_vector_similarity
+    docs = self.retriever.run(
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\haystack_integrations\components\retrievers\pgvector\embedding_retriever.py", line 160, in run
+    docs = self.document_store._embedding_retrieval(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\haystack_integrations\document_stores\pgvector\document_store.py", line 617, in _embedding_retrieval
+    if len(query_embedding) != self.embedding_dimension:
+       ^^^^^^^^^^^^^^^^^^^^
+TypeError: object of type 'Prisma' has no len()
 

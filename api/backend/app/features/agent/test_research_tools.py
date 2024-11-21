@@ -11,8 +11,6 @@ from backend.app.config import Settings
 from backend.app.features.agent.tools.vector_embed_tool import VectorEmbedTool
 from backend.app.features.agent.tools.similarity_search_tool import SimilaritySearchTool
 from backend.app.features.core.services.block_service import BlockService
-from backend.app.features.agent.crews.research_crew import ResearchCrew
-from backend.app.features.agent.crews.dev_crew import DevCrew
 
 
 async def test_tools():
