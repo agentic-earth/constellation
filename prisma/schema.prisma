@@ -55,7 +55,7 @@ model Paper {
   created_at DateTime @default(now()) @db.Timestamptz(6)
   updated_at DateTime @default(now()) @db.Timestamptz(6)
   block_id   String   @unique @db.Uuid
-  block      Block    @relation(fields: [block_id], references: [block_id])
+  block      Block    @relation(fields: [block_id], references: [block_id], onDelete: Cascade)
 
   @@index([title], map: "idx_paper_title")
 }
