@@ -1,4 +1,5 @@
 import asyncio
+import nest_asyncio
 from langchain.tools import StructuredTool
 from backend.app.features.core.services.block_service import BlockService
 from langchain.tools import BaseTool
@@ -6,11 +7,16 @@ from typing import List, Dict, Any
 
 def _run(vector: List[float]) -> List[Dict[str, Any]]:
     """Synchronous run method"""
-    loop = asyncio.get_event_loop()
-    if loop.is_running():
-        # If we're in an event loop, use run_coroutine_threadsafe
+    try:
+        # Use nest_asyncio to handle nested event loops
+        nest_asyncio.apply()
+        
+        loop = asyncio.get_event_loop()
         return loop.run_until_complete(_arun(vector))
-    return asyncio.run(_arun(vector))
+    except Exception as e:
+        raise RuntimeError(f"Error in vector embedding: {str(e)}")
+
+
 
 async def _arun(vector: List[float]) -> List[Dict[str, Any]]:
     """Asynchronous run method"""
