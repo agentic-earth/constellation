@@ -1,5 +1,5 @@
-Log file initialized on 2024-11-21 00:43:56.884194
-2024-11-21 00:43:56,884 - BlockService - ERROR - Failed to create block - error=Unable to match input value to any allowed input type for the field. Parse errors: [`data.name`: A value is required but not set, `data.name`: A value is required but not set] - traceback=Traceback (most recent call last):
+Log file initialized on 2024-11-21 01:19:49.758821
+2024-11-21 01:19:49,759 - BlockService - ERROR - Failed to create block - error=Unable to match input value to any allowed input type for the field. Parse errors: [`data.name`: A value is required but not set, `data.name`: A value is required but not set] - traceback=Traceback (most recent call last):
   File "C:\Users\JXPARATROOPER\Desktop\CourseCode\CSCI 2340\constellation-backend\api\backend\app\features\core\services\block_service.py", line 82, in create_block
     created_block = await tx.block.create(data=block_data)
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -22,7 +22,7 @@ Log file initialized on 2024-11-21 00:43:56.884194
     raise prisma_errors.MissingRequiredValueError(error)
 prisma.errors.MissingRequiredValueError: Unable to match input value to any allowed input type for the field. Parse errors: [`data.name`: A value is required but not set, `data.name`: A value is required but not set]
 
-2024-11-21 00:43:56,888 - BlockService - ERROR - Failed to create block - error=Unable to match input value to any allowed input type for the field. Parse errors: [`data.name`: A value is required but not set, `data.name`: A value is required but not set] - traceback=Traceback (most recent call last):
+2024-11-21 01:19:49,763 - BlockService - ERROR - Failed to create block - error=Unable to match input value to any allowed input type for the field. Parse errors: [`data.name`: A value is required but not set, `data.name`: A value is required but not set] - traceback=Traceback (most recent call last):
   File "C:\Users\JXPARATROOPER\Desktop\CourseCode\CSCI 2340\constellation-backend\api\backend\app\features\core\services\block_service.py", line 82, in create_block
     created_block = await tx.block.create(data=block_data)
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

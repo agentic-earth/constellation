@@ -1,4 +1,5 @@
 import asyncio
+import nest_asyncio
 from langchain.tools import StructuredTool
 from backend.app.features.core.services.vector_embedding_service import VectorEmbeddingService
 from langchain.tools import BaseTool
@@ -7,11 +8,16 @@ import asyncio
 
 def _run(query: str) -> List[float]:
     """Synchronous run method"""
-    loop = asyncio.get_event_loop()
-    if loop.is_running():
-        # If we're in an event loop, use run_coroutine_threadsafe
+    try:
+        # Use nest_asyncio to handle nested event loops
+        nest_asyncio.apply()
+        
+        loop = asyncio.get_event_loop()
         return loop.run_until_complete(_arun(query))
-    return asyncio.run(_arun(query))
+    except Exception as e:
+        raise RuntimeError(f"Error in vector embedding: {str(e)}")
+
+
 
 async def _arun(query: str) -> List[float]:
     """Asynchronous run method"""

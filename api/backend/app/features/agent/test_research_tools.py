@@ -73,8 +73,8 @@ async def test_tools():
                 print("No similar blocks found.")
 
             print("\nTesting Research Crew:")
-               # Get the crew instance
-            crew = crew_process.make_crews()
+            # Get the crew instance
+            crew = crew_process.make_crews("Find papers related to climate change")
             # Run the crew
             crew.kickoff()
 
