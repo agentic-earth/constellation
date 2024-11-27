@@ -356,7 +356,7 @@ class BlockService:
         #     self.logger.log("BlockService", "error", f"Failed to retrieve block vector - error={str(e)}")
         #     return None
 
-    async def search_blocks_by_vector_similarity(self, tx: Prisma, query_vector: List[float], top_k: int = 5) -> List[Dict[str, Any]]:
+    async def search_blocks_by_vector_similarity(self, tx: Prisma, query_vector: List[float], top_k: int = 5) -> List[PrismaBlock]:
         """
         Performs a vector similarity search on blocks.
 
@@ -366,7 +366,7 @@ class BlockService:
             top_k (int): The number of top similar blocks to return.
 
         Returns:
-            List[Dict[str, Any]]: List of similar blocks with their similarity scores.
+            List[PrismaBlock]: List of similar blocks.
         """
         try:
             docs = self.retriever.run(
@@ -375,7 +375,13 @@ class BlockService:
                 vector_function="cosine_similarity"
             )
 
-            return [doc.to_dict() for doc in docs["documents"]]
+            blocks = []
+
+            for doc in docs["documents"]:
+                block = await self.get_block_by_id(tx, doc.id)
+                blocks.append(block)
+
+            return blocks
 
             # vector_str = ','.join(map(str, query_vector))
             # query = f"""
@@ -399,8 +405,7 @@ class BlockService:
             #     for row in results
             # ]
         except Exception as e:
-            self.logger.log("BlockService", "error", "Failed to perform vector similarity search", error=str(e))
-            self.logger.log("BlockService", "error", "Failed to perform vector similarity search", extra=traceback.format_exc())
+            self.logger.log("BlockService", "error", "Failed to perform vector similarity search", error=str(e), extra=traceback.format_exc())
             return None
 
     async def get_all_vectors(self, tx: Prisma) -> List[List[float]]:
