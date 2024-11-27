@@ -1,5 +1,5 @@
-Log file initialized on 2024-11-05 16:31:19.210602
-2024-11-05 16:31:19,211 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text` - traceback=Traceback (most recent call last):
+Log file initialized on 2024-11-21 01:45:44.033731
+2024-11-21 01:45:44,034 - BlockService - ERROR - Failed to create block - error=Unable to match input value to any allowed input type for the field. Parse errors: [`data.name`: A value is required but not set, `data.name`: A value is required but not set] - traceback=Traceback (most recent call last):
   File "C:\Users\JXPARATROOPER\Desktop\CourseCode\CSCI 2340\constellation-backend\api\backend\app\features\core\services\block_service.py", line 82, in create_block
     created_block = await tx.block.create(data=block_data)
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -18,11 +18,11 @@ Log file initialized on 2024-11-05 16:31:19.210602
   File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\engine\_http.py", line 87, in _process_response_data
     return utils.handle_response_errors(response, errors_data)
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\engine\utils.py", line 175, in handle_response_errors
-    raise exc(error)
-prisma.errors.FieldNotFoundError: Could not find field at `createOneBlock.data.text`
+  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\engine\utils.py", line 163, in handle_response_errors
+    raise prisma_errors.MissingRequiredValueError(error)
+prisma.errors.MissingRequiredValueError: Unable to match input value to any allowed input type for the field. Parse errors: [`data.name`: A value is required but not set, `data.name`: A value is required but not set]
 
-2024-11-05 16:31:19,215 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text` - traceback=Traceback (most recent call last):
+2024-11-21 01:45:44,040 - BlockService - ERROR - Failed to create block - error=Unable to match input value to any allowed input type for the field. Parse errors: [`data.name`: A value is required but not set, `data.name`: A value is required but not set] - traceback=Traceback (most recent call last):
   File "C:\Users\JXPARATROOPER\Desktop\CourseCode\CSCI 2340\constellation-backend\api\backend\app\features\core\services\block_service.py", line 82, in create_block
     created_block = await tx.block.create(data=block_data)
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -41,30 +41,7 @@ prisma.errors.FieldNotFoundError: Could not find field at `createOneBlock.data.t
   File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\engine\_http.py", line 87, in _process_response_data
     return utils.handle_response_errors(response, errors_data)
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\engine\utils.py", line 175, in handle_response_errors
-    raise exc(error)
-prisma.errors.FieldNotFoundError: Could not find field at `createOneBlock.data.text`
-
-2024-11-05 16:31:19,219 - BlockService - ERROR - Failed to create block - error=Could not find field at `createOneBlock.data.text` - traceback=Traceback (most recent call last):
-  File "C:\Users\JXPARATROOPER\Desktop\CourseCode\CSCI 2340\constellation-backend\api\backend\app\features\core\services\block_service.py", line 82, in create_block
-    created_block = await tx.block.create(data=block_data)
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\actions.py", line 2243, in create
-    resp = await self._client._execute(
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\_base_client.py", line 543, in _execute
-    return await self._engine.query(builder.build(), tx_id=self._tx_id)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\engine\_query.py", line 402, in query
-    return await self.request(
-           ^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\engine\_http.py", line 233, in request
-    return self._process_response_data(data=data, response=response)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\engine\_http.py", line 87, in _process_response_data
-    return utils.handle_response_errors(response, errors_data)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\engine\utils.py", line 175, in handle_response_errors
-    raise exc(error)
-prisma.errors.FieldNotFoundError: Could not find field at `createOneBlock.data.text`
+  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\engine\utils.py", line 163, in handle_response_errors
+    raise prisma_errors.MissingRequiredValueError(error)
+prisma.errors.MissingRequiredValueError: Unable to match input value to any allowed input type for the field. Parse errors: [`data.name`: A value is required but not set, `data.name`: A value is required but not set]
 

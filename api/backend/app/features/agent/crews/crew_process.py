@@ -3,19 +3,14 @@ from crewai import Crew
 
 class CrewProcess:
     def __init__(self):
-        self.researcher = ResearchCrew()
+        self.research_agent = ResearchCrew().research_agent()
         # self.developer = DevCrew()
 
-    def make_crews(self) -> Crew:
+    def make_crews(self, query: str) -> Crew:
         return Crew(
-            agents=[self.researcher.research_agent_],
-            tasks=[self.researcher.research_task_],
-            verbose=True,
-            memory=True,
-            planning=True  # Enable planning feature for the crew
+            agents=[self.research_agent],
+            tasks=[ResearchCrew().research_task(query, self.research_agent)],
+            verbose=False,
+            # memory=True,
+            # planning=True  # Enable planning feature for the crew
         )
-
-# if __name__ == "__main__":
-#     crew_process = CrewProcess()
-#     crews = crew_process.make_crews()
-#     crews.kickoff()
