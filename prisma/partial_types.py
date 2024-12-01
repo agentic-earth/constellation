@@ -1,4 +1,4 @@
-from prisma import Prisma
+# from prisma import Prisma
 from prisma.models import Block, Edge, Pipeline, PipelineBlock, PipelineEdge, BlockVector, Paper
 
 Block.create_partial("BlockBasicInfo", include=["name", "block_type", "description"])

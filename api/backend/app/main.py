@@ -97,6 +97,7 @@ async def on_startup():
 async def on_shutdown():
     await disconnect_db()
 
+
 # Include all the API routers
 app.include_router(blocks.router, prefix="/blocks", tags=["Blocks"])
 app.include_router(edges.router, prefix="/edges", tags=["Edges"])
@@ -106,6 +107,18 @@ app.include_router(pipelines.router, prefix="/pipelines", tags=["Pipelines"])
 @app.get("/", tags=["Root"])
 async def root():
     return {"message": "Welcome to the Constellation API!"}
+
+@app.get("/database_stats")
+async def get_database_stats():
+    return {"status": "ok"}
+
+@app.get("/info")
+async def get_info():
+    return {"status": "ok"}
+
+@app.get("/ping")
+async def ping():
+    return {"status": "pong"}
 
 @app.get("/health", tags=["Health Check"])
 async def health_check():
