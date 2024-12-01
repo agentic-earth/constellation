@@ -71,14 +71,15 @@ services:
       - dagster_network
     depends_on:
       - dagster_postgresql
-      # - dagster_assets
-
+      - dagster_assets
       # This service runs the dagster-daemon process, which is responsible for taking runs
       # off of the queue and launching them, as well as creating runs from schedules or sensors.
   dagster_daemon:
     build:
       context: ./dagster
       dockerfile: ./dagster.Dockerfile
+      args:
+        - PYTHON_VERSION=3.9-slim
     entrypoint:
       - dagster-daemon
       - run
@@ -103,6 +104,8 @@ services:
     build:
       context: ./dagster
       dockerfile: ./api.Dockerfile
+      args:
+        - PYTHON_VERSION=3.9-slim
     container_name: dagster_api
     expose:
       - "8001"
@@ -112,14 +115,18 @@ services:
       API_HOME: /opt/api/app
     networks:
       - dagster_network
+    volumes:
+      - ./dagster/:/opt/dagster/app
     depends_on:
       - dagster_postgresql
-      # - dagster_assets
+      - dagster_assets
 
   main_api:
     build:
       context: ./api
       dockerfile: ./Dockerfile
+      args:
+        - PYTHON_VERSION=3.10-slim
     container_name: main_api
     expose:
       - "8000"
@@ -131,7 +138,7 @@ services:
       - dagster_network
     depends_on:
       - dagster_postgresql
-      # - dagster_assets
+      - dagster_assets
 
 networks:
   dagster_network:
