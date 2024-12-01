@@ -1,0 +1,37 @@
+"ops": {
+    "generate_dynamic_job_configs": {
+        "config": {
+            "raw_input": [
+                {
+                    "operation": "deploy_model",
+                    "parameters": {
+                        "model": "EdBianchi/vit-fire-detection"
+                    }
+                },
+                {  
+                    "operation": "model_inference",
+                    "parameters": {
+                        "model": "EdBianchi/vit-fire-detection",
+                        "data": {
+                            "operation": "dict_to_list",
+                            "parameters": {
+                                "data": {
+                                    "operation": "import_from_google_drive",
+                                    "parameters": {
+                                        "file_id": "1aniasD6RcD3Zr7K8DSWiiqtXCRbFx7gU",
+                                    },
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "operation": "delete_model",
+                    "parameters": {
+                        "model": "EdBianchi/vit-fire-detection"
+                    }
+                },
+            ],
+        }
+    }
+}

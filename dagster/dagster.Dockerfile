@@ -1,6 +1,6 @@
 # Dagster libraries to run both dagster-webserver and the dagster-daemon. Does not
 # need to have access to any pipeline code.
-ARG PYTHON_VERSION=3.9-slim
+ARG PYTHON_VERSION=3.10-slim
 FROM python:${PYTHON_VERSION}
 
 RUN pip install \
@@ -9,7 +9,9 @@ RUN pip install \
     dagster-webserver \
     dagster-postgres \
     dagster-docker \
-    pandas
+    pandas 
+
+RUN pip install gdown
 
 # Set $DAGSTER_HOME and copy dagster instance and workspace YAML there
 ENV DAGSTER_HOME=/opt/dagster/dagster_home/

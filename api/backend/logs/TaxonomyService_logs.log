@@ -1,4 +1,0 @@
-Log file initialized on 2024-10-10 03:40:51.138696
-2024-10-10 03:40:51,139 - TaxonomyService - INFO - Block associated with categories successfully - block_id=f9e863e3-a72b-4a6f-8b41-1aa3178c30dc - category_ids=['732947cc-3e9d-4608-bc30-3ff38f4c2613', '3179b99c-531a-4080-9846-2c913fc84779', 'aaafc8a0-d4b4-483c-a9e9-d3d7e17dc319', '558bab44-3b83-4d74-ac08-297f7f6dac8b']
-2024-10-10 03:40:52,622 - TaxonomyService - INFO - Block associated with categories successfully - block_id=f9e863e3-a72b-4a6f-8b41-1aa3178c30dc - category_ids=['732947cc-3e9d-4608-bc30-3ff38f4c2613', 'e35dd535-4c3d-4361-aa82-0801b1e8c8ff', '73a7e753-aab8-4157-8dad-bf9f059b28ff', 'bce315a5-8967-45a7-b686-72382c8b27dd']
-2024-10-10 03:40:53,369 - TaxonomyService - INFO - Blocks retrieved successfully based on search filters - filters={'category_names': ['Climate Data'], 'block_types': ['model']} - count=1

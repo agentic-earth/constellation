@@ -7,15 +7,14 @@ import os
 from pathlib import Path
 import dotenv
 
-# Get the path to the root of the project
-ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
-
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 dotenv.load_dotenv(ROOT_DIR / ".env", override=True)
+
 
 class Settings(BaseSettings):
     """
     Application settings loaded from environment variables.
-    
+
     Attributes:
         SUPABASE_URL (AnyHttpUrl): The URL of the Supabase project.
         SUPABASE_KEY (str): The Supabase service role key.
@@ -24,32 +23,39 @@ class Settings(BaseSettings):
         SECRET_KEY (str): The secret key for JWT token generation.
         OPENAI_API_KEY (str): The OpenAI API key.
     """
-    
-    SUPABASE_URL: AnyHttpUrl = Field(..., validation_alias="SUPABASE_URL")
-    SUPABASE_KEY: str = Field(..., validation_alias="SUPABASE_KEY")
-    SUPABASE_SERVICE_KEY: Optional[str] = Field(None, validation_alias="SUPABASE_SERVICE_KEY")
-    LOG_LEVEL: str = Field("INFO", validation_alias="LOG_LEVEL")
-    LOG_FORMAT: str = Field(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s", 
-        validation_alias="LOG_FORMAT"
+
+    SUPABASE_URL: AnyHttpUrl = Field(default=os.getenv("SUPABASE_URL"))
+    SUPABASE_KEY: str = Field(default=os.getenv("SUPABASE_KEY"))
+    SUPABASE_SERVICE_KEY: Optional[str] = Field(
+        default=os.getenv("SUPABASE_SERVICE_KEY")
     )
-    SECRET_KEY: str = Field(default="default-secret-key", validation_alias="SECRET_KEY")
-    OPENAI_API_KEY: str = Field(default=os.getenv("OPENAI_API_KEY"), validation_alias="OPENAI_API_KEY")
-    # Add more configuration variables as needed
-    DATABASE_URL: PostgresDsn = Field(..., validation_alias="DATABASE_URL")
+    LOG_LEVEL: str = Field(
+        default=os.getenv("LOG_LEVEL") if os.getenv("LOG_LEVEL") else "INFO"
+    )
+    LOG_FORMAT: str = Field(
+        default=(
+            os.getenv("LOG_FORMAT")
+            if os.getenv("LOG_FORMAT")
+            else "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+    )
+    SECRET_KEY: str = Field(
+        default=(
+            os.getenv("SECRET_KEY") if os.getenv("SECRET_KEY") else "default-secret-key"
+        )
+    )
+    OPENAI_API_KEY: str = Field(default=os.getenv("OPENAI_API_KEY"))
+    DATABASE_URL: PostgresDsn = Field(
+        default=(os.getenv("DATABASE_URL") if os.getenv("DATABASE_URL") else "")
+    )
 
     model_config = SettingsConfigDict(
         env_file=ROOT_DIR / ".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
-        extra='ignore'  # This will ignore any extra fields in the environment
+        extra="ignore",  # This will ignore any extra fields in the environment
     )
+
 
 # Initialize the settings object
 settings = Settings()
-
-#print("Loaded settings:", settings.dict())
-# Uncomment these lines for debugging
-# print("Loaded settings:", settings.dict())
-# print("ENV file path:", ROOT_DIR / ".env")
-# print("DATABASE_URL:", settings.DATABASE_URL)
