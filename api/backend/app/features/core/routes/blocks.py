@@ -100,3 +100,16 @@ async def search_blocks_by_vector(
     if results is None:
         raise HTTPException(status_code=500, detail="Similarity search failed.")
     return results
+
+@router.get("/", response_model=List[BlockBasicInfoWithID])
+async def get_all_blocks(
+    user_id: Optional[UUID] = None,
+    block_type: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+    controller: BlockController = Depends(get_block_controller),
+):
+    results = await controller.get_all_blocks(user_id=user_id, block_type=block_type, limit=limit, offset=offset)
+    if results is None:
+        raise HTTPException(status_code=500, detail="Failed to fetch blocks.")
+    return results

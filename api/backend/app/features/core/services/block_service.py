@@ -439,6 +439,19 @@ class BlockService:
         except Exception as e:
             self.logger.log("BlockService", "error", "Failed to retrieve all vectors", error=str(e))
             return []
+    
+    async def get_all_blocks(
+    self, tx, user_id: Optional[UUID] = None, block_type: Optional[str] = None, limit: int = 100, offset: int = 0) -> Optional[List[Any]]:
+        query = tx.block.find_many(
+            where={
+                "user_id": user_id if user_id else None,
+                "block_type": block_type if block_type else None,
+            },
+            take=limit,
+            skip=offset,
+        )
+        return query
+
 
 async def main():
     """

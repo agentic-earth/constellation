@@ -70,6 +70,7 @@ from fastapi import FastAPI, HTTPException
 from backend.app.features.core.routes import blocks, edges, pipelines
 from backend.app.database import connect_db, disconnect_db, prisma_client
 from backend.app.logger import ConstellationLogger
+from fastapi.middleware.cors import CORSMiddleware
 # from backend.app.utils.helpers import SupabaseClientManager
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -103,6 +104,16 @@ app.include_router(blocks.router, prefix="/blocks", tags=["Blocks"])
 app.include_router(edges.router, prefix="/edges", tags=["Edges"])
 app.include_router(pipelines.router, prefix="/pipelines", tags=["Pipelines"])
 # app.include_router(users.router, prefix="/users", tags=["Users"])
+
+@app.get("/database_stats")
+async def get_database_stats():
+    return {"status": "ok"}
+@app.get("/info")
+async def get_info():
+    return {"status": "ok"}
+@app.get("/ping")
+async def ping():
+    return {"status": "pong"}
 
 @app.get("/", tags=["Root"])
 async def root():

@@ -333,7 +333,21 @@ class BlockController:
         except Exception as e:
             self.logger.log("BlockController", "error", "Failed to search blocks by vector similarity", error=str(e), extra=traceback.format_exc())
             return None
+        
+    async def get_all_blocks(
+    self, user_id: Optional[UUID] = None, block_type: Optional[str] = None, limit: int = 100, offset: int = 0) -> Optional[List[Dict[str, Any]]]:
+        try:
+            async with self.prisma.tx() as tx:
+                blocks = await self.block_service.get_all_blocks(tx, user_id=user_id, block_type=block_type, limit=limit, offset=offset)
+                if blocks:
+                    return [block.dict() for block in blocks]
+                else:
+                    return []
+        except Exception as e:
+            self.logger.log("BlockController", "error", "Failed to retrieve all blocks", error=str(e), extra=traceback.format_exc())
+            return None
 
+        
 # -------------------
 # Testing Utility
 # -------------------
