@@ -442,15 +442,23 @@ class BlockService:
     
     async def get_all_blocks(
     self, tx, user_id: Optional[UUID] = None, block_type: Optional[str] = None, limit: int = 100, offset: int = 0) -> Optional[List[Any]]:
-        query = tx.block.find_many(
-            where={
-                "user_id": user_id if user_id else None,
-                "block_type": block_type if block_type else None,
-            },
-            take=limit,
-            skip=offset,
-        )
-        return query
+        try:
+            async with self.prisma.tx() as tx:
+                query = {
+                    "where": {},
+                    "take": limit,
+                    "skip": offset,
+                }
+                if block_type:
+                    query["where"]["block_type"] = block_type
+                if user_id:
+                    query["where"]["user_id"] = user_id
+
+                blocks = await tx.block.find_many(**query)
+                return blocks
+        except Exception as e:
+            self.logger.log("BlockController", "error", "Failed to fetch all blocks", error=str(e), extra=traceback.format_exc())
+            return None
 
 
 async def main():
