@@ -19,53 +19,56 @@ Design Philosophy:
 - Ensure clear separation between HTTP handling and business logic.
 """
 
-from fastapi import APIRouter, HTTPException
-from typing import List, Optional
+from fastapi import APIRouter, HTTPException, Depends
+from typing import List, Optional, Dict, Any
 from uuid import UUID
 from backend.app.features.core.controllers.pipeline_controller import PipelineController
-from backend.app.schemas import (
-    PipelineCreateSchema,
-    PipelineUpdateSchema,
-    PipelineResponseSchema,
-    PipelineBlockCreateSchema,
-    PipelineEdgeCreateSchema,
-    PipelineBlockResponseSchema,
-    PipelineEdgeResponseSchema,
+
+from prisma.partials import (
+    PipelineBasicInfo,
+    PipelineBasicInfoWithID,
+    BlockBasicInfo,
+    EdgeBasicInfo,
 )
 
-router = APIRouter(
-    prefix="/pipelines",
-    tags=["Pipelines"],
-    responses={404: {"description": "Not found"}},
-)
+from backend.app.dependencies import get_pipeline_controller
 
-# Initialize the PipelineController instance
-pipeline_controller = PipelineController()
+router = APIRouter()
 
 # -------------------
 # Basic Pipeline Endpoints
 # -------------------
 
 
-@router.post("/", response_model=PipelineResponseSchema, status_code=201)
-def create_pipeline(pipeline: PipelineCreateSchema):
+@router.post("/", response_model=PipelineBasicInfo, status_code=201)
+async def create_pipeline(
+    pipeline: PipelineBasicInfo,
+    user_id: UUID,
+    controller: PipelineController = Depends(get_pipeline_controller)
+):
     """
     Create a new pipeline.
 
     Args:
-        pipeline (PipelineCreateSchema): The data required to create a new pipeline.
+        pipeline (PipelineBasicInfo): The data required to create a new pipeline.
+        user_id (UUID): The UUID of the user creating the pipeline.
 
     Returns:
-        PipelineResponseSchema: The created pipeline's data.
+        PipelineBasicInfo: The created pipeline's data.
     """
-    created_pipeline = pipeline_controller.create_pipeline(pipeline)
+    pipeline_data = pipeline.model_dump(exclude_none=True)  
+    created_pipeline = await controller.create_pipeline(pipeline_data, user_id)
     if not created_pipeline:
         raise HTTPException(status_code=400, detail="Pipeline creation failed.")
     return created_pipeline
 
 
-@router.get("/{pipeline_id}", response_model=PipelineResponseSchema)
-def get_pipeline(pipeline_id: UUID):
+@router.get("/{pipeline_id}", response_model=PipelineBasicInfoWithID)
+async def get_pipeline(
+    pipeline_id: UUID,
+    user_id: UUID,
+    controller: PipelineController = Depends(get_pipeline_controller)
+):
     """
     Retrieve a pipeline by its UUID.
 
@@ -73,16 +76,21 @@ def get_pipeline(pipeline_id: UUID):
         pipeline_id (UUID): The UUID of the pipeline to retrieve.
 
     Returns:
-        PipelineResponseSchema: The pipeline's data if found.
+        PipelineBasicInfoWithID: The pipeline's data if found.
     """
-    pipeline = pipeline_controller.get_pipeline_by_id(pipeline_id)
+    pipeline = await controller.get_pipeline_by_id(pipeline_id, user_id)
     if not pipeline:
         raise HTTPException(status_code=404, detail="Pipeline not found.")
     return pipeline
 
 
-@router.put("/{pipeline_id}", response_model=PipelineResponseSchema)
-def update_pipeline(pipeline_id: UUID, pipeline_update: PipelineUpdateSchema):
+@router.put("/{pipeline_id}", response_model=PipelineBasicInfo)
+async def update_pipeline(
+    pipeline_id: UUID,
+    pipeline_update: PipelineBasicInfo,
+    user_id: UUID,
+    controller: PipelineController = Depends(get_pipeline_controller)
+):
     """
     Update an existing pipeline's information.
 
@@ -93,14 +101,19 @@ def update_pipeline(pipeline_id: UUID, pipeline_update: PipelineUpdateSchema):
     Returns:
         PipelineResponseSchema: The updated pipeline's data if successful.
     """
-    updated_pipeline = pipeline_controller.update_pipeline(pipeline_id, pipeline_update)
+    pipeline_update_data = pipeline_update.model_dump(exclude_none=True)
+    updated_pipeline = await controller.update_pipeline(pipeline_id, pipeline_update_data, user_id)
     if not updated_pipeline:
         raise HTTPException(status_code=400, detail="Pipeline update failed.")
     return updated_pipeline
 
 
 @router.delete("/{pipeline_id}", status_code=204)
-def delete_pipeline(pipeline_id: UUID):
+async def delete_pipeline(
+    pipeline_id: UUID,
+    user_id: UUID,
+    controller: PipelineController = Depends(get_pipeline_controller)
+):
     """
     Delete a pipeline by its UUID.
 
@@ -110,7 +123,7 @@ def delete_pipeline(pipeline_id: UUID):
     Returns:
         HTTP 204 No Content: If deletion was successful.
     """
-    success = pipeline_controller.delete_pipeline(pipeline_id)
+    success = await controller.delete_pipeline(pipeline_id, user_id)
     if not success:
         raise HTTPException(
             status_code=404, detail="Pipeline not found or already deleted."
@@ -118,24 +131,26 @@ def delete_pipeline(pipeline_id: UUID):
     return
 
 
-@router.get("/", response_model=List[PipelineResponseSchema])
-def list_pipelines(name: Optional[str] = None, created_by: Optional[UUID] = None):
+@router.get("/", response_model=List[PipelineBasicInfoWithID])
+async def list_pipelines(
+    user_id: UUID,
+    filters: Optional[Dict[str, Any]] = None,
+    limit: int = 10,
+    offset: int = 0,
+    controller: PipelineController = Depends(get_pipeline_controller)
+):
     """
-    List pipelines with optional filtering by name and creator.
+    List pipelines by filters.
 
     Args:
-        name (Optional[str]): Filter pipelines by name.
-        created_by (Optional[UUID]): Filter pipelines by the creator's UUID.
+        filters (Optional[Dict[str, Any]]): Key-value pairs to filter the pipelines.
+            Supported filters: 'name', 'user_id'.
+        user_id (Optional[UUID]): Filter pipelines by the user's UUID.
 
     Returns:
-        List[PipelineResponseSchema]: A list of pipelines matching the filters.
+        List[PipelineBasicInfoWithID]: A list of pipelines matching the filters.
     """
-    filters = {}
-    if name:
-        filters["name"] = name
-    if created_by:
-        filters["created_by"] = str(created_by)
-    pipelines = pipeline_controller.list_pipelines(filters)
+    pipelines = await controller.list_pipelines(user_id, filters, limit, offset)
     if pipelines is None:
         raise HTTPException(status_code=500, detail="Failed to retrieve pipelines.")
     return pipelines
@@ -146,13 +161,13 @@ def list_pipelines(name: Optional[str] = None, created_by: Optional[UUID] = None
 # -------------------
 
 
-@router.post(
-    "/with-dependencies/", response_model=PipelineResponseSchema, status_code=201
-)
-def create_pipeline_with_dependencies(
-    pipeline: PipelineCreateSchema,
-    blocks: List[PipelineBlockCreateSchema] = [],
-    edges: List[PipelineEdgeCreateSchema] = [],
+@router.post("/with-dependencies/", response_model=PipelineBasicInfo, status_code=201)
+async def create_pipeline_with_dependencies(
+    pipeline: PipelineBasicInfo,
+    user_id: UUID,
+    blocks: List[BlockBasicInfo] = [],
+    edges: List[EdgeBasicInfo] = [],
+    controller: PipelineController = Depends(get_pipeline_controller)
 ):
     """
     Create a new pipeline along with its associated blocks and edges.
@@ -165,8 +180,12 @@ def create_pipeline_with_dependencies(
     Returns:
         PipelineResponseSchema: The created pipeline's data with dependencies.
     """
-    created_pipeline = pipeline_controller.create_pipeline_with_dependencies(
-        pipeline, blocks, edges
+    pipeline_data = pipeline.model_dump(exclude_none=True)
+    blocks_data = [block.model_dump(exclude_none=True) for block in blocks]
+    edges_data = [edge.model_dump(exclude_none=True) for edge in edges]
+    
+    created_pipeline = await controller.create_pipeline_with_dependencies(
+        pipeline_data, blocks_data, edges_data, user_id
     )
     if not created_pipeline:
         raise HTTPException(
@@ -176,7 +195,11 @@ def create_pipeline_with_dependencies(
 
 
 @router.delete("/with-dependencies/{pipeline_id}", status_code=204)
-def delete_pipeline_with_dependencies(pipeline_id: UUID):
+async def delete_pipeline_with_dependencies(
+    pipeline_id: UUID,
+    user_id: UUID,
+    controller: PipelineController = Depends(get_pipeline_controller)
+):
     """
     Delete a pipeline along with all its associated blocks and edges.
 
@@ -186,9 +209,20 @@ def delete_pipeline_with_dependencies(pipeline_id: UUID):
     Returns:
         HTTP 204 No Content: If deletion was successful.
     """
-    success = pipeline_controller.delete_pipeline_with_dependencies(pipeline_id)
+    success = await controller.delete_pipeline_with_dependencies(pipeline_id, user_id)
     if not success:
         raise HTTPException(
             status_code=400, detail="Failed to delete pipeline with dependencies."
         )
     return
+
+@router.post("/verify/{pipeline_id}", status_code=200)
+async def verify_pipeline(
+    pipeline_id: UUID,
+    user_id: UUID,
+    controller: PipelineController = Depends(get_pipeline_controller)
+):
+    verified = await controller.verify_pipeline(pipeline_id, user_id)
+    if not verified:
+        raise HTTPException(status_code=400, detail="Pipeline verification failed.")
+    return {"message": "Pipeline verified successfully."}
