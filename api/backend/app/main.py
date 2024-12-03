@@ -17,7 +17,6 @@ The Constellation API is a FastAPI-based application designed to manage pipeline
     - [Pipelines](#pipelines)
     - [Blocks](#blocks)
     - [Edges](#edges)
-    - [Audit Logs](#audit-logs)
 3. [Running the Application](#running-the-application)
 4. [Logging](#logging)
 5. [Shutdown](#shutdown)
@@ -38,9 +37,10 @@ The Constellation API is a FastAPI-based application designed to manage pipeline
   - `GET /pipelines/{pipeline_id}`  
   - `PUT /pipelines/{pipeline_id}`  
   - `DELETE /pipelines/{pipeline_id}`  
-  - `GET /pipelines/`  
-  - `POST /pipelines/search/`  
-  - `POST /pipelines/{pipeline_id}/assign-version/`  
+  - `GET /pipelines/`
+  - `POST /pipelines/with-dependencies/`
+  - `DELETE /pipelines/with-dependencies/{pipeline_id}`
+  - `POST /pipelines/verify/{pipeline_id}`
 
 - **Blocks:**  
   CRUD operations for managing blocks.  
@@ -48,9 +48,8 @@ The Constellation API is a FastAPI-based application designed to manage pipeline
   - `GET /blocks/{block_id}`  
   - `PUT /blocks/{block_id}`  
   - `DELETE /blocks/{block_id}`  
-  - `GET /blocks/`  
-  - `GET /blocks/search/`  
-  - `POST /blocks/{block_id}/assign-version/`  
+  - `POST /blocks/search-by-filters/`  
+  - `POST /blocks/search-by-vector/`
 
 - **Edges:**  
   CRUD operations for managing edges.  
@@ -59,26 +58,19 @@ The Constellation API is a FastAPI-based application designed to manage pipeline
   - `PUT /edges/{edge_id}`  
   - `DELETE /edges/{edge_id}`  
   - `GET /edges/`  
-  - `GET /edges/search/`  
-  - `POST /edges/{edge_id}/assign-version/`  
-
-- **Audit Logs:**  
-  CRUD operations for managing audit logs.  
-  - `POST /audit-logs/`  
-  - `GET /audit-logs/{log_id}`  
-  - `PUT /audit-logs/{log_id}`  
-  - `DELETE /audit-logs/{log_id}`  
-  - `GET /audit-logs/`  
+  - `POST /edges/search-by-filters/`  
+  - `POST /edges/search-by-vector/`   
 
 """
 
 # main.py
 
+import uvicorn
 from fastapi import FastAPI, HTTPException
-from backend.app.features.core.routes import blocks, edges, pipelines, audit_logs, users
+from backend.app.features.core.routes import blocks, edges, pipelines
 from backend.app.database import connect_db, disconnect_db, prisma_client
 from backend.app.logger import ConstellationLogger
-from backend.app.utils.helpers import SupabaseClientManager
+# from backend.app.utils.helpers import SupabaseClientManager
 
 logger = ConstellationLogger()
 
@@ -100,8 +92,7 @@ async def on_shutdown():
 app.include_router(blocks.router, prefix="/blocks", tags=["Blocks"])
 app.include_router(edges.router, prefix="/edges", tags=["Edges"])
 app.include_router(pipelines.router, prefix="/pipelines", tags=["Pipelines"])
-app.include_router(audit_logs.router, prefix="/audit-logs", tags=["Audit Logs"])
-app.include_router(users.router, prefix="/users", tags=["Users"])
+# app.include_router(users.router, prefix="/users", tags=["Users"])
 
 @app.get("/", tags=["Root"])
 async def root():
@@ -111,7 +102,7 @@ async def root():
 async def health_check():
     try:
         # Simple query to check database connectivity
-        result = await prisma_client.alembic_version.find_first()
+        result = prisma_client.is_connected()
         if result:
             return {"status": "healthy"}
         else:
@@ -121,6 +112,7 @@ async def health_check():
     except Exception as e:
         logger.log("main", "critical", f"Health check failed: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error.")
+
 def main():
     """
     Main function to launch the FastAPI application using Uvicorn.
@@ -128,7 +120,7 @@ def main():
     """
     logger.log("main", "info", "Starting Constellation API on port 8081.")
     uvicorn.run(
-        "app.main:app",
+        "api.backend.app.main:app",
         host="0.0.0.0",
         port=8081,
         reload=True,

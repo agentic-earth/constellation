@@ -51,7 +51,7 @@ class TaxonomyService:
         Returns:
             Optional[PrismaCategory]: The created category if successful, None otherwise.
         """
-        try:
+        try:                
             created_category = await tx.category.create(
                 data={
                     "name": category_data["name"],
@@ -66,23 +66,9 @@ class TaxonomyService:
                 category_name=created_category.name
             )
             return created_category
+
         except UniqueViolationError:
-            # Category with this name and parent_id already exists, retrieve it
-            existing_category = await self.get_category_by_name_and_parent(
-                category_data["name"],
-                category_data.get("parent_id")
-            )
-            if existing_category:
-                self.logger.log(
-                    "TaxonomyService",
-                    "info",
-                    "Category already exists, retrieved existing category.",
-                    category_id=existing_category.category_id,
-                    category_name=existing_category.name
-                )
-                return existing_category
-            else:
-                raise ValueError(f"Failed to create or retrieve category with name: {category_data['name']}")
+            raise ValueError(f"Failed to create or retrieve category with name: {category_data['name']}")
         except Exception as e:
             self.logger.log("TaxonomyService", "error", "Failed to create category", error=str(e))
             return None
@@ -123,7 +109,7 @@ class TaxonomyService:
             self.logger.log("TaxonomyService", "error", "Failed to retrieve category by ID", error=str(e))
             return None
 
-    async def get_category_by_name_and_parent(self, tx: Prisma, name: str, parent_id: Optional[UUID]) -> Optional[PrismaCategory]:
+    async def get_category_by_name_and_parent(self, tx: Prisma, name: str, parent_id: Optional[UUID]=None) -> Optional[PrismaCategory]:
         """
         Retrieves a category by its name and parent_id.
 
