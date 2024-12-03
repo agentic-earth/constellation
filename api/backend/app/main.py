@@ -105,16 +105,6 @@ app.include_router(edges.router, prefix="/edges", tags=["Edges"])
 app.include_router(pipelines.router, prefix="/pipelines", tags=["Pipelines"])
 # app.include_router(users.router, prefix="/users", tags=["Users"])
 
-@app.get("/database_stats")
-async def get_database_stats():
-    return {"status": "ok"}
-@app.get("/info")
-async def get_info():
-    return {"status": "ok"}
-@app.get("/ping")
-async def ping():
-    return {"status": "pong"}
-
 @app.get("/", tags=["Root"])
 async def root():
     return {"message": "Welcome to the Constellation API!"}
