@@ -18,11 +18,13 @@ from datetime import datetime
 # Enum Definitions
 # -------------------
 
+
 class PaperType(str, Enum):
     WEATHER_CLIMATE = "Weather/Climate Model"
     EARTH_OBSERVATION = "Earth Observation Model"
     DATASET = "Dataset"
     OTHER = "Other"
+
 
 class InputDataType(str, Enum):
     OPTICAL = "Optical"
@@ -35,6 +37,7 @@ class InputDataType(str, Enum):
     THERMAL = "Thermal"
     MULTISPECTRAL = "Multispectral"
     OTHER = "Other"
+
 
 class ApplicationArea(str, Enum):
     LAND_USE_LAND_COVER = "Land Use and Land Cover"
@@ -65,6 +68,7 @@ class ApplicationArea(str, Enum):
     GENERAL = "General"
     NA = "N/A"
 
+
 class SatelliteSource(str, Enum):
     # Landsat series
     LANDSAT_1 = "Landsat 1"
@@ -76,7 +80,7 @@ class SatelliteSource(str, Enum):
     LANDSAT_7 = "Landsat 7"
     LANDSAT_8 = "Landsat 8"
     LANDSAT_9 = "Landsat 9"
-    
+
     # Sentinel series
     SENTINEL_1A = "Sentinel-1A"
     SENTINEL_1B = "Sentinel-1B"
@@ -93,7 +97,7 @@ class SatelliteSource(str, Enum):
     # MODIS
     TERRA_MODIS = "Terra MODIS"
     AQUA_MODIS = "Aqua MODIS"
-    
+
     # GOES series
     GOES_13 = "GOES-13"
     GOES_14 = "GOES-14"
@@ -101,13 +105,13 @@ class SatelliteSource(str, Enum):
     GOES_16 = "GOES-16"
     GOES_17 = "GOES-17"
     GOES_18 = "GOES-18"
-    
+
     # NOAA series
     NOAA_15 = "NOAA-15"
     NOAA_18 = "NOAA-18"
     NOAA_19 = "NOAA-19"
     NOAA_20 = "NOAA-20"
-    
+
     # Other NASA satellites
     SMAP = "SMAP"
     ICESAT_2 = "ICESat-2"
@@ -119,7 +123,7 @@ class SatelliteSource(str, Enum):
     AQUA = "Aqua"
     AURA = "Aura"
     SUOMI_NPP = "Suomi NPP"
-    
+
     # Commercial satellites
     WORLDVIEW_1 = "WorldView-1"
     WORLDVIEW_2 = "WorldView-2"
@@ -131,7 +135,7 @@ class SatelliteSource(str, Enum):
     PLEIADES = "Pleiades"
     SPOT_6 = "SPOT-6"
     SPOT_7 = "SPOT-7"
-    
+
     # Radar satellites
     RADARSAT_1 = "RADARSAT-1"
     RADARSAT_2 = "RADARSAT-2"
@@ -167,6 +171,7 @@ class ClimateWeatherDataSource(str, Enum):
     GHCN = "GHCN"
     # Add other climate/weather data sources as needed
 
+
 class SpatialResolution(str, Enum):
     EXTREMELY_HIGH = "Extremely High (<0.1m)"
     VERY_HIGH = "Very High (0.1-1m)"
@@ -200,6 +205,7 @@ class SpatialScale(str, Enum):
     GLOBAL = "Global"
     NA = "N/A"
 
+
 class TemporalScale(str, Enum):
     STATIC = "Static"
     DAILY = "Daily"
@@ -210,6 +216,7 @@ class TemporalScale(str, Enum):
     MULTI_DECADAL = "Multi-decadal"
     NA = "N/A"
 
+
 class ApplicationReadiness(str, Enum):
     THEORETICAL = "Theoretical"
     EXPERIMENTAL = "Experimental"
@@ -217,11 +224,13 @@ class ApplicationReadiness(str, Enum):
     OPERATIONAL = "Operational"
     NA = "N/A"
 
+
 class ModelType(str, Enum):
     VISION = "Vision"
     CLIMATE = "Climate"
     WEATHER = "Weather"
     NA = "N/A"
+
 
 class Architecture(str, Enum):
     CNN = "CNN"
@@ -244,6 +253,7 @@ class Architecture(str, Enum):
     OTHER = "Other"
     NA = "N/A"
 
+
 class ProcessingLevel(str, Enum):
     LEVEL_0 = "Level 0"
     LEVEL_1 = "Level 1"
@@ -252,9 +262,11 @@ class ProcessingLevel(str, Enum):
     LEVEL_4 = "Level 4"
     NA = "N/A"
 
+
 class DependencyTypeEnum(str, Enum):
     INTERNAL = "internal"
     EXTERNAL = "external"
+
 
 class OutputDataType(str, Enum):
     CLASSIFICATION = "Classification"
@@ -274,6 +286,7 @@ class ModelCharacteristics(BaseModel):
     is_multi_modal: bool = False
     is_foundation_model: bool = False
     is_physics_informed: bool = False
+
 
 class Architecture(str, Enum):
     # General architectures
@@ -300,21 +313,23 @@ class Architecture(str, Enum):
     NA = "N/A"
 
 
-
 class PaperType(str, Enum):
     WEATHER_CLIMATE = "Weather/Climate Model"
     EARTH_OBSERVATION = "Earth Observation Model"
     DATASET = "Dataset"
     OTHER = "Other"
 
+
 class PaperTypeModel(BaseModel):
     paper_type: PaperType
+
 
 class ScrapedPaper(BaseModel):
     """
     Represents the initial data scraped from a source.
     This object is immutable once created.
     """
+
     id: str = Field(..., description="Unique identifier for the paper")
     title: str = Field(..., description="Title of the paper")
     abstract: str = Field(..., description="Abstract of the paper")
@@ -326,15 +341,19 @@ class ScrapedPaper(BaseModel):
     class Config:
         frozen = True  # Makes the object immutable
 
+
 class EnrichedPaper(BaseModel):
     """
     Represents a paper after LLM processing.
     This builds upon ScrapedPaper with additional fields.
     """
+
     scraped_data: ScrapedPaper
-    paper_type: Optional[PaperType] = Field(None, description="Type of the research paper")
-    #keywords: Optional[List[str]] = Field(None, description="List of keywords")
-    #metadata: Dict[str, Any] = Field(default_factory=dict, description="Flexible metadata storage")
+    paper_type: Optional[PaperType] = Field(
+        None, description="Type of the research paper"
+    )
+    # keywords: Optional[List[str]] = Field(None, description="List of keywords")
+    # metadata: Dict[str, Any] = Field(default_factory=dict, description="Flexible metadata storage")
 
     @property
     def id(self) -> str:
@@ -364,11 +383,13 @@ class EnrichedPaper(BaseModel):
     def pdf_url(self) -> Optional[str]:
         return self.scraped_data.pdf_url
 
+
 class FullPaper(BaseModel):
     """
     Represents the final, complete paper object.
     This is created once all processing is done.
     """
+
     id: str = Field(..., description="Unique identifier for the paper")
     title: str = Field(..., description="Title of the paper")
     abstract: str = Field(..., description="Abstract of the paper")
@@ -382,9 +403,11 @@ class FullPaper(BaseModel):
     metadata: Dict[str, Any] = Field(..., description="Flexible metadata storage")
 
     @classmethod
-    def from_enriched(cls, enriched: EnrichedPaper) -> 'FullPaper':
+    def from_enriched(cls, enriched: EnrichedPaper) -> "FullPaper":
         if enriched.paper_type is None or enriched.keywords is None:
-            raise ValueError("EnrichedPaper must have paper_type and keywords to create a FullPaper")
+            raise ValueError(
+                "EnrichedPaper must have paper_type and keywords to create a FullPaper"
+            )
         return cls(
             id=enriched.scraped_data.id,
             title=enriched.scraped_data.title,
@@ -395,107 +418,182 @@ class FullPaper(BaseModel):
             pdf_url=enriched.scraped_data.pdf_url,
             paper_type=enriched.paper_type,
             keywords=enriched.keywords,
-            metadata=enriched.metadata
+            metadata=enriched.metadata,
         )
-
-
 
 
 # -------------------
 # Model Definitions
 # -------------------
 
+
 class ModelCharacteristics(BaseModel):
-    is_stochastic: bool = Field(default=False, description="Indicates if the model is stochastic.")
-    is_deterministic: bool = Field(default=True, description="Indicates if the model is deterministic.")
-    is_multi_modal: bool = Field(default=False, description="Indicates if the model is multi-modal.")
-    is_foundation_model: bool = Field(default=False, description="Indicates if the model is a foundation model.")
-    is_physics_informed: bool = Field(default=False, description="Indicates if the model is physics-informed.")
+    is_stochastic: bool = Field(
+        default=False, description="Indicates if the model is stochastic."
+    )
+    is_deterministic: bool = Field(
+        default=True, description="Indicates if the model is deterministic."
+    )
+    is_multi_modal: bool = Field(
+        default=False, description="Indicates if the model is multi-modal."
+    )
+    is_foundation_model: bool = Field(
+        default=False, description="Indicates if the model is a foundation model."
+    )
+    is_physics_informed: bool = Field(
+        default=False, description="Indicates if the model is physics-informed."
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class TaxonomyBase(BaseModel):
     paper_id: str = Field(..., description="ID of the associated paper.")
-    created_at: datetime = Field(default_factory=datetime.utcnow, description="Timestamp of taxonomy creation.")
-    updated_at: datetime = Field(default_factory=datetime.utcnow, description="Timestamp of last update.")
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow, description="Timestamp of taxonomy creation."
+    )
+    updated_at: datetime = Field(
+        default_factory=datetime.utcnow, description="Timestamp of last update."
+    )
     version: int = Field(default=1, description="Version number of the taxonomy.")
     code_url: Optional[str] = Field(None, description="URL to the code repository.")
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class GeneralTaxonomy(TaxonomyBase):
     paper_type: PaperType = Field(..., description="Type of the research paper.")
-    application_areas: List[ApplicationArea] = Field(..., description="List of application areas.")
+    application_areas: List[ApplicationArea] = Field(
+        ..., description="List of application areas."
+    )
     keywords: List[str] = Field(..., description="List of keywords.")
     spatial_scale: SpatialScale = Field(..., description="Spatial scale of the study.")
-    temporal_scale: TemporalScale = Field(..., description="Temporal scale of the study.")
-    application_readiness: ApplicationReadiness = Field(..., description="Readiness level of the application or method.")
+    temporal_scale: TemporalScale = Field(
+        ..., description="Temporal scale of the study."
+    )
+    application_readiness: ApplicationReadiness = Field(
+        ..., description="Readiness level of the application or method."
+    )
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class ModelTaxonomyBase(GeneralTaxonomy):
     model_type: ModelType = Field(..., description="Type of the model.")
-    architecture: Architecture = Field(..., description="Architecture of the implemented model.")
-    model_characteristics: ModelCharacteristics = Field(..., description="Characteristics of the model.")
-    input_data_types: List[InputDataType] = Field(..., description="Types of input data used.")
-    output_data_type: OutputDataType = Field(..., description="Type of output data produced.")
-    spatial_resolution: SpatialResolution = Field(..., description="Spatial resolution of the model.")
-    temporal_resolution: TemporalResolution = Field(..., description="Temporal resolution of the model.")
+    architecture: Architecture = Field(
+        ..., description="Architecture of the implemented model."
+    )
+    model_characteristics: ModelCharacteristics = Field(
+        ..., description="Characteristics of the model."
+    )
+    input_data_types: List[InputDataType] = Field(
+        ..., description="Types of input data used."
+    )
+    output_data_type: OutputDataType = Field(
+        ..., description="Type of output data produced."
+    )
+    spatial_resolution: SpatialResolution = Field(
+        ..., description="Spatial resolution of the model."
+    )
+    temporal_resolution: TemporalResolution = Field(
+        ..., description="Temporal resolution of the model."
+    )
 
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
+
 class EarthObservationModelTaxonomy(ModelTaxonomyBase):
-    satellite_data_sources: List[SatelliteSource] = Field(..., description="Satellite data sources used.")
-    processing_level: ProcessingLevel = Field(..., description="Processing level of input data.")
+    satellite_data_sources: List[SatelliteSource] = Field(
+        ..., description="Satellite data sources used."
+    )
+    processing_level: ProcessingLevel = Field(
+        ..., description="Processing level of input data."
+    )
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class WeatherClimateModelTaxonomy(ModelTaxonomyBase):
-    climate_weather_data_sources: List["ClimateWeatherDataSource"] = Field(..., description="Climate/weather data sources used.")
+    climate_weather_data_sources: List["ClimateWeatherDataSource"] = Field(
+        ..., description="Climate/weather data sources used."
+    )
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class DatasetTaxonomy(GeneralTaxonomy):
-    satellite_data_sources: List[SatelliteSource] = Field(..., description="Satellite data sources.")
-    climate_weather_data_sources: List["ClimateWeatherDataSource"] = Field(..., description="Climate/weather data sources.")
-    spatial_resolution: SpatialResolution = Field(..., description="Spatial resolution of the data.")
-    temporal_resolution: TemporalResolution = Field(..., description="Temporal resolution of the data.")
-    processing_level: ProcessingLevel = Field(..., description="Processing level of the data.")
+    satellite_data_sources: List[SatelliteSource] = Field(
+        ..., description="Satellite data sources."
+    )
+    climate_weather_data_sources: List["ClimateWeatherDataSource"] = Field(
+        ..., description="Climate/weather data sources."
+    )
+    spatial_resolution: SpatialResolution = Field(
+        ..., description="Spatial resolution of the data."
+    )
+    temporal_resolution: TemporalResolution = Field(
+        ..., description="Temporal resolution of the data."
+    )
+    processing_level: ProcessingLevel = Field(
+        ..., description="Processing level of the data."
+    )
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class Taxonomy(BaseModel):
     general: GeneralTaxonomy
-    specific: Optional[Union[EarthObservationModelTaxonomy, WeatherClimateModelTaxonomy, DatasetTaxonomy]] = Field(None, description="Specific taxonomy based on paper type.")
+    specific: Optional[
+        Union[
+            EarthObservationModelTaxonomy, WeatherClimateModelTaxonomy, DatasetTaxonomy
+        ]
+    ] = Field(None, description="Specific taxonomy based on paper type.")
 
     model_config = ConfigDict(from_attributes=True)
+
 
 # Mapping between PaperType and Taxonomy classes
 PAPER_TYPE_TO_TAXONOMY: Dict[PaperType, type] = {
     PaperType.WEATHER_CLIMATE: WeatherClimateModelTaxonomy,
     PaperType.EARTH_OBSERVATION: EarthObservationModelTaxonomy,
     PaperType.DATASET: DatasetTaxonomy,
-    PaperType.OTHER: GeneralTaxonomy  # Assuming GeneralTaxonomy for 'Other'
+    PaperType.OTHER: GeneralTaxonomy,  # Assuming GeneralTaxonomy for 'Other'
 }
 
+
 class TaxonomyFilter(BaseModel):
-    general: Optional[Dict[str, Any]] = Field(None, description="Filters for GeneralTaxonomy fields.")
-    earth_observation: Optional[Dict[str, Any]] = Field(None, description="Filters for EarthObservationModelTaxonomy fields.")
-    weather_climate: Optional[Dict[str, Any]] = Field(None, description="Filters for WeatherClimateModelTaxonomy fields.")
-    dataset: Optional[Dict[str, Any]] = Field(None, description="Filters for DatasetTaxonomy fields.")
+    general: Optional[Dict[str, Any]] = Field(
+        None, description="Filters for GeneralTaxonomy fields."
+    )
+    earth_observation: Optional[Dict[str, Any]] = Field(
+        None, description="Filters for EarthObservationModelTaxonomy fields."
+    )
+    weather_climate: Optional[Dict[str, Any]] = Field(
+        None, description="Filters for WeatherClimateModelTaxonomy fields."
+    )
+    dataset: Optional[Dict[str, Any]] = Field(
+        None, description="Filters for DatasetTaxonomy fields."
+    )
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class DatabaseStats(BaseModel):
-    total_papers: int = Field(..., description="Total number of papers in the database.")
-    papers_by_type: Dict[PaperType, int] = Field(..., description="Number of papers categorized by type.")
+    total_papers: int = Field(
+        ..., description="Total number of papers in the database."
+    )
+    papers_by_type: Dict[PaperType, int] = Field(
+        ..., description="Number of papers categorized by type."
+    )
 
     model_config = ConfigDict(from_attributes=True)
+
 
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any, Tuple
 from pydantic import BaseModel, Field, field_validator, model_validator
 from dateutil import parser as date_parser
+
 
 class SearchQuery(BaseModel):
     """
@@ -525,6 +623,7 @@ class SearchQuery(BaseModel):
         )
         ```
     """
+
     keywords: Optional[List[str]] = None
     paper_type: Optional[PaperType] = None
     date_range: Optional[Tuple[datetime, datetime]] = None
@@ -532,7 +631,7 @@ class SearchQuery(BaseModel):
     limit: int = Field(default=10)
     offset: int = Field(default=0)
 
-    @field_validator('date_range', mode='before')
+    @field_validator("date_range", mode="before")
     @classmethod
     def parse_date_range(cls, v):
         if isinstance(v, (list, tuple)) and len(v) == 2:
@@ -555,23 +654,26 @@ class SearchQuery(BaseModel):
                 raise ValueError(f"Unable to parse date string: {value}")
         raise ValueError(f"Unsupported date type: {type(value)}")
 
-    model_config = ConfigDict(
-        json_serializers={
-            datetime: lambda v: v.isoformat()
-        }
-    )
+    model_config = ConfigDict(json_serializers={datetime: lambda v: v.isoformat()})
+
 
 class SearchResult(BaseModel):
-    papers: List[FullPaper] = Field(..., description="List of full papers matching the search criteria")
-    total_count: int = Field(..., description="Total number of papers matching the search criteria")
+    papers: List[FullPaper] = Field(
+        ..., description="List of full papers matching the search criteria"
+    )
+    total_count: int = Field(
+        ..., description="Total number of papers matching the search criteria"
+    )
     page: int = Field(..., description="Current page number")
     total_pages: int = Field(..., description="Total number of pages available")
     query: SearchQuery = Field(..., description="The original search query")
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
+
 class EOWorkflowRequest(BaseModel):
     prompt: str
+
 
 # Add this at the end of the file, after all class definitions
 WeatherClimateModelTaxonomy.model_rebuild()
@@ -579,10 +681,18 @@ DatasetTaxonomy.model_rebuild()
 Taxonomy.model_rebuild()
 
 __all__ = [
-    "ModelType", "Architecture", "ModelCharacteristics",
-    "TaxonomyBase", "GeneralTaxonomy", "ModelTaxonomyBase",
-    "EarthObservationModelTaxonomy", "WeatherClimateModelTaxonomy",
-    "DatasetTaxonomy", "Taxonomy",
-    "SearchQuery", "SearchResult",
-    "PAPER_TYPE_TO_TAXONOMY", "PaperTypeModel"
+    "ModelType",
+    "Architecture",
+    "ModelCharacteristics",
+    "TaxonomyBase",
+    "GeneralTaxonomy",
+    "ModelTaxonomyBase",
+    "EarthObservationModelTaxonomy",
+    "WeatherClimateModelTaxonomy",
+    "DatasetTaxonomy",
+    "Taxonomy",
+    "SearchQuery",
+    "SearchResult",
+    "PAPER_TYPE_TO_TAXONOMY",
+    "PaperTypeModel",
 ]

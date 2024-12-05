@@ -23,11 +23,7 @@ from typing import List, Optional, Dict, Any
 from uuid import UUID
 from backend.app.features.core.controllers.edge_controller import EdgeController
 
-from prisma.partials import (
-    EdgeBasicInfo,
-    EdgeBasicInfoWithID,
-    EdgeUpdate
-)
+from prisma.partials import EdgeBasicInfo, EdgeBasicInfoWithID, EdgeUpdate
 
 from backend.app.dependencies import get_edge_controller
 
@@ -37,11 +33,12 @@ router = APIRouter()
 # Edge Endpoints
 # -------------------
 
+
 @router.post("/", response_model=EdgeBasicInfo, status_code=status.HTTP_201_CREATED)
 async def create_edge(
     edge: EdgeBasicInfo,
     user_id: UUID,
-    controller: EdgeController = Depends(get_edge_controller)
+    controller: EdgeController = Depends(get_edge_controller),
 ):
     """
     Create a new edge.
@@ -60,11 +57,12 @@ async def create_edge(
         raise HTTPException(status_code=400, detail="Edge creation failed.")
     return created_edge
 
+
 @router.get("/{edge_id}", response_model=EdgeBasicInfoWithID)
 async def get_edge(
     edge_id: UUID,
     user_id: UUID,
-    controller: EdgeController = Depends(get_edge_controller)
+    controller: EdgeController = Depends(get_edge_controller),
 ):
     """
     Retrieve an edge by its UUID.
@@ -81,12 +79,13 @@ async def get_edge(
         raise HTTPException(status_code=404, detail="Edge not found.")
     return edge
 
+
 @router.put("/{edge_id}", response_model=EdgeBasicInfo)
 async def update_edge(
     edge_id: UUID,
     edge_update: EdgeUpdate,
     user_id: UUID,
-    controller: EdgeController = Depends(get_edge_controller)
+    controller: EdgeController = Depends(get_edge_controller),
 ):
     """
     Update an existing edge's information.
@@ -105,11 +104,12 @@ async def update_edge(
         raise HTTPException(status_code=400, detail="Edge update failed.")
     return updated_edge
 
+
 @router.delete("/{edge_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_edge(
     edge_id: UUID,
     user_id: UUID,
-    controller: EdgeController = Depends(get_edge_controller)
+    controller: EdgeController = Depends(get_edge_controller),
 ):
     """
     Delete an edge by its UUID.
@@ -125,6 +125,7 @@ async def delete_edge(
     if not success:
         raise HTTPException(status_code=400, detail="Edge deletion failed.")
     return
+
 
 # @router.get("/", response_model=List[EdgeBasicInfoWithID])
 # async def list_edges(

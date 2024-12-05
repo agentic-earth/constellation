@@ -4,9 +4,10 @@ from langchain_openai import ChatOpenAI
 from backend.app.features.agent.tools.vector_embed_tool import VectorEmbedTool
 from backend.app.features.agent.tools.similarity_search_tool import SimilaritySearchTool
 
+
 @CrewBase
 class ResearchCrew:
-    '''Research Crew'''
+    """Research Crew"""
 
     agents_config = "agents_config.yaml"
     tasks_config = "tasks_config.yaml"
@@ -24,7 +25,7 @@ class ResearchCrew:
             llm=self.llm,
             verbose=True,
         )
-    
+
     @task
     def research_task(self) -> Task:
         return Task(
@@ -32,7 +33,7 @@ class ResearchCrew:
             agent=self.research_agent,
             process=Process.sequential,
         )
-    
+
     @crew
     def research_crew(self) -> Crew:
         return Crew(

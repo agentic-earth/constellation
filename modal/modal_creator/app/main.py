@@ -1,7 +1,13 @@
 from fastapi import FastAPI
-from modal_creator.assets.utils import deploy_model_service, delete_model_service, post_model_inference, get_service_code
+from modal_creator.assets.utils import (
+    deploy_model_service,
+    delete_model_service,
+    post_model_inference,
+    get_service_code,
+)
 
 app = FastAPI()
+
 
 @app.get("/deploy")
 async def deploy(model_name: str):
