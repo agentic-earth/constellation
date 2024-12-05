@@ -19,6 +19,7 @@ from backend.app.features.core.services.block_service import BlockService
 import json
 from typing import List, Dict, Any, ClassVar
 
+
 class ResearchAgent(Agent):
     def __init__(self, **kwargs):
         super().__init__(
@@ -29,7 +30,7 @@ class ResearchAgent(Agent):
             verbose=True,
             allow_delegation=False,
             tools=[self.find_similar_papers],
-            **kwargs
+            **kwargs,
         )
 
     @tool
@@ -37,7 +38,11 @@ class ResearchAgent(Agent):
         """Find papers similar to the given query."""
         try:
             query_embedding = await self.block_service.generate_embedding(query)
-            similar_blocks = await self.block_service.search_blocks_by_vector_similarity(query_embedding, top_k=top_k)
+            similar_blocks = (
+                await self.block_service.search_blocks_by_vector_similarity(
+                    query_embedding, top_k=top_k
+                )
+            )
             return json.dumps(similar_blocks)
         except Exception as e:
             self.logger.error(f"Error in find_similar_papers: {str(e)}")
@@ -53,12 +58,12 @@ class ResearchAgent(Agent):
     #             paper_name = paper['name']
     #             paper_description = paper.get('description', 'No description available')
     #             similarity_score = paper['similarity']
-                
+
     #             analysis += f"Paper: {paper_name}\n"
     #             analysis += f"Relevance Score: {similarity_score:.2f}\n"
     #             analysis += f"Description: {paper_description}\n"
     #             analysis += f"Relevance: This paper is relevant because it discusses aspects of {query}.\n\n"
-            
+
     #         return json.dumps({"analysis": analysis})
     #     except Exception as e:
     #         self.logger.error(f"Error in analyze_papers: {str(e)}")

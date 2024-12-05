@@ -17,7 +17,11 @@ def serialize_dict(data: dict) -> dict:
             serialized[key] = serialize_dict(value)
         elif isinstance(value, list):
             serialized[key] = [
-                serialize_dict(item) if isinstance(item, dict) else str(item) if isinstance(item, (datetime, UUID)) else item
+                (
+                    serialize_dict(item)
+                    if isinstance(item, dict)
+                    else str(item) if isinstance(item, (datetime, UUID)) else item
+                )
                 for item in value
             ]
         else:
@@ -25,7 +29,9 @@ def serialize_dict(data: dict) -> dict:
     return serialized
 
 
-def align_dict_with_model(data: Dict[str, Any], model: Type[BaseModel]) -> Dict[str, Any]:
+def align_dict_with_model(
+    data: Dict[str, Any], model: Type[BaseModel]
+) -> Dict[str, Any]:
     """
     Aligns a dictionary with a Pydantic model by:
     - Including only the fields present in the model.
@@ -38,7 +44,7 @@ def align_dict_with_model(data: Dict[str, Any], model: Type[BaseModel]) -> Dict[
     Returns:
         Dict[str, Any]: The aligned and validated data dictionary.
     """
-    print('*' * 20)
+    print("*" * 20)
     print(f"Input data fields: {list(data.keys())}")
     print(f"Pydantic model fields: {list(model.__fields__.keys())}")
 
@@ -63,7 +69,10 @@ def align_dict_with_model(data: Dict[str, Any], model: Type[BaseModel]) -> Dict[
 
     # Transform UUID fields to strings if the Pydantic model uses strings
     for field_name, field_value in validated_data.items():
-        if isinstance(field_value, UUID) and model.__annotations__.get(field_name) == str:
+        if (
+            isinstance(field_value, UUID)
+            and model.__annotations__.get(field_name) == str
+        ):
             validated_data[field_name] = str(field_value)
-    print('*' * 20)
+    print("*" * 20)
     return validated_data

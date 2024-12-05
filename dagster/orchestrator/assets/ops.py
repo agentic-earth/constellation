@@ -1,7 +1,7 @@
-
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 import base64
 from dagster import Any, In, OpExecutionContext, Out, op
@@ -121,8 +121,10 @@ def model_inference(
     MODEL_ENDPOINT = f"http://model_api:8000"
     endpoint = f"{MODEL_ENDPOINT}/infer?model_name={model}"
     batch_size = 2
-    batches = [data[i : min(len(data), i + batch_size)] for i in range(0, len(data), batch_size)]
-
+    batches = [
+        data[i : min(len(data), i + batch_size)]
+        for i in range(0, len(data), batch_size)
+    ]
 
     results = []
     for batch in batches:
@@ -178,7 +180,9 @@ def math_block(
     data: pd.DataFrame,
 ) -> pd.DataFrame:
     operation_func = getattr(operator, operand)
-    context.log.info(f"Applying operation '{operand}' with constant {constant} to DataFrame.")
+    context.log.info(
+        f"Applying operation '{operand}' with constant {constant} to DataFrame."
+    )
     result_df = data.map(lambda x: operation_func(x, constant))
     context.log.info(f"Resulting DataFrame:\n{result_df}")
     return result_df
