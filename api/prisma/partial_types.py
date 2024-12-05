@@ -1,4 +1,3 @@
-from prisma import Prisma
 from prisma.models import (
     Block,
     Edge,
