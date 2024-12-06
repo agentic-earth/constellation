@@ -157,6 +157,28 @@ async def list_pipelines(
         raise HTTPException(status_code=500, detail="Failed to retrieve pipelines.")
     return pipelines
 
+@router.put("/status/{run_id}", status_code=200)
+async def update_pipeline_status(
+    run_id: UUID,
+    status: str,
+    controller: PipelineController = Depends(get_pipeline_controller),
+):
+    """
+    Update the status of a pipeline by run ID.
+
+    Args:
+        run_id (UUID): The run ID of the pipeline to update.
+        status (str): The new status to set for the pipeline.
+
+    Returns:
+        Dict[str, str]: A success message if the update is successful.
+    """
+    success = await controller.update_pipeline_status(run_id, status)
+    if not success:
+        raise HTTPException(
+            status_code=400, detail="Failed to update pipeline status."
+        )
+    return {"message": "Pipeline status updated successfully."}
 
 # -------------------
 # Complex Pipeline Operations Endpoints
