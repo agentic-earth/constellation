@@ -739,10 +739,56 @@ class PipelineController:
     
     async def update_pipeline_status(self, run_id: UUID, status: str) -> bool:
         """
-        Updates the status of a pipeline.
+        Updates the status of a pipeline based on its run ID.
+
+        Args:
+            run_id (UUID): The run ID of the pipeline to update.
+            status (str): The new status to set for the pipeline.
+
+        Returns:
+            bool: True if the status update is successful, False otherwise.
         """
-        pass
-    
+        try:
+            async with self.prisma.tx() as tx:
+                # Retrieve the pipeline using the run_id
+                pipeline = await self.pipeline_service.get_pipeline_by_run_id(tx, run_id)
+                if not pipeline:
+                    raise ValueError(f"Pipeline with run_id {run_id} not found.")
+
+                # Update the pipeline status
+                update_success = await self.pipeline_service.update_pipeline_status(
+                    tx, pipeline.pipeline_id, status
+                )
+                if not update_success:
+                    raise ValueError("Failed to update pipeline status.")
+
+                # Log the update event
+                self.logger.log(
+                    "PipelineController",
+                    "info",
+                    f"Pipeline status updated successfully.",
+                    extra={
+                        "run_id": str(run_id),
+                        "pipeline_id": str(pipeline.pipeline_id),
+                        "status": status,
+                    },
+                )
+                return True
+
+        except Exception as e:
+            # Log unexpected exceptions with critical level
+            self.logger.log(
+                "PipelineController",
+                "critical",
+                f"Exception during pipeline status update: {str(e)}",
+                extra={
+                    "traceback": traceback.format_exc(),
+                    "run_id": str(run_id),
+                    "status": status,
+                },
+            )
+            return False
+        
     async def run_pipeline(self, config: str, user_id: UUID) -> bool:
         """
         Runs a pipeline with the given config.

@@ -517,7 +517,40 @@ class PipelineService:
                 error=str(e),
             )
             return False
-    
+    async def get_pipeline_by_run_id(self, tx: Prisma, run_id: UUID) -> Optional[PrismaPipeline]:
+        """
+        Retrieves a pipeline by its run ID.
+
+        Args:
+            tx (Prisma): The Prisma transaction instance.
+            run_id (UUID): The run ID of the pipeline.
+
+        Returns:
+            Optional[PrismaPipeline]: The pipeline if found, None otherwise.
+        """
+        try:
+            pipeline = await tx.pipeline.find_unique(where={"run_id": str(run_id)})
+            if pipeline:
+                self.logger.log(
+                    "PipelineService",
+                    "info",
+                    "Pipeline retrieved successfully by run_id.",
+                    run_id=str(run_id),
+                    pipeline_id=str(pipeline.pipeline_id),
+                )
+            else:
+                self.logger.log(
+                    "PipelineService",
+                    "warning",
+                    "Pipeline not found by run_id.",
+                    run_id=str(run_id),
+                )
+            return pipeline
+        except Exception as e:
+            self.logger.log(
+                "PipelineService", "error", "Error retrieving pipeline by run_id.", error=str(e)
+            )
+            return None
     async def update_pipeline_status(self, tx: Prisma, pipeline_id: UUID, status: str) -> bool:
         try:
             updated_pipeline = await tx.pipeline.update(
