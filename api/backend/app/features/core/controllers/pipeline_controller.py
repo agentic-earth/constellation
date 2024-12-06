@@ -795,7 +795,6 @@ class PipelineController:
         """
         # Based on the config, store the pipeline in the database
         pipeline_data = {
-            "name": "Test Pipeline",
             "user_id": str(user_id),
         }
         pipeline = await self.pipeline_service.create_pipeline(self.prisma, pipeline_data)
@@ -821,16 +820,12 @@ class PipelineController:
                 delete_result = await self.delete_pipeline(pipeline.pipeline_id)
                 if not delete_result:
                     raise Exception("Failed to delete pipeline.")
+                
+                return False
 
 
-        except Exception as e:
-            self.logger.log(
-                "PipelineController",
-                "critical",
-                f"Exception during running pipeline: {str(e)}",
-                extra={"traceback": traceback.format_exc()},
-            )
-            return False
+        except HTTPException as e:
+            raise e
 
     async def main(self):
         from backend.app.features.core.services.block_service import BlockService

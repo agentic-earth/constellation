@@ -159,7 +159,7 @@ async def list_pipelines(
 
 @router.put("/status/{run_id}", status_code=200)
 async def update_pipeline_status(
-    run_id: UUID,
+    run_id: str,
     status: str,
     controller: PipelineController = Depends(get_pipeline_controller),
 ):
@@ -253,12 +253,16 @@ async def verify_pipeline(
     return {"message": "Pipeline verified successfully."}
 
 
-@router.post("/run}", status_code=200)
+@router.post("/run", status_code=200)
 async def run_pipeline(
     config: str,
+    user_id: UUID,
     controller: PipelineController = Depends(get_pipeline_controller),
 ):
-    result = await controller.run_pipeline(config)
-    if not result:
-        raise HTTPException(status_code=400, detail="Pipeline run failed.")
-    return {"message": "Pipeline run successfully."}
+    try:
+        result = await controller.run_pipeline(config, user_id)
+        if not result:
+            raise HTTPException(status_code=400, detail="Pipeline run failed.")
+        return {"message": "Pipeline run successfully."}
+    except HTTPException as e:
+        raise e

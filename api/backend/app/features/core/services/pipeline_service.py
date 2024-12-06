@@ -40,7 +40,7 @@ class PipelineService:
             pipeline = await tx.pipeline.create(
                 data={
                     "pipeline_id": pipeline_id,
-                    "name": pipeline_data["name"],
+                    "name": pipeline_data.get("name"),
                     "description": pipeline_data.get("description"),
                     "user_id": str(pipeline_data["user_id"]),
                     "created_at": created_at,

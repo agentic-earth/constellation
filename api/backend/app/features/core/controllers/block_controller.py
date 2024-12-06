@@ -414,7 +414,21 @@ class BlockController:
                 extra=traceback.format_exc(),
             )
             return None
-
+    
+    async def get_all_blocks(self, user_id: UUID) -> Optional[List[Dict[str, Any]]]:
+        try:
+            async with self.prisma.tx() as tx:
+                blocks = await self.block_service.get_all_blocks(tx)
+                return [block.dict() for block in blocks]
+        except Exception as e:
+            self.logger.log(
+                "BlockController",
+                "error",
+                "Failed to get all blocks",
+                error=str(e),
+                extra=traceback.format_exc(),
+            )
+            return None
 
 # -------------------
 # Testing Utility
