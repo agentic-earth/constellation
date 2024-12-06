@@ -494,6 +494,51 @@ class PipelineService:
                 error=str(e),
             )
             return False
+    
+    async def assign_run_id_to_pipeline(self, tx: Prisma, pipeline_id: UUID, run_id: str) -> bool:
+        try:
+            updated_pipeline = await tx.pipeline.update(
+                where={"pipeline_id": str(pipeline_id)},
+                data={"run_id": str(run_id)},
+            )
+            self.logger.log(
+                "PipelineService",
+                "info",
+                "Run ID assigned to pipeline successfully.",
+                pipeline_id=str(pipeline_id),
+                run_id=str(run_id),
+            )
+            return True
+        except Exception as e:
+            self.logger.log(
+                "PipelineService",
+                "error",
+                "Error assigning run_id to pipeline.",
+                error=str(e),
+            )
+            return False
+    
+    async def update_pipeline_status(self, tx: Prisma, pipeline_id: UUID, status: str) -> bool:
+        try:
+            updated_pipeline = await tx.pipeline.update(
+                where={"pipeline_id": str(pipeline_id)}, data={"status": status}
+            )
+            self.logger.log(
+                "PipelineService",
+                "info",
+                "Pipeline status updated successfully.",
+                pipeline_id=str(pipeline_id),
+                status=status,
+            )
+            return True
+        except Exception as e:
+            self.logger.log(
+                "PipelineService",
+                "error",
+                "Error updating pipeline status.",
+                error=str(e),
+            )
+            return False
 
     # -------------------
     # Main function for testing
