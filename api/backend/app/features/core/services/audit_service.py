@@ -96,7 +96,7 @@ class AuditService:
                 "action_type": str(PrismaActionTypeEnum[audit_data["action_type"]]),
                 "entity_type": str(PrismaAuditEntityTypeEnum[audit_data["entity_type"]]),
                 "entity_id": str(audit_data["entity_id"]),
-                "timestamp": str(datetime.now(timezone.utc)),
+                "timestamp": datetime.now(timezone.utc),
                 "details": json.dumps(details)  # Ensure this is a dict
             }
 
@@ -119,7 +119,7 @@ class AuditService:
                 entity_type=created_log.entity_type,
                 entity_id=created_log.entity_id
             )
-
+            print(f"Audit log created successfully: {created_log.log_id}")
             return created_log
 
         except Exception as e:

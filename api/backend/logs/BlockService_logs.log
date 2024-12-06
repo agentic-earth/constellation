@@ -1,47 +1,14 @@
-Log file initialized on 2024-11-21 01:45:44.033731
-2024-11-21 01:45:44,034 - BlockService - ERROR - Failed to create block - error=Unable to match input value to any allowed input type for the field. Parse errors: [`data.name`: A value is required but not set, `data.name`: A value is required but not set] - traceback=Traceback (most recent call last):
-  File "C:\Users\JXPARATROOPER\Desktop\CourseCode\CSCI 2340\constellation-backend\api\backend\app\features\core\services\block_service.py", line 82, in create_block
-    created_block = await tx.block.create(data=block_data)
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\actions.py", line 2243, in create
-    resp = await self._client._execute(
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\_base_client.py", line 543, in _execute
-    return await self._engine.query(builder.build(), tx_id=self._tx_id)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\engine\_query.py", line 402, in query
-    return await self.request(
-           ^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\engine\_http.py", line 233, in request
-    return self._process_response_data(data=data, response=response)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\engine\_http.py", line 87, in _process_response_data
-    return utils.handle_response_errors(response, errors_data)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\engine\utils.py", line 163, in handle_response_errors
-    raise prisma_errors.MissingRequiredValueError(error)
-prisma.errors.MissingRequiredValueError: Unable to match input value to any allowed input type for the field. Parse errors: [`data.name`: A value is required but not set, `data.name`: A value is required but not set]
-
-2024-11-21 01:45:44,040 - BlockService - ERROR - Failed to create block - error=Unable to match input value to any allowed input type for the field. Parse errors: [`data.name`: A value is required but not set, `data.name`: A value is required but not set] - traceback=Traceback (most recent call last):
-  File "C:\Users\JXPARATROOPER\Desktop\CourseCode\CSCI 2340\constellation-backend\api\backend\app\features\core\services\block_service.py", line 82, in create_block
-    created_block = await tx.block.create(data=block_data)
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\actions.py", line 2243, in create
-    resp = await self._client._execute(
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\_base_client.py", line 543, in _execute
-    return await self._engine.query(builder.build(), tx_id=self._tx_id)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\engine\_query.py", line 402, in query
-    return await self.request(
-           ^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\engine\_http.py", line 233, in request
-    return self._process_response_data(data=data, response=response)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\engine\_http.py", line 87, in _process_response_data
-    return utils.handle_response_errors(response, errors_data)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\JXPARATROOPER\AppData\Local\pypoetry\Cache\virtualenvs\backend-NGljmPTT-py3.12\Lib\site-packages\prisma\engine\utils.py", line 163, in handle_response_errors
-    raise prisma_errors.MissingRequiredValueError(error)
-prisma.errors.MissingRequiredValueError: Unable to match input value to any allowed input type for the field. Parse errors: [`data.name`: A value is required but not set, `data.name`: A value is required but not set]
-
+Log file initialized on 2024-12-03 17:29:37.931232
+2024-12-03 17:29:37,931 - BlockService - INFO - Block retrieved successfully. - block_id=973753b4-6995-4bc0-9318-df6cc9c6204b - block_name=Quantum Artificial Intelligence for the Science of Climate Change
+2024-12-03 17:29:38,119 - BlockService - INFO - Block retrieved successfully. - block_id=d4c47b00-4002-4c11-b1d8-a55ca3e7633e - block_name=Proceedings of AAAI 2022 Fall Symposium: The Role of AI in Responding to
+  Climate Challenges
+2024-12-03 17:29:38,362 - BlockService - INFO - Block retrieved successfully. - block_id=0280db57-fc98-4824-b82e-aef5727bd37b - block_name=Leveraging machine learning to enhance climate models: a review
+2024-12-03 17:29:38,537 - BlockService - INFO - Block retrieved successfully. - block_id=ba31ce2e-82db-49fc-ad5b-e077233d5e8f - block_name=Robustness of AI-based weather forecasts in a changing climate
+2024-12-03 17:29:38,801 - BlockService - INFO - Block retrieved successfully. - block_id=109915e4-1170-4469-86df-60d97d295da1 - block_name=Multi-scale Digital Twin: Developing a fast and physics-informed
+  surrogate model for groundwater contamination with uncertain climate models
+2024-12-03 17:29:38,999 - BlockService - INFO - Block retrieved successfully. - block_id=70cbd2dd-b223-4e10-8ea6-0c447f426fee - block_name=Using Artificial Intelligence to aid Scientific Discovery of Climate
+  Tipping Points
+2024-12-03 17:29:39,186 - BlockService - INFO - Block retrieved successfully. - block_id=f9502aea-6356-4dae-bd9b-20bacda01a6d - block_name=AI For Global Climate Cooperation 2023 Competition Proceedings
+2024-12-03 17:29:39,411 - BlockService - INFO - Block retrieved successfully. - block_id=d141fe97-e94b-4ea5-80e8-81a8d18f7c4a - block_name=Modeling chaotic Lorenz ODE System using Scientific Machine Learning
+2024-12-03 17:29:39,501 - BlockService - ERROR - Failed to retrieve block by ID - error=Transaction already closed: Could not perform operation.
+2024-12-03 17:29:39,505 - BlockService - ERROR - Failed to retrieve block by ID - error=Transaction already closed: A query cannot be executed on an expired transaction. The timeout for this transaction was 5000 ms, however 5267 ms passed since the start of the transaction. Consider increasing the interactive transaction timeout or doing less work in the transaction.
