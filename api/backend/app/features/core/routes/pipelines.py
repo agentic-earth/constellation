@@ -19,7 +19,7 @@ Design Philosophy:
 - Ensure clear separation between HTTP handling and business logic.
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from backend.app.features.core.controllers.pipeline_controller import PipelineController
@@ -157,8 +157,8 @@ async def list_pipelines(
         raise HTTPException(status_code=500, detail="Failed to retrieve pipelines.")
     return pipelines
 
-@router.put("/status/{run_id}", status_code=200)
-async def update_pipeline_status(
+@router.put("/status/{run_id}/{status}", status_code=200)
+async def update_pipeline_status_by_run_id(
     run_id: str,
     status: str,
     controller: PipelineController = Depends(get_pipeline_controller),
@@ -173,12 +173,36 @@ async def update_pipeline_status(
     Returns:
         Dict[str, str]: A success message if the update is successful.
     """
-    success = await controller.update_pipeline_status(run_id, status)
+    success = await controller.update_pipeline_status_by_run_id(run_id, status)
     if not success:
         raise HTTPException(
             status_code=400, detail="Failed to update pipeline status."
         )
     return {"message": "Pipeline status updated successfully."}
+
+
+@router.post("/run", status_code=200)
+async def run_pipeline(
+    request: Request,
+    controller: PipelineController = Depends(get_pipeline_controller),
+):
+    """
+    Run a pipeline with a given config.
+    """
+    try:
+        request_body = await request.json()
+        config = request_body.get("config")
+        user_id = request_body.get("user_id")
+        if not config or not user_id:
+            raise HTTPException(status_code=400, detail="Config or user_id not provided.")
+
+        result = await controller.run_pipeline(config, user_id)
+        if not result:
+            raise HTTPException(status_code=400, detail="Pipeline run failed.")
+        return {"message": "Pipeline run successfully."}
+    except HTTPException as e:
+        raise e
+
 
 # -------------------
 # Complex Pipeline Operations Endpoints
@@ -251,18 +275,3 @@ async def verify_pipeline(
     if not verified:
         raise HTTPException(status_code=400, detail="Pipeline verification failed.")
     return {"message": "Pipeline verified successfully."}
-
-
-@router.post("/run", status_code=200)
-async def run_pipeline(
-    config: str,
-    user_id: UUID,
-    controller: PipelineController = Depends(get_pipeline_controller),
-):
-    try:
-        result = await controller.run_pipeline(config, user_id)
-        if not result:
-            raise HTTPException(status_code=400, detail="Pipeline run failed.")
-        return {"message": "Pipeline run successfully."}
-    except HTTPException as e:
-        raise e
