@@ -1,5 +1,5 @@
 # Use the official Python image from the Docker Hub
-ARG PYTHON_VERSION=3.9-slim
+ARG PYTHON_VERSION=3.10-slim
 FROM python:${PYTHON_VERSION}
 
 # Set the working directory in the container

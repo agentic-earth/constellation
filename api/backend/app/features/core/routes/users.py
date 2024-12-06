@@ -61,7 +61,9 @@ def register_user(user: UserCreateInput):
         UserResponseSchema: The created user's data.
     """
     user.password_hash = get_password_hash(user.password)
-    created_user = user_controller.register_user(user.email, user.password_hash, user.username)
+    created_user = user_controller.register_user(
+        user.email, user.password_hash, user.username
+    )
     if not created_user:
         raise HTTPException(status_code=400, detail="User registration failed.")
     return created_user

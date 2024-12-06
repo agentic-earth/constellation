@@ -17,9 +17,10 @@ from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
+
 class PDFEmbeddingService:
     def __init__(self):
-        self.sbert_model = SentenceTransformer('all-MiniLM-L6-v2')
+        self.sbert_model = SentenceTransformer("all-MiniLM-L6-v2")
 
     def extract_text_from_pdf(self, pdf_path: str) -> str:
         """
@@ -31,13 +32,13 @@ class PDFEmbeddingService:
         Returns:
             str: Extracted text from the PDF.
         """
-        with open(pdf_path, 'rb') as file:
+        with open(pdf_path, "rb") as file:
             reader = PyPDF2.PdfReader(file)
             text = ""
             for page in reader.pages:
                 text += page.extract_text()
         return text
-    
+
     def split_into_paragraphs(self, text: str) -> List[str]:
         """
         Split text into paragraphs.
@@ -48,7 +49,7 @@ class PDFEmbeddingService:
         Returns:
             List[str]: List of paragraphs.
         """
-        paragraphs = re.split(r'\n\s*\n', text)
+        paragraphs = re.split(r"\n\s*\n", text)
         return [p.strip() for p in paragraphs if p.strip()]
 
     def create_embeddings(self, paragraphs: List[str]) -> List[List[float]]:
@@ -76,19 +77,21 @@ class PDFEmbeddingService:
         """
         # Extract text from PDF
         text = self.extract_text_from_pdf(pdf_path)
-        
+
         paragraphs = self.split_into_paragraphs(text)
 
         # Create embeddings
         embeddings = self.create_embeddings(paragraphs)
-        
+
         return paragraphs, embeddings
 
     # Debugging function
-    def compute_similarity(self, embeddings1: List[List[float]], embeddings2: List[List[float]]) -> np.ndarray:
+    def compute_similarity(
+        self, embeddings1: List[List[float]], embeddings2: List[List[float]]
+    ) -> np.ndarray:
         embeddings1_array = np.array(embeddings1)
         embeddings2_array = np.array(embeddings2)
-        
+
         similarity_matrix = cosine_similarity(embeddings1_array, embeddings2_array)
         return similarity_matrix
 
@@ -108,10 +111,10 @@ class PDFEmbeddingService:
 
 # if __name__ == "__main__":
 #     pdf_service = PDFEmbeddingService()
-    
+
 #     paragraphs1, embeddings1 = pdf_service.process_pdf("/Users/wanminghe/Desktop/swe/constellation-backend/api/backend/app/features/agent/services/demo_papers/s41586-023-06444-3.pdf")
 #     paragraphs2, embeddings2 = pdf_service.process_pdf("/Users/wanminghe/Desktop/swe/constellation-backend/api/backend/app/features/agent/services/demo_papers/s43247-022-00344-6.pdf")
-    
+
 #     similarity_matrix = pdf_service.compute_similarity(embeddings1, embeddings2)
 
 #     print(f"Similarity matrix shape: {similarity_matrix.shape}")

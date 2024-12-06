@@ -19,7 +19,7 @@ from backend.app.database import (
     get_supabase_client,
     get_supabase_admin_client,
     connect_db,
-    disconnect_db
+    disconnect_db,
 )
 
 
@@ -37,7 +37,9 @@ class UserController:
         self.logger = logger
 
         self.user_service = UserService(logger=logger, hash_salt="your_secure_salt")
-        self.api_key_service = ApiKeyService(logger=logger, hash_salt="your_secure_salt")
+        self.api_key_service = ApiKeyService(
+            logger=logger, hash_salt="your_secure_salt"
+        )
         self.audit_service = AuditService()
 
     # -------------------
@@ -54,12 +56,14 @@ class UserController:
         try:
             async with self.prisma.tx() as tx:
                 # Step 1: Register User
-                registration_result = await self.user_service.register_user_email_password(
-                    prisma=tx,
-                    supabase=self.supabase,
-                    email=email,
-                    password=password,
-                    username=username
+                registration_result = (
+                    await self.user_service.register_user_email_password(
+                        prisma=tx,
+                        supabase=self.supabase,
+                        email=email,
+                        password=password,
+                        username=username,
+                    )
                 )
                 if not registration_result["success"]:
                     return registration_result
@@ -69,11 +73,11 @@ class UserController:
                     return {
                         "success": False,
                         "error": "profile_missing",
-                        "message": "User profile was not created."
+                        "message": "User profile was not created.",
                     }
 
                 user_id = UUID(profile.auth_uid)
-                
+
                 # Step 2: Audit Logging
                 audit_data = {
                     "user_id": str(user_id),
@@ -83,8 +87,7 @@ class UserController:
                     "details": {"username": username, "email": email},
                 }
                 audit_log = await self.audit_service.create_audit_log(
-                    tx=tx,
-                    audit_data=audit_data
+                    tx=tx, audit_data=audit_data
                 )
                 if not audit_log:
                     self.logger.log(
@@ -97,7 +100,7 @@ class UserController:
                 return {
                     "success": True,
                     "profile": profile.dict(),
-                    "message": "User registered successfully."
+                    "message": "User registered successfully.",
                 }
 
         except Exception as e:
@@ -111,25 +114,21 @@ class UserController:
             return {
                 "success": False,
                 "error": "registration_exception",
-                "message": "An error occurred during user registration."
+                "message": "An error occurred during user registration.",
             }
 
     # -------------------
     # User Sign-In
     # -------------------
 
-    async def sign_in_user(
-        self, email: str, password: str
-    ) -> Dict[str, Any]:
+    async def sign_in_user(self, email: str, password: str) -> Dict[str, Any]:
         """
         Signs in a user using email and password.
         """
         try:
             async with self.prisma.tx() as tx:
                 sign_in_result = await self.user_service.sign_in_user_email_password(
-                    supabase=self.supabase,
-                    email=email,
-                    password=password
+                    supabase=self.supabase, email=email, password=password
                 )
                 return sign_in_result
 
@@ -144,7 +143,7 @@ class UserController:
             return {
                 "success": False,
                 "error": "sign_in_exception",
-                "message": "An error occurred during user sign-in."
+                "message": "An error occurred during user sign-in.",
             }
 
     # -------------------
@@ -161,9 +160,7 @@ class UserController:
             async with self.prisma.tx() as tx:
                 # Step 1: Update profile
                 updated_profile = await self.user_service.update_profile(
-                    prisma=tx,
-                    user_id=user_id,
-                    update_data=update_data
+                    prisma=tx, user_id=user_id, update_data=update_data
                 )
 
                 if not updated_profile:
@@ -182,8 +179,7 @@ class UserController:
                     "details": {"updated_fields": update_data},
                 }
                 audit_log = await self.audit_service.create_audit_log(
-                    tx=tx,
-                    audit_data=audit_data
+                    tx=tx, audit_data=audit_data
                 )
                 if not audit_log:
                     self.logger.log(
@@ -213,7 +209,6 @@ class UserController:
                 "message": "An error occurred during profile update.",
             }
 
-
     # -------------------
     # Delete User
     # -------------------
@@ -226,9 +221,13 @@ class UserController:
         try:
             async with self.prisma.tx() as tx:
                 # Step 1: Revoke all API keys
-                api_keys = await self.api_key_service.get_api_keys_by_user(prisma=tx, user_id=user_id)
+                api_keys = await self.api_key_service.get_api_keys_by_user(
+                    prisma=tx, user_id=user_id
+                )
                 for api_key in api_keys:
-                    await self.api_key_service.revoke_api_key(prisma=tx, api_key_id=UUID(api_key.api_key_id))
+                    await self.api_key_service.revoke_api_key(
+                        prisma=tx, api_key_id=UUID(api_key.api_key_id)
+                    )
 
                 # Step 2: Delete user from Supabase Auth
                 deletion_success = await self.user_service.delete_user(
@@ -251,8 +250,11 @@ class UserController:
 
         except Exception as e:
             self.logger.log(
-                "UserController", "error", "Exception during user deletion", 
-                error=str(e), traceback=traceback.format_exc()
+                "UserController",
+                "error",
+                "Exception during user deletion",
+                error=str(e),
+                traceback=traceback.format_exc(),
             )
             return {"success": False, "error": "deletion_exception", "message": str(e)}
 
@@ -269,8 +271,7 @@ class UserController:
         try:
             async with self.prisma.tx() as tx:
                 api_keys = await self.api_key_service.get_api_keys_by_user(
-                    prisma=tx,
-                    user_id=user_id
+                    prisma=tx, user_id=user_id
                 )
                 if api_keys is None:
                     return None
@@ -293,8 +294,7 @@ class UserController:
             async with self.prisma.tx() as tx:
                 # Step 1: Revoke the API key
                 revoke_success = await self.api_key_service.revoke_api_key(
-                    prisma=tx,
-                    api_key_id=api_key_id
+                    prisma=tx, api_key_id=api_key_id
                 )
                 if not revoke_success:
                     return False
@@ -308,8 +308,7 @@ class UserController:
                     "details": {"action": "revoke_api_key"},
                 }
                 audit_log = await self.audit_service.create_audit_log(
-                    tx=tx,
-                    audit_data=audit_data
+                    tx=tx, audit_data=audit_data
                 )
                 if not audit_log:
                     self.logger.log(
@@ -339,8 +338,7 @@ class UserController:
             async with self.prisma.tx() as tx:
                 # Step 1: Delete the API key
                 delete_success = await self.api_key_service.delete_api_key(
-                    prisma=tx,
-                    api_key_id=api_key_id
+                    prisma=tx, api_key_id=api_key_id
                 )
                 if not delete_success:
                     return False
@@ -354,8 +352,7 @@ class UserController:
                     "details": {"action": "delete_api_key"},
                 }
                 audit_log = await self.audit_service.create_audit_log(
-                    tx=tx,
-                    audit_data=audit_data
+                    tx=tx, audit_data=audit_data
                 )
                 if not audit_log:
                     self.logger.log(
@@ -387,8 +384,7 @@ class UserController:
         """
         try:
             profile = await self.user_service.get_profile_by_user_id(
-                prisma=self.prisma,
-                user_id=UUID(user_id)
+                prisma=self.prisma, user_id=UUID(user_id)
             )
             if profile:
                 return {
@@ -398,16 +394,30 @@ class UserController:
                         "username": profile.username,
                         "email": profile.email,
                         # Add any other profile fields you want to return
-                    }
+                    },
                 }
             else:
-                self.logger.log("UserController", "warning", "Profile not found", user_id=user_id)
-                return {"success": False, "error": "profile_not_found", "message": "User profile not found."}
+                self.logger.log(
+                    "UserController", "warning", "Profile not found", user_id=user_id
+                )
+                return {
+                    "success": False,
+                    "error": "profile_not_found",
+                    "message": "User profile not found.",
+                }
         except Exception as e:
-            self.logger.log("UserController", "error", "Failed to retrieve user profile", 
-                            error=str(e), traceback=traceback.format_exc())
-            return {"success": False, "error": "retrieval_error", "message": "Failed to retrieve user profile."}
-
+            self.logger.log(
+                "UserController",
+                "error",
+                "Failed to retrieve user profile",
+                error=str(e),
+                traceback=traceback.format_exc(),
+            )
+            return {
+                "success": False,
+                "error": "retrieval_error",
+                "message": "Failed to retrieve user profile.",
+            }
 
     async def create_api_key(self, user_id: str) -> Dict[str, Any]:
         """
@@ -419,14 +429,18 @@ class UserController:
                 expires_at = datetime.utcnow() + timedelta(days=30)
 
                 # Step 1: Create the API key
-                new_api_key_obj, raw_api_key = await self.api_key_service.create_api_key(
-                    prisma=tx,
-                    user_id=UUID(user_id),
-                    expires_at=expires_at
+                new_api_key_obj, raw_api_key = (
+                    await self.api_key_service.create_api_key(
+                        prisma=tx, user_id=UUID(user_id), expires_at=expires_at
+                    )
                 )
-                
+
                 if not new_api_key_obj:
-                    return {"success": False, "error": "api_key_creation_failed", "message": "Failed to create API key."}
+                    return {
+                        "success": False,
+                        "error": "api_key_creation_failed",
+                        "message": "Failed to create API key.",
+                    }
 
                 api_key_id = new_api_key_obj.api_key_id
 
@@ -435,12 +449,13 @@ class UserController:
                     "user_id": user_id,
                     "action_type": ActionTypeEnum.CREATE.name,
                     "entity_type": AuditEntityTypeEnum.api_key.name.lower(),
-                    "entity_id": str(api_key_id),  # Using the API key ID as the entity_id
-                    "description": f"Created new API key for user {user_id}"
+                    "entity_id": str(
+                        api_key_id
+                    ),  # Using the API key ID as the entity_id
+                    "description": f"Created new API key for user {user_id}",
                 }
                 audit_log = await self.audit_service.create_audit_log(
-                    tx=tx,
-                    audit_data=audit_data
+                    tx=tx, audit_data=audit_data
                 )
                 if not audit_log:
                     self.logger.log(
@@ -454,7 +469,7 @@ class UserController:
                     "success": True,
                     "api_key_id": api_key_id,  # Return the UUID
                     "raw_api_key": raw_api_key,  # Return the raw API key
-                    "expires_at": expires_at.isoformat()
+                    "expires_at": expires_at.isoformat(),
                 }
 
         except Exception as e:
@@ -465,7 +480,11 @@ class UserController:
                 error=str(e),
                 traceback=traceback.format_exc(),
             )
-            return {"success": False, "error": "internal_error", "message": "An error occurred during API key creation."}
+            return {
+                "success": False,
+                "error": "internal_error",
+                "message": "An error occurred during API key creation.",
+            }
 
 
 # -------------------
@@ -481,7 +500,7 @@ async def run_user_controller_tests():
     # Initialize Prisma client and connect to the database
     prisma = Prisma()
     await prisma.connect()
-    
+
     try:
         await connect_db()
         logger.log("UserController", "info", "Prisma client connected successfully.")
@@ -491,7 +510,7 @@ async def run_user_controller_tests():
             "critical",
             "Failed to connect Prisma client",
             error=str(e),
-            traceback=traceback.format_exc()
+            traceback=traceback.format_exc(),
         )
         return
 
@@ -500,7 +519,9 @@ async def run_user_controller_tests():
     supabase_admin_client = get_supabase_admin_client()
 
     # Create UserController instance
-    user_controller = UserController(prisma, supabase_client, supabase_admin_client, logger)
+    user_controller = UserController(
+        prisma, supabase_client, supabase_admin_client, logger
+    )
 
     # Test user registration or sign-in
     email = "mason_lee@brown.edu"
@@ -510,8 +531,10 @@ async def run_user_controller_tests():
 
     try:
         print("=== Starting User Registration ===")
-        registration_result = await user_controller.register_user(email, password, username)
-        
+        registration_result = await user_controller.register_user(
+            email, password, username
+        )
+
         if registration_result["success"]:
             print(f"User registered successfully: {registration_result['message']}")
             user_id = registration_result["profile"]["auth_uid"]
@@ -524,7 +547,9 @@ async def run_user_controller_tests():
                     print("Signed in successfully with existing account.")
                     user_id = sign_in_result["user"]["id"]
                 else:
-                    print(f"Sign-in failed: {sign_in_result.get('message', 'Unknown error')}")
+                    print(
+                        f"Sign-in failed: {sign_in_result.get('message', 'Unknown error')}"
+                    )
                     return
             else:
                 print(f"User registration failed: {registration_result['message']}")
@@ -536,7 +561,7 @@ async def run_user_controller_tests():
             profile = await user_controller.get_user_profile(user_id)
             if profile:
                 print("User profile retrieved successfully:")
-                print(f'profile: {profile}')
+                print(f"profile: {profile}")
                 print(f"User ID: {profile['profile']['auth_uid']}")
                 print(f"Username: {profile['profile']['username']}")
                 print(f"Email: {profile['profile']['email']}")
@@ -547,12 +572,16 @@ async def run_user_controller_tests():
             print("\n=== Updating User Profile ===")
             new_username = "new_mason_lee"
             update_data = {"username": new_username}
-            update_result = await user_controller.update_user_profile(user_id, update_data)
+            update_result = await user_controller.update_user_profile(
+                user_id, update_data
+            )
             if update_result["success"]:
                 print("User profile updated successfully:")
                 print(f"New Username: {update_result['profile']['username']}")
             else:
-                print(f"User profile update failed: {update_result.get('message', 'Unknown error')}")
+                print(
+                    f"User profile update failed: {update_result.get('message', 'Unknown error')}"
+                )
 
             # Test listing API keys before any are created
             print("\n=== Listing API Keys for User ===")
@@ -563,7 +592,9 @@ async def run_user_controller_tests():
                 else:
                     print(f"User has {len(api_keys)} API key(s):")
                     for key in api_keys:
-                        print(f"- API Key ID: {key['api_key_id']}, Expires At: {key['expires_at']}, Is Active: {key['is_active']}")
+                        print(
+                            f"- API Key ID: {key['api_key_id']}, Expires At: {key['expires_at']}, Is Active: {key['is_active']}"
+                        )
             else:
                 print("Failed to retrieve API keys.")
 
@@ -584,7 +615,9 @@ async def run_user_controller_tests():
                 print(f"Revoking API Key ID: {api_key_id}")
                 try:
                     revoke_uuid = UUID(api_key_id)  # Ensure it's a valid UUID
-                    revoke_result = await user_controller.revoke_api_key(user_id, revoke_uuid)
+                    revoke_result = await user_controller.revoke_api_key(
+                        user_id, revoke_uuid
+                    )
                     if revoke_result:
                         print("API key revoked successfully.")
                     else:
@@ -594,14 +627,18 @@ async def run_user_controller_tests():
 
             # Optionally, list API keys after revocation
             print("\n=== Listing API Keys for User After Revocation ===")
-            api_keys_after_revocation = await user_controller.list_api_keys_for_user(user_id)
+            api_keys_after_revocation = await user_controller.list_api_keys_for_user(
+                user_id
+            )
             if api_keys_after_revocation is not None:
                 if len(api_keys_after_revocation) == 0:
                     print("User has no API keys.")
                 else:
                     print(f"User has {len(api_keys_after_revocation)} API key(s):")
                     for key in api_keys_after_revocation:
-                        print(f"- API Key ID: {key['api_key_id']}, Expires At: {key['expires_at']}, Is Active: {key['is_active']}")
+                        print(
+                            f"- API Key ID: {key['api_key_id']}, Expires At: {key['expires_at']}, Is Active: {key['is_active']}"
+                        )
             else:
                 print("Failed to retrieve API keys.")
 
@@ -620,21 +657,24 @@ async def run_user_controller_tests():
             "error",
             "Exception during user controller testing",
             error=str(e),
-            traceback=traceback.format_exc()
+            traceback=traceback.format_exc(),
         )
     finally:
         # Disconnect from the database
         try:
             await disconnect_db()
-            logger.log("UserController", "info", "Prisma client disconnected successfully.")
+            logger.log(
+                "UserController", "info", "Prisma client disconnected successfully."
+            )
         except Exception as e:
             logger.log(
                 "UserController",
                 "error",
                 "Failed to disconnect Prisma client",
                 error=str(e),
-                traceback=traceback.format_exc()
+                traceback=traceback.format_exc(),
             )
+
 
 if __name__ == "__main__":
     asyncio.run(run_user_controller_tests())

@@ -23,6 +23,7 @@ from backend.app.features.agent.services.research_agent import ResearchAgent
 from backend.app.features.core.services.block_service import BlockService
 import json
 
+
 class ResearchCrew:
     def __init__(self):
         self.logger = ConstellationLogger().get_logger("ResearchCrew")
@@ -33,40 +34,36 @@ class ResearchCrew:
         find_papers_task = Task(
             description=f"Find papers related to: {query}",
             agent=self.researcher,
-            expected_output="JSON string of similar papers"
+            expected_output="JSON string of similar papers",
         )
-        
+
         # analyze_papers_task = Task(
         #     description=f"Analyze the papers found in relation to: {query}",
         #     agent=self.researcher,
         #     expected_output="JSON string of paper analysis"
         # )
-        
+
         # return [find_papers_task, analyze_papers_task]
         return [find_papers_task]
 
     async def research(self, query: str) -> str:
         tasks = self.create_research_tasks(query)
-        
-        crew = Crew(
-            agents=[self.researcher],
-            tasks=tasks,
-            verbose=True
-        )
+
+        crew = Crew(agents=[self.researcher], tasks=tasks, verbose=True)
 
         result = crew.kickoff()
-        
+
         # Process and format the result
         try:
             papers = json.loads(result[0])
             analysis = json.loads(result[1])
-            
+
             formatted_result = {
                 "query": query,
                 "papers": papers,
-                "analysis": analysis["analysis"]
+                "analysis": analysis["analysis"],
             }
-            
+
             return json.dumps(formatted_result)
         except Exception as e:
             self.logger.error(f"Error processing research result: {str(e)}")

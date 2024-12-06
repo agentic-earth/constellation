@@ -7,11 +7,11 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
-fastapi = "^0.115.0"
-uvicorn = "^0.30.6"
-supabase = "^2.7.4"
-pydantic = "^2.9.2"
-pydantic-settings = "^2.5.2"
+fastapi = "^0.115.5"
+uvicorn = "^0.32.1"
+supabase = "^2.10.0"
+pydantic = "^2.10.2"
+pydantic-settings = "^2.6.1"
 python-dotenv = "^1.0.1"
 loguru = "^0.7.2"
 requests = "^2.32.3"
@@ -28,10 +28,12 @@ sentence-transformers = "^3.2.1"
 langchain-openai = "^0.0.5"
 prisma = "^0.15.0"
 nest-asyncio = "^1.6.0"
+gdown = "^5.2.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
-supabase = "^2.9.0"
+supabase = "^2.10.0"
+black = "^24.10.0"
 
 [build-system]
 requires = ["poetry-core"]

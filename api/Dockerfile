@@ -11,14 +11,17 @@ WORKDIR /app
 # Copy the pyproject.toml and poetry.lock files to the container
 COPY pyproject.toml poetry.lock ./
 
-# Install Poetry
+# Install Poetry and configure it to install dependencies globally
 RUN pip install poetry
 
 # Install the dependencies
-RUN poetry install --no-root
+RUN poetry install --no-root 
 
 # Copy the rest of the application code to the container
 COPY . .
+
+# Generate Prisma client
+RUN poetry run prisma generate
 
 # Expose port
 EXPOSE 8000

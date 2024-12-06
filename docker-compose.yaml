@@ -1,6 +1,4 @@
 services:
-  # This service runs the postgres DB used by dagster for run storage, schedule storage,
-  # and event log storage.
   dagster_postgresql:
     image: postgres:11
     container_name: dagster_postgresql
@@ -10,12 +8,12 @@ services:
       POSTGRES_DB: "postgres_db"
     networks:
       - dagster_network
-      # This service runs the gRPC server that loads your user code, in both dagster-webserver
-      # and dagster-daemon. By setting DAGSTER_CURRENT_IMAGE to its own image, we tell the
-      # run launcher to use this same image when launching runs in a new container as well.
-      # Multiple containers like this can be deployed separately - each just needs to run on
-      # its own port, and have its own entry in the workspace.yaml file that's loaded by the
-      # webserver.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres_user -d postgres_db"]
+      interval: 10s
+      timeout: 8s
+      retries: 5
+
   dagster_assets:
     build:
       context: ./dagster
@@ -35,9 +33,6 @@ services:
     networks:
       - dagster_network
 
-  # This service runs dagster-webserver, which loads your user code from the user code container.
-  # Since our instance uses the QueuedRunCoordinator, any runs submitted from the webserver will be put on
-  # a queue and later dequeued and launched by dagster-daemon.
   dagster_webserver:
     build:
       context: ./dagster
@@ -63,22 +58,23 @@ services:
       DAGSTER_POSTGRES_DB: "postgres_db"
 
     volumes:
-      # Make docker client accessible so we can terminate containers from the webserver
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/io_manager_storage:/tmp/io_manager_storage
       # - ./dagster/orchestrator/assets/:/opt/dagster/dagster_home/assets/
     networks:
       - dagster_network
     depends_on:
-      - dagster_postgresql
-      # - dagster_assets
+      dagster_postgresql:
+        condition: service_healthy
+      dagster_assets:
+        condition: service_started
 
-      # This service runs the dagster-daemon process, which is responsible for taking runs
-      # off of the queue and launching them, as well as creating runs from schedules or sensors.
   dagster_daemon:
     build:
       context: ./dagster
       dockerfile: ./dagster.Dockerfile
+      args:
+        - PYTHON_VERSION=3.9-slim
     entrypoint:
       - dagster-daemon
       - run
@@ -97,12 +93,17 @@ services:
     networks:
       - dagster_network
     depends_on:
-      - dagster_postgresql
+      dagster_postgresql:
+        condition: service_healthy
+      dagster_assets:
+        condition: service_started
 
   dagster_api:
     build:
       context: ./dagster
       dockerfile: ./api.Dockerfile
+      args:
+        - PYTHON_VERSION=3.9-slim
     container_name: dagster_api
     expose:
       - "8001"
@@ -112,14 +113,18 @@ services:
       API_HOME: /opt/api/app
     networks:
       - dagster_network
+    volumes:
+      - ./dagster/:/opt/dagster/app
     depends_on:
       - dagster_postgresql
-      # - dagster_assets
+      - dagster_assets
 
   main_api:
     build:
       context: ./api
       dockerfile: ./Dockerfile
+      args:
+        - PYTHON_VERSION=3.12-slim
     container_name: main_api
     expose:
       - "8000"
@@ -131,7 +136,26 @@ services:
       - dagster_network
     depends_on:
       - dagster_postgresql
-      # - dagster_assets
+      - dagster_assets
+
+  model_api:
+    build:
+      context: ./modal
+      dockerfile: ./Dockerfile
+      args:
+        - PYTHON_VERSION=3.10-slim
+    container_name: model_api
+    expose:
+      - "8002"
+    ports:
+      - "8002:8002"
+    environment:
+      API_HOME: /opt/api/app
+    networks:
+      - dagster_network
+    depends_on:
+      - dagster_postgresql
+      - dagster_assets
 
 networks:
   dagster_network:

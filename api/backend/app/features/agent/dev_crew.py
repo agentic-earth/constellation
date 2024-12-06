@@ -33,19 +33,18 @@ def create_dev_crew(github_repo_url: str):
     taxonomy_service = TaxonomyService()
 
     developer = DevAgent(github_repo_url, pipeline_service, taxonomy_service)
-    logger.info(f'Developer created: {developer}')
+    logger.info(f"Developer created: {developer}")
     development_task = Task(
-            description=f'Search for information in the GitHub repository: {github_repo_url}. '
-                        f'Focus on recent code changes, open issues, and pull requests. ',
-            agent=developer,
-            expected_output='Provide me a python code that utilizes the BERTopic library to perform topic modeling on a given dataset'
-        )
-    logger.info(f'Development task created: {development_task}')
-    crew = Crew(
-        agents=[developer],
-        tasks=[development_task]
+        description=f"Search for information in the GitHub repository: {github_repo_url}. "
+        f"Focus on recent code changes, open issues, and pull requests. ",
+        agent=developer,
+        expected_output="Provide me a python code that utilizes the BERTopic library to perform topic modeling on a given dataset",
     )
-    logger.info(f'Dev Crew created with {len(crew.agents)} agents and {len(crew.tasks)} tasks')
+    logger.info(f"Development task created: {development_task}")
+    crew = Crew(agents=[developer], tasks=[development_task])
+    logger.info(
+        f"Dev Crew created with {len(crew.agents)} agents and {len(crew.tasks)} tasks"
+    )
     return crew
 
 

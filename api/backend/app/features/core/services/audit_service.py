@@ -13,6 +13,7 @@ Key Design Decisions:
 3. Enum Handling: Utilizes Python Enums to mirror Prisma enums for `action_type` and `entity_type`.
 4. Main Function for Testing: Added a main function to demonstrate and test the AuditService functionalities.
 """
+
 import asyncio
 import traceback
 import json
@@ -20,7 +21,10 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
 from prisma import Prisma
-from prisma.enums import ActionTypeEnum as PrismaActionTypeEnum, AuditEntityTypeEnum as PrismaAuditEntityTypeEnum
+from prisma.enums import (
+    ActionTypeEnum as PrismaActionTypeEnum,
+    AuditEntityTypeEnum as PrismaAuditEntityTypeEnum,
+)
 from prisma.models import AuditLog as PrismaAuditLog
 from prisma.errors import UniqueViolationError, PrismaError
 
@@ -31,7 +35,9 @@ class AuditService:
     def __init__(self):
         self.logger = ConstellationLogger()
 
-    async def create_audit_log(self, tx: Prisma, audit_data: Dict[str, Any]) -> Optional[PrismaAuditLog]:
+    async def create_audit_log(
+        self, tx: Prisma, audit_data: Dict[str, Any]
+    ) -> Optional[PrismaAuditLog]:
         """
         Create a new audit log entry.
 
@@ -97,14 +103,14 @@ class AuditService:
                 "entity_type": str(PrismaAuditEntityTypeEnum[audit_data["entity_type"]]),
                 "entity_id": str(audit_data["entity_id"]),
                 "timestamp": datetime.now(timezone.utc),
-                "details": json.dumps(details)  # Ensure this is a dict
+                "details": json.dumps(details),  # Ensure this is a dict
             }
 
             self.logger.log(
                 "AuditService",
                 "info",
                 "Audit log data is valid.",
-                extra={"audit_create_data": create_data}
+                extra={"audit_create_data": create_data},
             )
 
             # Create the audit log
@@ -117,7 +123,7 @@ class AuditService:
                 log_id=created_log.log_id,
                 action_type=created_log.action_type,
                 entity_type=created_log.entity_type,
-                entity_id=created_log.entity_id
+                entity_id=created_log.entity_id,
             )
             print(f"Audit log created successfully: {created_log.log_id}")
             return created_log
@@ -131,7 +137,9 @@ class AuditService:
             )
             return None
 
-    async def get_audit_log_by_id(self, tx: Prisma, log_id: UUID) -> Optional[PrismaAuditLog]:
+    async def get_audit_log_by_id(
+        self, tx: Prisma, log_id: UUID
+    ) -> Optional[PrismaAuditLog]:
         """
         Retrieve an audit log entry by its ID.
 
@@ -143,23 +151,21 @@ class AuditService:
             Optional[PrismaAuditLog]: The audit log data if found, None otherwise.
         """
         try:
-            audit_log = await tx.auditlog.find_unique(
-                where={"log_id": str(log_id)}
-            )
+            audit_log = await tx.auditlog.find_unique(where={"log_id": str(log_id)})
 
             if audit_log:
                 self.logger.log(
                     "AuditService",
                     "info",
                     "Audit log retrieved successfully.",
-                    log_id=audit_log.log_id
+                    log_id=audit_log.log_id,
                 )
             else:
                 self.logger.log(
                     "AuditService",
                     "warning",
                     "Audit log not found.",
-                    log_id=str(log_id)
+                    log_id=str(log_id),
                 )
 
             return audit_log
@@ -168,11 +174,17 @@ class AuditService:
                 "AuditService",
                 "error",
                 "Failed to retrieve audit log by ID.",
-                error=str(e)
+                error=str(e),
             )
             return None
 
-    async def list_audit_logs(self, tx: Prisma, filters: Optional[Dict[str, Any]] = None, limit: int = 100, offset: int = 0) -> List[PrismaAuditLog]:
+    async def list_audit_logs(
+        self,
+        tx: Prisma,
+        filters: Optional[Dict[str, Any]] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> List[PrismaAuditLog]:
         """
         List audit log entries, optionally filtered.
 
@@ -201,19 +213,26 @@ class AuditService:
                         self.logger.log(
                             "AuditService",
                             "error",
-                            f"Invalid action_type filter: {filters['action_type']}"
+                            f"Invalid action_type filter: {filters['action_type']}",
                         )
                         return []
-                    prisma_filters["action_type"] = PrismaActionTypeEnum[filters["action_type"]]
+                    prisma_filters["action_type"] = PrismaActionTypeEnum[
+                        filters["action_type"]
+                    ]
                 if "entity_type" in filters:
-                    if filters["entity_type"] not in PrismaAuditEntityTypeEnum.__members__:
+                    if (
+                        filters["entity_type"]
+                        not in PrismaAuditEntityTypeEnum.__members__
+                    ):
                         self.logger.log(
                             "AuditService",
                             "error",
-                            f"Invalid entity_type filter: {filters['entity_type']}"
+                            f"Invalid entity_type filter: {filters['entity_type']}",
                         )
                         return []
-                    prisma_filters["entity_type"] = PrismaAuditEntityTypeEnum[filters["entity_type"]]
+                    prisma_filters["entity_type"] = PrismaAuditEntityTypeEnum[
+                        filters["entity_type"]
+                    ]
                 if "entity_id" in filters:
                     prisma_filters["entity_id"] = filters["entity_id"]
 
@@ -221,7 +240,7 @@ class AuditService:
                 where=prisma_filters,
                 take=limit,
                 skip=offset,
-                order={"timestamp": "desc"}
+                order={"timestamp": "desc"},
             )
 
             self.logger.log(
@@ -230,20 +249,19 @@ class AuditService:
                 f"Retrieved {len(audit_logs)} audit logs.",
                 filters=filters,
                 limit=limit,
-                offset=offset
+                offset=offset,
             )
 
             return audit_logs
         except Exception as e:
             self.logger.log(
-                "AuditService",
-                "error",
-                "Failed to list audit logs.",
-                error=str(e)
+                "AuditService", "error", "Failed to list audit logs.", error=str(e)
             )
             return []
 
-    async def update_audit_log(self, tx: Prisma, log_id: UUID, update_data: Dict[str, Any]) -> Optional[PrismaAuditLog]:
+    async def update_audit_log(
+        self, tx: Prisma, log_id: UUID, update_data: Dict[str, Any]
+    ) -> Optional[PrismaAuditLog]:
         """
         Update an existing audit log entry.
 
@@ -267,20 +285,27 @@ class AuditService:
                     self.logger.log(
                         "AuditService",
                         "error",
-                        f"Invalid action_type: {update_data['action_type']}"
+                        f"Invalid action_type: {update_data['action_type']}",
                     )
                     return None
-                update_data["action_type"] = PrismaActionTypeEnum[update_data["action_type"]]
+                update_data["action_type"] = PrismaActionTypeEnum[
+                    update_data["action_type"]
+                ]
 
             if "entity_type" in update_data:
-                if update_data["entity_type"] not in PrismaAuditEntityTypeEnum.__members__:
+                if (
+                    update_data["entity_type"]
+                    not in PrismaAuditEntityTypeEnum.__members__
+                ):
                     self.logger.log(
                         "AuditService",
                         "error",
-                        f"Invalid entity_type: {update_data['entity_type']}"
+                        f"Invalid entity_type: {update_data['entity_type']}",
                     )
                     return None
-                update_data["entity_type"] = PrismaAuditEntityTypeEnum[update_data["entity_type"]]
+                update_data["entity_type"] = PrismaAuditEntityTypeEnum[
+                    update_data["entity_type"]
+                ]
 
             # Validate 'details' field
             if "details" in update_data:
@@ -293,14 +318,15 @@ class AuditService:
                         extra={"details": details},
                     )
                     return None
-                update_data["details"] = details  # Will default to '{}'::jsonb if set to default
+                update_data["details"] = (
+                    details  # Will default to '{}'::jsonb if set to default
+                )
 
             # Update timestamp
             update_data["timestamp"] = datetime.now(timezone.utc)
             update_data["details"] = json.dumps(update_data["details"])
             updated_log = await tx.auditlog.update(
-                where={"log_id": str(log_id)},
-                data=update_data
+                where={"log_id": str(log_id)}, data=update_data
             )
 
             self.logger.log(
@@ -308,16 +334,14 @@ class AuditService:
                 "info",
                 "Audit log updated successfully.",
                 log_id=updated_log.log_id,
-                updated_fields=list(update_data.keys())
+                updated_fields=list(update_data.keys()),
             )
 
             return updated_log
 
         except Exception as e:
             self.logger.log(
-                "AuditService",
-                "error",
-                f"Failed to update audit log: {str(e)}"
+                "AuditService", "error", f"Failed to update audit log: {str(e)}"
             )
             return None
 
@@ -333,16 +357,14 @@ class AuditService:
             bool: True if the audit log was successfully deleted, False otherwise.
         """
         try:
-            deleted_log = await tx.auditlog.delete(
-                where={"log_id": str(log_id)}
-            )
+            deleted_log = await tx.auditlog.delete(where={"log_id": str(log_id)})
 
             if deleted_log:
                 self.logger.log(
                     "AuditService",
                     "info",
                     "Audit log deleted successfully.",
-                    log_id=str(log_id)
+                    log_id=str(log_id),
                 )
                 return True
             else:
@@ -350,14 +372,12 @@ class AuditService:
                     "AuditService",
                     "warning",
                     "Audit log not found for deletion.",
-                    log_id=str(log_id)
+                    log_id=str(log_id),
                 )
                 return False
         except Exception as e:
             self.logger.log(
-                "AuditService",
-                "error",
-                f"Failed to delete audit log: {str(e)}"
+                "AuditService", "error", f"Failed to delete audit log: {str(e)}"
             )
             return False
 
@@ -382,20 +402,28 @@ class AuditService:
                 "action_type": "CREATE",
                 "entity_type": "block",
                 "entity_id": str(uuid4()),
-                "details": {"message": "Created a new block with ID xyz"}  # Ensure this is a dict
+                "details": {
+                    "message": "Created a new block with ID xyz"
+                },  # Ensure this is a dict
             }
             created_log = await audit_service.create_audit_log(prisma, new_log_data)
             if created_log:
-                print(f"Created AuditLog: {created_log.log_id} - Action: {created_log.action_type}")
+                print(
+                    f"Created AuditLog: {created_log.log_id} - Action: {created_log.action_type}"
+                )
             else:
                 print("Failed to create AuditLog.")
 
             # Step 2: Retrieve the audit log by ID
             if created_log:
                 print(f"\nRetrieving AuditLog with ID: {created_log.log_id}")
-                retrieved_log = await audit_service.get_audit_log_by_id(prisma, UUID(created_log.log_id))
+                retrieved_log = await audit_service.get_audit_log_by_id(
+                    prisma, UUID(created_log.log_id)
+                )
                 if retrieved_log:
-                    print(f"Retrieved AuditLog: {retrieved_log.log_id} - Action: {retrieved_log.action_type} - Details: {retrieved_log.details}")
+                    print(
+                        f"Retrieved AuditLog: {retrieved_log.log_id} - Action: {retrieved_log.action_type} - Details: {retrieved_log.details}"
+                    )
                 else:
                     print("Failed to retrieve AuditLog.")
             else:
@@ -406,18 +434,26 @@ class AuditService:
             audit_logs = await audit_service.list_audit_logs(prisma)
             print(f"Total AuditLogs: {len(audit_logs)}")
             for log in audit_logs:
-                print(f"- Log ID: {log.log_id}, Action: {log.action_type}, Entity: {log.entity_type}, Details: {log.details}")
+                print(
+                    f"- Log ID: {log.log_id}, Action: {log.action_type}, Entity: {log.entity_type}, Details: {log.details}"
+                )
 
             # Step 4: Update the audit log's details
             if created_log:
                 print(f"\nUpdating AuditLog with ID: {created_log.log_id}")
                 update_data = {
-                    "details": {"message": "Updated audit log details."},  # Ensure this is a dict
-                    "action_type": "UPDATE"
+                    "details": {
+                        "message": "Updated audit log details."
+                    },  # Ensure this is a dict
+                    "action_type": "UPDATE",
                 }
-                updated_log = await audit_service.update_audit_log(prisma, UUID(created_log.log_id), update_data)
+                updated_log = await audit_service.update_audit_log(
+                    prisma, UUID(created_log.log_id), update_data
+                )
                 if updated_log:
-                    print(f"Updated AuditLog: {updated_log.log_id} - Action: {updated_log.action_type} - Details: {updated_log.details}")
+                    print(
+                        f"Updated AuditLog: {updated_log.log_id} - Action: {updated_log.action_type} - Details: {updated_log.details}"
+                    )
                 else:
                     print("Failed to update AuditLog.")
             else:
@@ -426,7 +462,9 @@ class AuditService:
             # Step 5: Delete the audit log
             if created_log:
                 print(f"\nDeleting AuditLog with ID: {created_log.log_id}")
-                deletion_success = await audit_service.delete_audit_log(prisma, UUID(created_log.log_id))
+                deletion_success = await audit_service.delete_audit_log(
+                    prisma, UUID(created_log.log_id)
+                )
                 print(f"AuditLog deleted: {deletion_success}")
             else:
                 print("Skipping deletion since AuditLog creation failed.")
@@ -436,19 +474,25 @@ class AuditService:
             audit_logs_after_deletion = await audit_service.list_audit_logs(prisma)
             print(f"Total AuditLogs: {len(audit_logs_after_deletion)}")
             for log in audit_logs_after_deletion:
-                print(f"- Log ID: {log.log_id}, Action: {log.action_type}, Entity: {log.entity_type}, Details: {log.details}")
+                print(
+                    f"- Log ID: {log.log_id}, Action: {log.action_type}, Entity: {log.entity_type}, Details: {log.details}"
+                )
 
         except Exception as e:
-            self.logger.log("AuditService", "error", "An error occurred in main.", error=str(e))
+            self.logger.log(
+                "AuditService", "error", "An error occurred in main.", error=str(e)
+            )
             print(f"An error occurred: {e}")
         finally:
             print("\nDisconnecting from the database...")
             await prisma.disconnect()
             print("Database disconnected.")
 
+
 # -------------------
 # Testing Utility
 # -------------------
+
 
 async def run_audit_service_tests():
     """
@@ -456,6 +500,7 @@ async def run_audit_service_tests():
     """
     audit_service = AuditService()
     await audit_service.main()
+
 
 if __name__ == "__main__":
     asyncio.run(run_audit_service_tests())

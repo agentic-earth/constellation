@@ -82,11 +82,13 @@ async def test_tools():
     except Exception as e:
         print(f"An error occurred: {e}")
         import traceback
+
         print(traceback.format_exc())
 
     finally:
         await prisma.disconnect()
         print("Disconnected from the database")
+
 
 if __name__ == "__main__":
     asyncio.run(test_tools())

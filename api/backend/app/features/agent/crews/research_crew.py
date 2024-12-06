@@ -7,7 +7,7 @@ from langchain_openai import ChatOpenAI
 import yaml
 
 class ResearchCrew:
-    '''Research Crew'''
+    """Research Crew"""
 
     def __init__(self):
         with open("C:/Users/JXPARATROOPER/Desktop/CourseCode/CSCI 2340/constellation-backend/api/backend/app/features/agent/config/agents.yaml", "r") as file:
@@ -45,3 +45,4 @@ class ResearchCrew:
             verbose=True,
             # human_input=True,
         )
+
