@@ -737,7 +737,7 @@ class PipelineController:
             )
             return False
     
-    async def update_pipeline_status(self, run_id: UUID, status: str) -> bool:
+    async def update_pipeline_status_by_run_id(self, run_id: UUID, status: str) -> bool:
         """
         Updates the status of a pipeline based on its run ID.
 
@@ -807,11 +807,12 @@ class PipelineController:
             response = response.json()
 
             if response["status"] == "success":
+                run_id = response["run_id"]
                 async with self.prisma.tx() as tx:
                     # assign the run_id to the pipeline
-                    self.pipeline_service.assign_run_id_to_pipeline(tx, pipeline.pipeline_id, response["run_id"])
+                    self.pipeline_service.update_pipeline(tx, pipeline.pipeline_id, {"run_id": run_id})
                     # change the pipeline status to running
-                    self.pipeline_service.update_pipeline_status(tx, pipeline.pipeline_id, "running")
+                    self.pipeline_service.update_pipeline_status_by_run_id(tx, run_id, "running")
                 
                 return True
 
