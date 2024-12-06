@@ -229,3 +229,14 @@ async def verify_pipeline(
     if not verified:
         raise HTTPException(status_code=400, detail="Pipeline verification failed.")
     return {"message": "Pipeline verified successfully."}
+
+
+@router.post("/run}", status_code=200)
+async def run_pipeline(
+    config: str,
+    controller: PipelineController = Depends(get_pipeline_controller),
+):
+    result = await controller.run_pipeline(config)
+    if not result:
+        raise HTTPException(status_code=400, detail="Pipeline run failed.")
+    return {"message": "Pipeline run successfully."}

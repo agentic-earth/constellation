@@ -13,7 +13,8 @@ async def run_dagster_job_with_config(request: Request):
     """
 
     # Parse the request body
-    instructions = await request.json().get("instructions")
+    instructions = await request.json()
+    instructions = instructions.get("instructions")
 
     if not instructions or not isinstance(instructions, list):
         raise HTTPException(status_code=400, detail="No instructions provided")
@@ -80,3 +81,23 @@ async def run_dagster_job_with_config(request: Request):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+import uvicorn
+
+def main():
+    """
+    Main function to launch the FastAPI application using Uvicorn.
+    The API will be accessible at http://localhost:8082
+    """
+    # logger.log("main", "info", "Starting Dagster Orchestrator on port 8082.")
+    uvicorn.run(
+        "dagster.orchestrator.app.main:app",
+        host="0.0.0.0",
+        port=8082,
+        reload=True,
+        log_level="info",
+    )
+
+
+if __name__ == "__main__":
+    main()

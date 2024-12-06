@@ -144,6 +144,8 @@ model Pipeline {
   created_at    DateTime        @default(now()) @db.Timestamptz(6)
   updated_at    DateTime        @default(now()) @db.Timestamptz(6)
   user_id       String          @db.Uuid
+  run_id        String?         @unique
+  status        String?
   Profile       Profile         @relation(fields: [user_id], references: [auth_uid], onDelete: Cascade, onUpdate: NoAction, map: "fk_pipeline_user")
   PipelineBlock PipelineBlock[]
   PipelineEdge  PipelineEdge[]

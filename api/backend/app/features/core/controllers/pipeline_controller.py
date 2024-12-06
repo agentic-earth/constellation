@@ -36,6 +36,9 @@ from backend.app.logger import ConstellationLogger
 from prisma import Prisma
 import asyncio
 from collections import defaultdict
+import requests
+
+from dagster.orchestrator.app.main import run_dagster_job_with_config
 
 
 class PipelineController:
@@ -730,6 +733,55 @@ class PipelineController:
                 "PipelineController",
                 "critical",
                 f"Exception during pipeline validation: {str(e)}",
+                extra={"traceback": traceback.format_exc()},
+            )
+            return False
+    
+    async def update_pipeline_status(self, run_id: UUID, status: str) -> bool:
+        """
+        Updates the status of a pipeline.
+        """
+        pass
+    
+    async def run_pipeline(self, config: str, user_id: UUID) -> bool:
+        """
+        Runs a pipeline with the given config.
+        """
+        # Based on the config, store the pipeline in the database
+        pipeline_data = {
+            "name": "Test Pipeline",
+            "user_id": str(user_id),
+        }
+        pipeline = await self.pipeline_service.create_pipeline(self.prisma, pipeline_data)
+
+        try:
+            response = requests.post(
+                "http://localhost:8082/execute", json={"instructions": config}
+            )
+
+            response = response.json()
+
+            if response["status"] == "success":
+                async with self.prisma.tx() as tx:
+                    # assign the run_id to the pipeline
+                    self.pipeline_service.assign_run_id_to_pipeline(tx, pipeline.pipeline_id, response["run_id"])
+                    # change the pipeline status to running
+                    self.pipeline_service.update_pipeline_status(tx, pipeline.pipeline_id, "running")
+                
+                return True
+
+            elif response["status"] == "failure":
+                # delete the pipeline
+                delete_result = await self.delete_pipeline(pipeline.pipeline_id)
+                if not delete_result:
+                    raise Exception("Failed to delete pipeline.")
+
+
+        except Exception as e:
+            self.logger.log(
+                "PipelineController",
+                "critical",
+                f"Exception during running pipeline: {str(e)}",
                 extra={"traceback": traceback.format_exc()},
             )
             return False
