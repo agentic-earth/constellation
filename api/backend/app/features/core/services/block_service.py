@@ -485,6 +485,12 @@ class BlockService:
                 extra=traceback.format_exc(),
             )
             return None
+    
+    async def get_all_blocks(self, tx: Prisma) -> List[PrismaBlock]:
+        """
+        Retrieves all blocks.
+        """
+        return await tx.block.find_many()
 
     async def get_all_vectors(self, tx: Prisma) -> List[List[float]]:
         """
