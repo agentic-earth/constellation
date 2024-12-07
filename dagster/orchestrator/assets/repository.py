@@ -20,7 +20,7 @@ from dagster import (
 )
 
 from dataclasses import dataclass
-from typing import Any as TypingAny, Dict, Tuple
+from typing import Any as TypingAny, Dict, Tuple, List
 
 # Import s3_resource from dagster_aws
 from dagster_aws.s3 import s3_resource
@@ -131,27 +131,34 @@ def generate_dynamic_job_configs(context: OpExecutionContext):
     yield DynamicOutput(raw_input, mapping_key="dynamic_config")
 
 @op
-def parse_and_execute_job(context: OpExecutionContext, instructions: list):
+def parse_and_execute_job(context: OpExecutionContext, instructions: list) -> List[TypingAny]:
     job_list = []
+    run_configs = []
     for instruction in instructions:
         job, run_config = define_composite_job(
             name="dynamic_job", raw_input=instruction
         )
         context.log.info(f"Created dynamic job: {job.name}")
-        job_list.append((job, run_config))
-
-    for job, run_config in job_list:
+        job_list.append(job)
+        run_configs.append(run_config)
+    
+    all_results = []
+    for job, run_config in zip(job_list, run_configs):
         context.log.info(f"Executing dynamic job with run_config: {run_config}")
         result = job.execute_in_process(run_config=run_config)
-
+    
         for event in result.all_events:
             context.log.info(f"Event: {event.message}")
-
+    
         try:
             dynamic_result = result.output_value()
             context.log.info(f"Dynamic job result: {dynamic_result}")
+            all_results.append(dynamic_result)
         except DagsterInvariantViolationError:
             context.log.info("Dynamic job executed without outputs.")
+            all_results.append(None)
+    
+    return all_results
 
 @job(
     resource_defs={"s3_resource": s3_resource},
