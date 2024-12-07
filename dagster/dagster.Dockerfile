@@ -13,6 +13,7 @@ RUN pip install \
 
 RUN pip install gdown
 
+RUN pip install dagster_aws
 # Set $DAGSTER_HOME and copy dagster instance and workspace YAML there
 ENV DAGSTER_HOME=/opt/dagster/dagster_home/
 
@@ -20,5 +21,7 @@ RUN mkdir -p $DAGSTER_HOME
 
 COPY dagster.yaml workspace.yaml $DAGSTER_HOME
 
+ENV AWS_ACCESS_KEY_ID=AKIASE5KQ2YESPUIVLWS
+ENV AWS_SECRET_ACCESS_KEY=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
 
 WORKDIR $DAGSTER_HOME

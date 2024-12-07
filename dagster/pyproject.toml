@@ -9,14 +9,17 @@ readme = "README.md"
 python = ">=3.9,<3.13"
 fastapi = "^0.115.0"
 uvicorn = "^0.30.6"
-dagster = "^1.8.8"
 pandas = "^2.2.3"
 gdown = "^4.7.1"
 asyncio = "*"
-
+dagster = "1.9.4"
+dagster-aws = "0.25.4"
+dagster-docker = "0.25.4"
+dagster-postgres = "0.25.4"
+dagster-graphql = "1.9.4"
+dagster-webserver = "1.9.4"
 
 [tool.poetry.group.dev.dependencies]
-dagster-docker = "^0.24.8"
 
 [build-system]
 requires = ["poetry-core"]

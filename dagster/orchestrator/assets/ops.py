@@ -1,4 +1,3 @@
-
 import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
@@ -9,10 +8,8 @@ import requests
 import pandas as pd
 import operator
 import zipfile
-import os
-import sys
 import gdown
-
+import json
 
 @op(
     name="import_from_google_drive",
@@ -26,7 +23,6 @@ def import_from_google_drive(
     context.log.info("Starting import_from_google_drive...")
     download_url = f"https://drive.google.com/uc?id={file_id}"
     try:
-        # Download the file using gdown
         output = "download.zip"
         gdown.download(download_url, output, quiet=False)
         context.log.info("Downloaded file successfully using gdown.")
@@ -66,13 +62,10 @@ def dict_to_list(context: OpExecutionContext, data: dict[str, Any]) -> list[byte
 @op(name="deploy_model", ins={"model": In(str)})
 def deploy_model(context: OpExecutionContext, model: str) -> None:
     context.log.info(f"Deploying model: {model}")
-
-    # Define the endpoint and payload
     MODEL_ENDPOINT = "http://model_api:8000"
     endpoint = f"{MODEL_ENDPOINT}/deploy?model_name={model}"
     payload = {"model_name": model}
 
-    # Make a POST request to the endpoint
     response = requests.get(endpoint, json=payload)
 
     if response.status_code == 200:
@@ -89,13 +82,10 @@ def deploy_model(context: OpExecutionContext, model: str) -> None:
 @op(name="delete_model", ins={"model": In(str)})
 def delete_model(context: OpExecutionContext, model: str) -> None:
     context.log.info(f"Deleting model service: {model}")
-
-    # Define the endpoint and payload
     MODEL_ENDPOINT = "http://model_api:8000"
     endpoint = f"{MODEL_ENDPOINT}/delete?model_name={model}"
     payload = {"model_name": model}
 
-    # Make a POST request to the endpoint
     response = requests.delete(endpoint, json=payload)
 
     if response.status_code == 200:
@@ -106,7 +96,6 @@ def delete_model(context: OpExecutionContext, model: str) -> None:
         )
 
 
-# Model infrence
 @op(
     name="model_inference",
     ins={"data": In(list[bytes]), "model": In(str)},
@@ -123,7 +112,6 @@ def model_inference(
     batch_size = 2
     batches = [data[i : min(len(data), i + batch_size)] for i in range(0, len(data), batch_size)]
 
-
     results = []
     for batch in batches:
         payload = {"data": [base64.b64encode(image).decode("utf-8") for image in batch]}
@@ -139,6 +127,25 @@ def model_inference(
             f"Failed to run model inference. Status code: {response.status_code}, Response: {response.text}"
         )
         return {}
+
+
+@op(
+    name="export_to_s3",
+    ins={"inference_results": In(dict)},
+    out=Out(str),
+    description="Exports inference results to S3 as a JSON file.",
+    required_resource_keys={"s3_resource"}
+)
+def export_to_s3(context, inference_results):
+    bucket_name = "agenticexportbucket"
+    key = "inference_results.json"
+
+    data = json.dumps(inference_results, indent=2)
+    s3 = context.resources.s3_resource
+    s3.put_object(Bucket=bucket_name, Key=key, Body=data.encode("utf-8"))
+
+    context.log.info(f"Uploaded inference results to s3://{bucket_name}/{key}")
+    return f"s3://{bucket_name}/{key}"
 
 
 @op(name="mock_csv_data", out=Out())
