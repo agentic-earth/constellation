@@ -241,6 +241,7 @@ enum BlockTypeEnum {
   dataset
   model
   paper
+  exports
 }
 
 enum BuildStatusEnum {
