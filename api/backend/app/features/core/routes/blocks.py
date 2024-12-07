@@ -1,5 +1,6 @@
 # routes/blocks.py
 
+# from backend.app.features.agent.crews.crew_process import CrewProcess
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Dict, Any, Optional
 from uuid import UUID
@@ -13,7 +14,7 @@ from prisma.partials import (
 )
 
 from backend.app.features.core.controllers.block_controller import BlockController
-from backend.app.dependencies import get_block_controller
+from backend.app.dependencies import get_block_controller, get_crew
 
 router = APIRouter()
 
@@ -111,13 +112,27 @@ async def search_blocks_by_vector(
         raise HTTPException(status_code=500, detail="Similarity search failed.")
     return results
 
+@router.post("/construct-pipeline/", response_model=Dict[str, Any])
+async def search_blocks_by_vector(
+    query: str,
+    user_id: UUID,
+    controller: BlockController = Depends(get_block_controller),
+):
+    results = await controller.get_llm_output(query, user_id)
+    if results is None:
+        raise HTTPException(status_code=500, detail="Similarity search failed.")
+    return results
 
-@router.get("/get-all-blocks", response_model=List[BlockBasicInfo])
+
+@router.get("/get-all-blocks/", response_model=List[BlockBasicInfo])
 async def get_all_blocks(
     user_id: UUID,
     controller: BlockController = Depends(get_block_controller),
+    # crew: CrewProcess = Depends(get_crew),
 ):
     blocks = await controller.get_all_blocks(user_id)
     if blocks is None:
         raise HTTPException(status_code=500, detail="Failed to get all blocks.")
-    return blocks
+    print(blocks)
+    dataset_model_block = [block for block in blocks if block['block_type'] == "dataset" or block['block_type'] == "model"]
+    return dataset_model_block

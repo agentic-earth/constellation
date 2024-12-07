@@ -16,6 +16,7 @@ Responsibilities:
 - Ensure transactional safety and data consistency.
 """
 
+import json
 import sys
 sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api")
 sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api/backend")
@@ -420,6 +421,46 @@ class BlockController:
             )
             return None
     
+    async def get_llm_output(self, query: str, user_id: UUID) -> Optional[Dict[str, Any]]:
+        try:
+            # retrieve all blocks and organize the pipeline file with LLM
+            async with self.prisma.tx() as tx:
+                blocks = await self.block_service.get_all_blocks(tx)
+                dataset_model_block = [block for block in blocks if block.block_type == "dataset" or block.block_type == "model"]
+                output = await self.block_service.get_llm_output(query, dataset_model_block)
+
+                if output is None:
+                    raise Exception("Failed to get response from LLM")
+
+                # Audit Logging for Search by vector
+                audit_log = {
+                    "user_id": str(user_id),
+                    "action_type": "READ",  # Use 'READ' for searches
+                    "entity_type": "block",  # If 'block_search' is not in enum, use 'block'
+                    "entity_id": (
+                        None
+                    ),
+                    "details": {"results_count": len(output)}
+                    # Removed 'users' field
+                }
+                if not audit_log:
+                    raise Exception(
+                        "Failed to create audit log for block get_llm_output"
+                    )
+
+                return json.loads(output)
+        except Exception as e:
+            self.logger.log(
+                "BlockController",
+                "error",
+                "Failed to search blocks by vector similarity",
+                error=str(e),
+                extra=traceback.format_exc(),
+            )
+            return None
+
+                
+
     async def get_all_blocks(self, user_id: UUID) -> Optional[List[Dict[str, Any]]]:
         try:
             async with self.prisma.tx() as tx:

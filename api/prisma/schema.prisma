@@ -3,7 +3,7 @@ generator client {
   previewFeatures        = ["postgresqlExtensions"]
   recursive_type_depth   = "5"
   interface              = "asyncio"
-  partial_type_generator = "prisma/partial_types.py"
+  partial_type_generator = "partial_types.py"
 }
 
 datasource db {

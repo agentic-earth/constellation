@@ -23,15 +23,14 @@ Key Design Decisions:
 This approach balances flexibility, type safety, and simplicity, leveraging Prisma's capabilities
 while providing a clean API for block operations.
 """
-import re
+import json
 from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
 import asyncio
 
-from prisma.errors import UniqueViolationError
+from backend.app.features.agent.crews.crew_process import CrewProcess
 from prisma.models import Block as PrismaBlock
-from prisma.models import BlockVector as PrismaBlockVector
 from prisma import Prisma
 from backend.app.logger import ConstellationLogger
 from backend.app.config import settings
@@ -63,6 +62,7 @@ class BlockService:
             search_strategy="hnsw",
         )
         self.retriever = PgvectorEmbeddingRetriever(document_store=self.document_store)
+        self.crew = CrewProcess()
 
     async def create_block(
         self,
@@ -523,6 +523,21 @@ class BlockService:
                 "BlockService", "error", "Failed to retrieve all vectors", error=str(e)
             )
             return []
+        
+    async def get_llm_output(self, query: str, blocks: List[PrismaBlock]) -> str:
+        """
+        Retrieves the output of the LLM model for a given query and list of blocks.
+
+        Args:
+            query (str): The input query.
+            blocks (List[PrismaBlock]): The list of blocks.
+
+        Returns:
+            str: The output of the LLM model.
+        """
+        crew_process = self.crew.make_crews(query, blocks)
+        result = crew_process.kickoff()
+        return result
 
 
 async def main():
