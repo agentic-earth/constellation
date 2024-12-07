@@ -159,6 +159,7 @@ async def list_pipelines(
 
 @router.put("/status/{run_id}/{status}", status_code=200)
 async def update_pipeline_status_by_run_id(
+    request: Request,
     run_id: str,
     status: str,
     controller: PipelineController = Depends(get_pipeline_controller),
@@ -173,6 +174,14 @@ async def update_pipeline_status_by_run_id(
     Returns:
         Dict[str, str]: A success message if the update is successful.
     """
+
+    # Get the message from the request body
+    request_body = await request.json()
+    message = request_body["message"]
+    # send message to frontend if there is an error occured when executing the pipeline
+    # add the message to the pipeline's message field
+
+
     success = await controller.update_pipeline_status_by_run_id(run_id, status)
     if not success:
         raise HTTPException(
