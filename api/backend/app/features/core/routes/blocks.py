@@ -112,7 +112,7 @@ async def search_blocks_by_vector(
     return results
 
 
-@router.get("/get-all-blocks", response_model=List[BlockBasicInfo])
+@router.get("/get-all-blocks", response_model=List[BlockBasicInfoWithID])
 async def get_all_blocks(
     user_id: UUID,
     controller: BlockController = Depends(get_block_controller),
