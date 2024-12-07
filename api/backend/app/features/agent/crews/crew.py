@@ -85,7 +85,8 @@ class LLMCrew:
                                         }
                                         }
                                     }
-                                    }
+                                    },
+                                    "model": "{xxx}"
                                 }
                                 }
                             ]
