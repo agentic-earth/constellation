@@ -60,28 +60,45 @@ class LLMCrew:
             {
                 "ops": {
                     "generate_dynamic_job_configs": {
-                        "config": {
-                            "raw_input": [
+                    "config": {
+                        "raw_input": [
+                        {
+                            "operation": "deploy_model",
+                            "parameters": {
+                            "model": "{xxx}"
+                            }
+                        },
+                        {
+                            "operation": "export_to_s3",
+                            "parameters": {
+                            "inference_results": [
                                 {
-                                    "operation": "deploy_model",
+                                "operation": "model_inference",
+                                "parameters": {
+                                    "data": {
+                                    "operation": "dict_to_list",
                                     "parameters": {
-                                        "model": "{xxx}"
+                                        "data": {
+                                        "operation": "import_from_google_drive",
+                                        "parameters": {
+                                            "file_id": "{yyy}"
+                                        }
+                                        }
                                     }
-                                },
-                                {
-                                    "operation": "import_from_google_drive",
-                                    "parameters": {
-                                        "file_id": "{yyy}"
-                                    }
-                                },
-                                {
-                                    "operation": "delete_model",
-                                    "parameters": {
-                                        "service_name": "{xxx}-service"
                                     }
                                 }
+                                }
                             ]
+                            }
+                        },
+                        {
+                            "operation": "delete_model",
+                            "parameters": {
+                            "model": "{xxx}"
+                            }
                         }
+                        ]
+                    }
                     }
                 }
             }
