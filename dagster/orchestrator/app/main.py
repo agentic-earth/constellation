@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Request
 import requests
+import uvicorn
 
 app = FastAPI()
 
@@ -82,14 +83,13 @@ async def run_dagster_job_with_config(request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-import uvicorn
 
 def main():
     """
     Main function to launch the FastAPI application using Uvicorn.
     The API will be accessible at http://localhost:8082
     """
-    # logger.log("main", "info", "Starting Dagster Orchestrator on port 8082.")
+
     uvicorn.run(
         "dagster.orchestrator.app.main:app",
         host="0.0.0.0",

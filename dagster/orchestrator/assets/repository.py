@@ -4,8 +4,6 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from dagster import (
-    mem_io_manager,
-    in_process_executor,
     Any,
     DependencyDefinition,
     DynamicOut,
@@ -33,16 +31,31 @@ OP_DEFS = [
     model_inference,
     mock_csv_data,
     write_csv,
+    publish_success,
+    publish_failure,
 ]
 
 
 @dataclass
 class CallableOperation:
+    """
+    A dataclass to represent a callable operation.
+    """
+
     operation: str
     parameters: Dict[str, TypingAny]
 
 
 def parse_instructions(input: dict) -> CallableOperation:
+    """
+    Parse the instructions to create a CallableOperation.
+
+    Args:
+        input (dict): The input instructions.
+
+    Returns:
+        CallableOperation: The parsed CallableOperation.
+    """
     if "operation" not in input:
         raise ValueError("Operation not found in instruction")
 
@@ -64,6 +77,15 @@ def parse_instructions(input: dict) -> CallableOperation:
 def generate_dependencies_and_run_config(
     instruction: CallableOperation,
 ) -> Tuple[Dict, Dict]:
+    """
+    Generate the dependencies and run config for a given instruction.
+
+    Args:
+        instruction (CallableOperation): The instruction to generate the dependencies and run config for.
+
+    Returns:
+        Tuple[Dict, Dict]: A tuple containing the dependencies and run config.
+    """
     result = {}
     run_config = {"ops": {}}
     alias_counter = [1]
@@ -99,6 +121,16 @@ def generate_dependencies_and_run_config(
 
 
 def define_composite_job(name: str, raw_input: dict) -> Tuple[JobDefinition, Dict]:
+    """
+    Define a composite job based on the raw input instructions.
+
+    Args:
+        name (str): The name of the job.
+        raw_input (dict): The raw input instructions.
+
+    Returns:
+        Tuple[JobDefinition, Dict]: A tuple containing the job definition and run config.
+    """
     instruction: CallableOperation = parse_instructions(input=raw_input)
     deps = {}
     run_config = {}
@@ -116,18 +148,28 @@ def define_composite_job(name: str, raw_input: dict) -> Tuple[JobDefinition, Dic
         dependencies=deps,
     )
 
-    return graph.to_job(), run_config
+    return (
+        graph.to_job(
+            hooks=[publish_failure],
+        ),
+        run_config,
+    )
 
 
 @op(config_schema={"raw_input": Field(Any)}, out=DynamicOut())
 def generate_dynamic_job_configs(context: OpExecutionContext):
+    """
+    Generate dynamic job configs from the raw input.
+    """
     raw_input = context.op_config["raw_input"]
     yield DynamicOutput(raw_input, mapping_key="dynamic_config")
 
 
 @op
 def parse_and_execute_job(context: OpExecutionContext, instructions: list):
-    # Dynamically generate a job based on the input
+    """
+    Parse and execute a job based on the input instructions.
+    """
     job_list = []
     for instruction in instructions:
         job, run_config = define_composite_job(
@@ -136,9 +178,20 @@ def parse_and_execute_job(context: OpExecutionContext, instructions: list):
         context.log.info(f"Created dynamic job: {job.name}")
         job_list.append((job, run_config))
 
+    # Add final success op
+    job_list.append(
+        (
+            GraphDefinition(name="success_graph", node_defs=[publish_success]),
+            None,
+        )
+    )
+
     for job, run_config in job_list:
         context.log.info(f"Executing dynamic job with run_config: {run_config}")
-        result = job.execute_in_process(run_config=run_config)
+        if run_config:
+            result = job.execute_in_process(run_config=run_config)
+        else:
+            result = job.execute_in_process()
 
         for event in result.all_events:
             context.log.info(f"Event: {event.message}")
@@ -169,6 +222,9 @@ def parse_and_execute_job(context: OpExecutionContext, instructions: list):
     }
 )
 def build_execute_job():
+    """
+    Build and execute a job based on the input instructions.
+    """
     dynamic_configs = generate_dynamic_job_configs()
     dynamic_configs.map(parse_and_execute_job)
 
@@ -187,9 +243,15 @@ def build_execute_job():
     }
 )
 def test_import_from_google_drive_job():
+    """
+    Test the import from google drive job.
+    """
     import_from_google_drive()
 
 
 @repository(name="main")
 def deploy_docker_repository():
+    """
+    Deploy the docker repository.
+    """
     return [build_execute_job, test_import_from_google_drive_job]

@@ -4,7 +4,8 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 import base64
-from dagster import Any, In, OpExecutionContext, Out, op
+from dagster import Any, In, OpExecutionContext, Out, op, failure_hook, HookContext
+import traceback
 import requests
 import pandas as pd
 import operator
@@ -186,3 +187,51 @@ def math_block(
     result_df = data.map(lambda x: operation_func(x, constant))
     context.log.info(f"Resulting DataFrame:\n{result_df}")
     return result_df
+
+
+@failure_hook(name="publish_failure")
+def publish_failure(context: HookContext) -> None:
+    """
+    Publish the status of the job to the orchestrator.
+
+    Args:
+        context (HookContext): The context of the failure hook.
+    """
+    status = "failed"
+
+    # Get run id from context
+    run_id = context.run_id
+    context.log.info(f"Publishing status: {status} for job: {run_id}")
+
+    # Get the status from the context
+    op_exception: BaseException = context.op_exception
+    message = op_exception.__traceback__.format_exc()
+
+    # Post to the status endpoint
+    publish_status_helper(context, run_id, status, message)
+
+
+@op(name="publish_success")
+def publish_success(context: OpExecutionContext) -> None:
+    status = "success"
+    run_id = context.run_id
+    publish_status_helper(context, run_id, status, "")
+
+
+def publish_status_helper(
+    context: HookContext, run_id: str, status: str, message: str
+) -> None:
+    """
+    Publish the status of the job to the main API.
+
+    Args:
+        context (HookContext): The context of the failure hook.
+        run_id (str): The id of the run.
+        status (str): The status of the job.
+        message (str): The message of the job.
+    """
+    MAIN_ENDPOINT = "http://main_api:8000"
+    endpoint = f"{MAIN_ENDPOINT}/pipelines/status/{run_id}/{status}"
+    payload = {"message": message}
+    response = requests.put(endpoint, json=payload)
+    context.log.info(f"Status published: {response.text}")

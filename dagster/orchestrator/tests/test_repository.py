@@ -1,4 +1,3 @@
-import pytest
 from unittest import mock
 import os
 import sys
@@ -9,7 +8,7 @@ import base64
 # Dynamically add the parent directory to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from dagster import build_op_context, OpExecutionContext, DagsterInvariantViolationError
+from dagster import build_op_context
 
 from orchestrator.assets.ops import (
     import_from_google_drive,
