@@ -139,15 +139,15 @@ model EdgeVersion {
 }
 
 model Pipeline {
-  pipeline_id   String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  name          String?         @unique @db.VarChar(255)
-  description   String?
-  created_at    DateTime        @default(now()) @db.Timestamptz(6)
-  updated_at    DateTime        @default(now()) @db.Timestamptz(6)
-  user_id       String          @db.Uuid
-  run_id        String?         @unique
-  status        String?
-  message       String?
+  pipeline_id String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name        String?  @unique @db.VarChar(255)
+  description String?
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+  user_id     String   @db.Uuid
+  run_id      String?  @unique
+  status      String?
+  message     String?
 
   Profile       Profile         @relation(fields: [user_id], references: [auth_uid], onDelete: Cascade, onUpdate: NoAction, map: "fk_pipeline_user")
   PipelineBlock PipelineBlock[]

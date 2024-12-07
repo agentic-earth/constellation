@@ -31,7 +31,9 @@ Edge.create_partial(
     "EdgeBasicInfoWithID", include=["edge_id", "source_block_id", "target_block_id"]
 )
 
-Pipeline.create_partial("PipelineBasicInfo", include=["name", "description", "user_id"])
+Pipeline.create_partial(
+    "PipelineBasicInfo", include=["name", "description", "user_id", "status", "message"]
+)
 Pipeline.create_partial(
     "PipelineBasicInfoWithID",
     include=[
@@ -39,8 +41,10 @@ Pipeline.create_partial(
         "name",
         "description",
         "user_id",
-        "PipelineBlock",
-        "PipelineEdge",
+        # "PipelineBlock",
+        # "PipelineEdge",
+        "status",
+        "message",
     ],
 )
 
