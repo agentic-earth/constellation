@@ -24,6 +24,3 @@ def get_edge_controller(prisma: Prisma = Depends(get_prisma)) -> EdgeController:
 
 def get_pipeline_controller(prisma: Prisma = Depends(get_prisma)) -> PipelineController:
     return PipelineController(prisma)
-
-def get_crew() -> CrewProcess:
-    return CrewProcess()

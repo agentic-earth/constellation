@@ -14,7 +14,7 @@ from prisma.partials import (
 )
 
 from backend.app.features.core.controllers.block_controller import BlockController
-from backend.app.dependencies import get_block_controller, get_crew
+from backend.app.dependencies import get_block_controller
 
 router = APIRouter()
 
@@ -118,7 +118,7 @@ async def search_blocks_by_vector(
     user_id: UUID,
     controller: BlockController = Depends(get_block_controller),
 ):
-    results = await controller.get_llm_output(query, user_id)
+    results = await controller.construct_pipeline(query, user_id)
     if results is None:
         raise HTTPException(status_code=500, detail="Similarity search failed.")
     return results
@@ -128,7 +128,6 @@ async def search_blocks_by_vector(
 async def get_all_blocks(
     user_id: UUID,
     controller: BlockController = Depends(get_block_controller),
-    # crew: CrewProcess = Depends(get_crew),
 ):
     blocks = await controller.get_all_blocks(user_id)
     if blocks is None:

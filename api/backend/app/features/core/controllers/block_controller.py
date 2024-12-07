@@ -421,7 +421,7 @@ class BlockController:
             )
             return None
     
-    async def get_llm_output(self, query: str, user_id: UUID) -> Optional[Dict[str, Any]]:
+    async def construct_pipeline(self, query: str, user_id: UUID) -> Optional[Dict[str, Any]]:
         try:
             # retrieve all blocks and organize the pipeline file with LLM
             async with self.prisma.tx() as tx:
@@ -438,14 +438,13 @@ class BlockController:
                     "action_type": "READ",  # Use 'READ' for searches
                     "entity_type": "block",  # If 'block_search' is not in enum, use 'block'
                     "entity_id": (
-                        None
+                        dataset_model_block[0].block_id if dataset_model_block else str(UUID(int=0))
                     ),
                     "details": {"results_count": len(output)}
-                    # Removed 'users' field
                 }
                 if not audit_log:
                     raise Exception(
-                        "Failed to create audit log for block get_llm_output"
+                        "Failed to create audit log for construct pipeline"
                     )
 
                 return json.loads(output)
@@ -453,13 +452,11 @@ class BlockController:
             self.logger.log(
                 "BlockController",
                 "error",
-                "Failed to search blocks by vector similarity",
+                "Failed to construct_pipeline",
                 error=str(e),
                 extra=traceback.format_exc(),
             )
             return None
-
-                
 
     async def get_all_blocks(self, user_id: UUID) -> Optional[List[Dict[str, Any]]]:
         try:
