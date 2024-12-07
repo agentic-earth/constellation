@@ -109,8 +109,9 @@ async def search_blocks_by_vector(
 ):
     results = await controller.search_blocks_by_vector_similarity(query, user_id, top_k)
     if results is None:
-        raise HTTPException(status_code=500, detail="Similarity search failed.")
+        raise HTTPException(status_code=500, detail="Similarity vector failed.")
     return results
+
 
 @router.post("/construct-pipeline/", response_model=Dict[str, Any])
 async def search_blocks_by_vector(
@@ -120,7 +121,7 @@ async def search_blocks_by_vector(
 ):
     results = await controller.construct_pipeline(query, user_id)
     if results is None:
-        raise HTTPException(status_code=500, detail="Similarity search failed.")
+        raise HTTPException(status_code=500, detail="Construct pipeline failed.")
     return results
 
 
