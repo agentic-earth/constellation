@@ -147,6 +147,7 @@ model Pipeline {
   user_id       String          @db.Uuid
   run_id        String?         @unique
   status        String?
+  message       String?
   Profile       Profile         @relation(fields: [user_id], references: [auth_uid], onDelete: Cascade, onUpdate: NoAction, map: "fk_pipeline_user")
   PipelineBlock PipelineBlock[]
   PipelineEdge  PipelineEdge[]
@@ -209,8 +210,8 @@ model BlockVector {
   blob_meta      Json?
   blob_mime_type String?                @db.VarChar(255)
   meta           Json?
-  Block          Block?                 @relation(fields: [blockBlock_id], references: [block_id])
   blockBlock_id  String?                @db.Uuid
+  Block          Block?                 @relation(fields: [blockBlock_id], references: [block_id])
 
   @@index([embedding], map: "haystack_hnsw_index")
 }
@@ -239,6 +240,7 @@ enum BlockTypeEnum {
   dataset
   model
   paper
+  exports
 }
 
 enum BuildStatusEnum {

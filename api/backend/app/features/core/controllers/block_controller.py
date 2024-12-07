@@ -36,9 +36,7 @@ from backend.app.utils.serialization_utils import (
     align_dict_with_model,
 )  # Ensure this import is present
 import asyncio
-from prisma import Prisma
 from backend.app.logger import ConstellationLogger
-from prisma.models import AuditLog as PrismaAuditLog
 import traceback
 
 
@@ -426,9 +424,8 @@ class BlockController:
             # retrieve all blocks and organize the pipeline file with LLM
             async with self.prisma.tx() as tx:
                 blocks = await self.block_service.get_all_blocks(tx)
-                dataset_model_block = [block for block in blocks if block.block_type == "dataset" or block.block_type == "model"]
-                output = await self.block_service.get_llm_output(query, dataset_model_block)
-
+                dataset_model_blocks = [block for block in blocks if block.block_type == "dataset" or block.block_type == "model"]
+                output = await self.block_service.get_llm_output(query, dataset_model_blocks)
                 if output is None:
                     raise Exception("Failed to get response from LLM")
 
@@ -438,11 +435,12 @@ class BlockController:
                     "action_type": "READ",  # Use 'READ' for searches
                     "entity_type": "block",  # If 'block_search' is not in enum, use 'block'
                     "entity_id": (
-                        dataset_model_block[0].block_id if dataset_model_block else str(UUID(int=0))
+                        dataset_model_blocks[0].block_id if dataset_model_blocks else str(UUID(int=0))
                     ),
                     "details": {"results_count": len(output)}
                 }
-                if not audit_log:
+                audit_log_result = await self.audit_service.create_audit_log(tx, audit_log)
+                if not audit_log_result:
                     raise Exception(
                         "Failed to create audit log for construct pipeline"
                     )

@@ -71,7 +71,7 @@ class LLMCrew:
                         {
                             "operation": "export_to_s3",
                             "parameters": {
-                            "inference_results": [
+                            "inference_results": {`
                                 {
                                 "operation": "model_inference",
                                 "parameters": {
@@ -89,7 +89,7 @@ class LLMCrew:
                                     "model": "{xxx}"
                                 }
                                 }
-                            ]
+                            }
                             }
                         },
                         {
