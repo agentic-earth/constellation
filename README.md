@@ -186,7 +186,6 @@ The **Core Microservice** defines a set of Pydantic schemas and types that serve
 
 ### 🔑 **Key Schemas**
 
-- **User Schemas**: Manage user data, authentication, and authorization.
 - **Pipeline Schemas**: Define the structure and configurations of data pipelines.
 - **Block and Edge Schemas**: Represent the building blocks and their interconnections within pipelines.
 - **Vector Embedding Schemas**: Facilitate similarity searches and advanced data querying.
