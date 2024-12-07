@@ -4,22 +4,39 @@ import pathlib
 import json
 import uuid
 import asyncio
-from backend.app.features.core.controllers.block_controller import BlockController
-from backend.app.config import Settings
-from prisma import Prisma
 import requests
 import time
 import xml.etree.ElementTree as ET
-import time
-import os.path
+import fitz
+from backend.app.features.core.controllers.block_controller import BlockController
+from backend.app.config import Settings
+from prisma import Prisma
 
 class ArxivScraper:
+    """
+    ArxivScraper class to scrape papers from arXiv, save them locally, and store their data in a database.
+    """
+
     def __init__(self):
-        # self.settings = Settings()
+        """
+        Initializes the ArxivScraper with a Prisma client and a BlockController.
+        """
         self.prisma = Prisma(datasource={"url": str(Settings().DATABASE_URL)})
         self.controller = BlockController(self.prisma)
 
     def arxiv_scraper(self, topics, max_results=100, start_date=None, end_date=None):
+        """
+        Scrapes papers from arXiv based on the given topics and date range.
+
+        Args:
+            topics (list): List of topics to search for.
+            max_results (int): Maximum number of results to retrieve per topic.
+            start_date (str): Start date for the search range (YYYY-MM-DD).
+            end_date (str): End date for the search range (YYYY-MM-DD).
+
+        Returns:
+            list: List of dictionaries containing paper data (title, abstract, pdf_url).
+        """
         base_url = "http://export.arxiv.org/api/query?"
         paper_data = []
         for topic in topics:
@@ -43,7 +60,6 @@ class ArxivScraper:
                         'abstract': abstract,
                         'pdf_url': pdf_url
                     })
-                    # save_paper_data(paper_data)
                     print({
                         'title': title,
                         'abstract': abstract,
@@ -54,6 +70,12 @@ class ArxivScraper:
         return paper_data
 
     def save_paper_data(self, paper_data):
+        """
+        Saves the paper PDF locally.
+
+        Args:
+            paper_data (dict): Dictionary containing paper data (title, abstract, pdf_url).
+        """
         # Create a folder to store the papers if it doesn't exist
         current_path = pathlib.Path(__file__).parent.resolve()
         scrape_folder = str(current_path) + "/scraped_papers"
@@ -72,6 +94,12 @@ class ArxivScraper:
             print(f"Failed to download PDF. Status code: {response.status_code}")
 
     def save_paper_data_json(self, paper_data):
+        """
+        Saves the paper data as a JSON file locally.
+
+        Args:
+            paper_data (list): List of dictionaries containing paper data (title, abstract, pdf_url).
+        """
         # Create a folder to store the papers if it doesn't exist
         current_path = pathlib.Path(__file__).parent.resolve()
         scrape_folder = str(current_path) + "/scraped_papers"
@@ -81,8 +109,31 @@ class ArxivScraper:
         with open(f"{file_path}", 'w') as file:
             json.dump(paper_data, file)
 
+    @staticmethod
+    def read_pdf(pdf_path):
+        """
+        Reads the text content from a PDF file.
+
+        Args:
+            pdf_path (str): Path to the PDF file.
+
+        Returns:
+            str: Text content of the PDF.
+        """
+        pdf = fitz.open(pdf_path)
+        text = ""
+        for page_num in range(pdf.page_count):
+            page = pdf.load_page(page_num)
+            text += page.get_text()
+        return text
+
     async def store_paper_data(self, paper_data):
-        # Store the paper data in a database
+        """
+        Stores the paper data in a database.
+
+        Args:
+            paper_data (list): List of dictionaries containing paper data (title, abstract, pdf_url).
+        """
         user_id = uuid.uuid4()
         await self.prisma.connect()
         try:
@@ -98,7 +149,6 @@ class ArxivScraper:
             print(f"An error occurred: {e}")
             import traceback
             print(traceback.format_exc())
-
         finally:
             await self.prisma.disconnect()
             print("Disconnected from the database")

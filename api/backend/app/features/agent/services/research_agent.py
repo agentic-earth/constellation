@@ -15,9 +15,7 @@ Design Philosophy:
 
 from crewai import Agent
 from crewai_tools import tool
-from backend.app.features.core.services.block_service import BlockService
 import json
-from typing import List, Dict, Any, ClassVar
 
 
 class ResearchAgent(Agent):
