@@ -69,9 +69,6 @@ The Constellation Master Program leverages the strengths of each microservice to
 At the heart of Constellation lies the **Core Microservice**, which defines essential data types and schemas critical for the seamless operation of all microservices. These types ensure consistent data handling and facilitate communication between different components of the system.
 
 ### 🔍 **Key Types Defined in Core**
-
-- **UserResponseSchema**
-  - Represents user information, including identifiers and metadata.
 - **PipelineResponseSchema**
   - Encapsulates details about data pipelines, their configurations, and statuses.
 - **BlockResponseSchema & EdgeResponseSchema**
