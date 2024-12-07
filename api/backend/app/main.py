@@ -67,6 +67,7 @@ The Constellation API is a FastAPI-based application designed to manage pipeline
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from backend.app.features.core.routes import blocks, edges, pipelines
 from backend.app.database import connect_db, disconnect_db, prisma_client
 from backend.app.logger import ConstellationLogger
@@ -79,6 +80,15 @@ app = FastAPI(
     title="Constellation API",
     description="API for managing Users, Blocks, Edges, Pipelines, and Audit Logs.",
     version="1.0.0",
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
 )
 
 
