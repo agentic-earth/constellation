@@ -11,9 +11,10 @@ from enum import Enum
 # Enum Definitions
 # -------------------
 
+
 class BlockTypeEnum(str, Enum):
-    dataset = 'dataset'
-    model = 'model'
+    dataset = "dataset"
+    model = "model"
 
     @classmethod
     def has_value(cls, value: str) -> bool:
@@ -31,8 +32,8 @@ class EdgeTypeEnum(str, Enum):
 
 
 class EntityTypeEnum(str, Enum):
-    block = 'block'
-    edge = 'edge'
+    block = "block"
+    edge = "edge"
 
     @classmethod
     def has_value(cls, value: str) -> bool:
@@ -40,9 +41,9 @@ class EntityTypeEnum(str, Enum):
 
 
 class BuildStatusEnum(str, Enum):
-    pending = 'pending'
-    success = 'success'
-    failed = 'failed'
+    pending = "pending"
+    success = "success"
+    failed = "failed"
 
     @classmethod
     def has_value(cls, value: str) -> bool:
@@ -50,8 +51,8 @@ class BuildStatusEnum(str, Enum):
 
 
 class DependencyTypeEnum(str, Enum):
-    internal = 'internal'
-    external = 'external'
+    internal = "internal"
+    external = "external"
 
     @classmethod
     def has_value(cls, value: str) -> bool:
@@ -59,9 +60,9 @@ class DependencyTypeEnum(str, Enum):
 
 
 class VerificationStatusEnum(str, Enum):
-    pending = 'pending'
-    passed = 'passed'
-    failed = 'failed'
+    pending = "pending"
+    passed = "passed"
+    failed = "failed"
 
     @classmethod
     def has_value(cls, value: str) -> bool:
@@ -69,10 +70,10 @@ class VerificationStatusEnum(str, Enum):
 
 
 class ActionTypeEnum(str, Enum):
-    CREATE = 'CREATE'
-    READ = 'READ'
-    UPDATE = 'UPDATE'
-    DELETE = 'DELETE'
+    CREATE = "CREATE"
+    READ = "READ"
+    UPDATE = "UPDATE"
+    DELETE = "DELETE"
 
     @classmethod
     def has_value(cls, value: str) -> bool:
@@ -80,16 +81,16 @@ class ActionTypeEnum(str, Enum):
 
 
 class AuditEntityTypeEnum(str, Enum):
-    block = 'block'
-    edge = 'edge'
-    pipeline = 'pipeline'
-    taxonomy = 'taxonomy'
-    metadata = 'metadata'
-    user = 'user'
-    api_key = 'api_key'
-    code_repo = 'code_repo'
-    docker_image = 'docker_image'
-    verification = 'verification'
+    block = "block"
+    edge = "edge"
+    pipeline = "pipeline"
+    taxonomy = "taxonomy"
+    metadata = "metadata"
+    user = "user"
+    api_key = "api_key"
+    code_repo = "code_repo"
+    docker_image = "docker_image"
+    verification = "verification"
 
     @classmethod
     def has_value(cls, value: str) -> bool:
@@ -99,6 +100,7 @@ class AuditEntityTypeEnum(str, Enum):
 # -------------------
 # Model Definitions
 # -------------------
+
 
 class BaseModelConfig(BaseModel):
     model_config = ConfigDict(from_attributes=True)

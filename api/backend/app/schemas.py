@@ -5,12 +5,18 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID
 from datetime import datetime
 
-from prisma.enums import BlockTypeEnum, ActionTypeEnum, AuditEntityTypeEnum, VerificationStatusEnum
+from prisma.enums import (
+    BlockTypeEnum,
+    ActionTypeEnum,
+    AuditEntityTypeEnum,
+    VerificationStatusEnum,
+)
 
 
 # -------------------
 # User Schemas
 # -------------------
+
 
 class UserCreateInput(BaseModel):
     username: str = Field(..., description="Unique username for the user.")
@@ -29,11 +35,16 @@ class UserCreateInput(BaseModel):
 # Block Schemas
 # -------------------
 
+
 class BlockCreateSchema(BaseModel):
     name: str = Field(..., description="Unique name of the block.")
-    block_type: BlockTypeEnum = Field(..., description="Type of the block (dataset or model).")
+    block_type: BlockTypeEnum = Field(
+        ..., description="Type of the block (dataset or model)."
+    )
     description: Optional[str] = Field(None, description="Description of the block.")
-    vector: Optional[List[float]] = Field(None, description="Optional vector representation of the block.")
+    vector: Optional[List[float]] = Field(
+        None, description="Optional vector representation of the block."
+    )
 
     class Config:
         orm_mode = True
@@ -41,9 +52,13 @@ class BlockCreateSchema(BaseModel):
 
 class BlockUpdateSchema(BaseModel):
     name: Optional[str] = Field(None, description="Unique name of the block.")
-    block_type: Optional[BlockTypeEnum] = Field(None, description="Type of the block (dataset or model).")
+    block_type: Optional[BlockTypeEnum] = Field(
+        None, description="Type of the block (dataset or model)."
+    )
     description: Optional[str] = Field(None, description="Description of the block.")
-    vector: Optional[List[float]] = Field(None, description="Optional vector representation of the block.")
+    vector: Optional[List[float]] = Field(
+        None, description="Optional vector representation of the block."
+    )
 
     class Config:
         orm_mode = True
@@ -66,6 +81,7 @@ class BlockResponseSchema(BaseModel):
 # Edge Schemas
 # -------------------
 
+
 class EdgeCreateSchema(BaseModel):
     source_block_id: UUID = Field(..., description="UUID of the source block.")
     target_block_id: UUID = Field(..., description="UUID of the target block.")
@@ -76,8 +92,12 @@ class EdgeCreateSchema(BaseModel):
 
 
 class EdgeUpdateSchema(BaseModel):
-    source_block_id: Optional[UUID] = Field(None, description="UUID of the source block.")
-    target_block_id: Optional[UUID] = Field(None, description="UUID of the target block.")
+    source_block_id: Optional[UUID] = Field(
+        None, description="UUID of the source block."
+    )
+    target_block_id: Optional[UUID] = Field(
+        None, description="UUID of the target block."
+    )
     updated_by: UUID = Field(..., description="UUID of the user updating the edge.")
 
     class Config:
@@ -99,6 +119,7 @@ class EdgeResponseSchema(BaseModel):
 # Edge Verification Schemas
 # -------------------
 
+
 class EdgeVerificationRequestSchema(BaseModel):
     source_block_id: UUID = Field(..., description="UUID of the source block.")
     target_block_id: UUID = Field(..., description="UUID of the target block.")
@@ -109,7 +130,9 @@ class EdgeVerificationRequestSchema(BaseModel):
 
 class EdgeVerificationResponseSchema(BaseModel):
     can_connect: bool
-    message: Optional[str] = Field(None, description="Additional information about the verification result.")
+    message: Optional[str] = Field(
+        None, description="Additional information about the verification result."
+    )
 
     class Config:
         orm_mode = True
@@ -118,6 +141,7 @@ class EdgeVerificationResponseSchema(BaseModel):
 # -------------------
 # Assign Version Schemas
 # -------------------
+
 
 class AssignVersionSchema(BaseModel):
     version_id: UUID = Field(..., description="UUID of the version to assign.")
@@ -129,6 +153,7 @@ class AssignVersionSchema(BaseModel):
 # -------------------
 # Audit Log Schemas
 # -------------------
+
 
 class AuditLogSchema(BaseModel):
     log_id: UUID
@@ -147,12 +172,17 @@ class AuditLogSchema(BaseModel):
 # Audit Log Schemas
 # -------------------
 
+
 class AuditLogCreateSchema(BaseModel):
     user_id: UUID = Field(..., description="UUID of the user performing the action.")
     action_type: ActionTypeEnum = Field(..., description="Type of action performed.")
-    entity_type: AuditEntityTypeEnum = Field(..., description="Type of entity being acted upon.")
+    entity_type: AuditEntityTypeEnum = Field(
+        ..., description="Type of entity being acted upon."
+    )
     entity_id: UUID = Field(..., description="UUID of the entity.")
-    details: Dict[str, Any] = Field(..., description="Additional details about the action.")
+    details: Dict[str, Any] = Field(
+        ..., description="Additional details about the action."
+    )
 
     class Config:
         orm_mode = True
@@ -163,11 +193,19 @@ class AuditLogResponseSchema(AuditLogSchema):
 
 
 class AuditLogUpdateSchema(BaseModel):
-    user_id: Optional[UUID] = Field(None, description="UUID of the user performing the action.")
-    action_type: Optional[ActionTypeEnum] = Field(None, description="Type of action performed.")
-    entity_type: Optional[AuditEntityTypeEnum] = Field(None, description="Type of entity being acted upon.")
+    user_id: Optional[UUID] = Field(
+        None, description="UUID of the user performing the action."
+    )
+    action_type: Optional[ActionTypeEnum] = Field(
+        None, description="Type of action performed."
+    )
+    entity_type: Optional[AuditEntityTypeEnum] = Field(
+        None, description="Type of entity being acted upon."
+    )
     entity_id: Optional[UUID] = Field(None, description="UUID of the entity.")
-    details: Optional[Dict[str, Any]] = Field(None, description="Additional details about the action.")
+    details: Optional[Dict[str, Any]] = Field(
+        None, description="Additional details about the action."
+    )
 
     class Config:
         orm_mode = True

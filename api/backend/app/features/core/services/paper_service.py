@@ -32,6 +32,7 @@ from prisma.models import Paper as PrismaPaper, Block as PrismaBlock
 from backend.app.logger import ConstellationLogger
 import asyncio
 
+
 class PaperService:
     def __init__(self):
         self.logger = ConstellationLogger()
@@ -60,21 +61,17 @@ class PaperService:
 
             # If block_id is provided, associate the Block
             if block_id:
-                data["block"] = {
-                    "connect": {"block_id": str(block_id)}
-                }
+                data["block"] = {"connect": {"block_id": str(block_id)}}
 
             # Create the Paper
-            created_paper = await tx.paper.create(
-                data=data
-            )
+            created_paper = await tx.paper.create(data=data)
 
             self.logger.log(
                 "PaperService",
                 "info",
                 "Paper created successfully.",
                 paper_id=created_paper.paper_id,
-                block_id=block_id
+                block_id=block_id,
             )
             return created_paper
         except Exception as e:
@@ -84,7 +81,7 @@ class PaperService:
                 "Failed to create paper.",
                 error=str(e),
                 paper_data=paper_data,
-                block_id=block_id
+                block_id=block_id,
             )
             return None
 
@@ -104,22 +101,18 @@ class PaperService:
         """
         try:
             paper = await tx.paper.find_unique(
-                where={"paper_id": str(paper_id)},
-                include={"block": include_block}
+                where={"paper_id": str(paper_id)}, include={"block": include_block}
             )
             if paper:
                 self.logger.log(
                     "PaperService",
                     "info",
                     "Paper retrieved successfully.",
-                    paper_id=paper_id
+                    paper_id=paper_id,
                 )
             else:
                 self.logger.log(
-                    "PaperService",
-                    "warning",
-                    "Paper not found.",
-                    paper_id=paper_id
+                    "PaperService", "warning", "Paper not found.", paper_id=paper_id
                 )
             return paper
         except Exception as e:
@@ -128,12 +121,16 @@ class PaperService:
                 "error",
                 "Failed to retrieve paper.",
                 error=str(e),
-                paper_id=paper_id
+                paper_id=paper_id,
             )
             return None
 
     async def update_paper(
-        self, tx: Prisma, paper_id: UUID, update_data: Dict[str, Any], block_id: Optional[UUID] = None
+        self,
+        tx: Prisma,
+        paper_id: UUID,
+        update_data: Dict[str, Any],
+        block_id: Optional[UUID] = None,
     ) -> Optional[PrismaPaper]:
         """
         Updates a Paper's details. Optionally updates the associated Block.
@@ -158,27 +155,21 @@ class PaperService:
                 data["abstract"] = update_data["abstract"]
 
             if block_id:
-                data["block"] = {
-                    "connect": {"block_id": str(block_id)}
-                }
+                data["block"] = {"connect": {"block_id": str(block_id)}}
             elif "block" in update_data and update_data["block"] is None:
                 # Disassociate Block if explicitly set to None
-                data["block"] = {
-                    "disconnect": True
-                }
+                data["block"] = {"disconnect": True}
 
             # Update the Paper
             updated_paper = await tx.paper.update(
-                where={"paper_id": str(paper_id)},
-                data=data,
-                include={"block": True}
+                where={"paper_id": str(paper_id)}, data=data, include={"block": True}
             )
             self.logger.log(
                 "PaperService",
                 "info",
                 "Paper updated successfully.",
                 paper_id=paper_id,
-                block_id=block_id
+                block_id=block_id,
             )
             return updated_paper
         except Exception as e:
@@ -189,13 +180,11 @@ class PaperService:
                 error=str(e),
                 paper_id=paper_id,
                 update_data=update_data,
-                block_id=block_id
+                block_id=block_id,
             )
             return None
 
-    async def delete_paper(
-        self, tx: Prisma, paper_id: UUID
-    ) -> bool:
+    async def delete_paper(self, tx: Prisma, paper_id: UUID) -> bool:
         """
         Deletes a Paper by its ID.
 
@@ -207,14 +196,9 @@ class PaperService:
             bool: True if deletion was successful, False otherwise.
         """
         try:
-            await tx.paper.delete(
-                where={"paper_id": str(paper_id)}
-            )
+            await tx.paper.delete(where={"paper_id": str(paper_id)})
             self.logger.log(
-                "PaperService",
-                "info",
-                "Paper deleted successfully.",
-                paper_id=paper_id
+                "PaperService", "info", "Paper deleted successfully.", paper_id=paper_id
             )
             return True
         except Exception as e:
@@ -223,7 +207,7 @@ class PaperService:
                 "error",
                 "Failed to delete paper.",
                 error=str(e),
-                paper_id=paper_id
+                paper_id=paper_id,
             )
             return False
 
@@ -241,21 +225,16 @@ class PaperService:
             Optional[list]: List of Papers or None if failed.
         """
         try:
-            papers = await tx.paper.find_many(
-                include={"block": include_block}
-            )
+            papers = await tx.paper.find_many(include={"block": include_block})
             self.logger.log(
                 "PaperService",
                 "info",
-                f"Retrieved {len(papers)} paper(s) successfully."
+                f"Retrieved {len(papers)} paper(s) successfully.",
             )
             return papers
         except Exception as e:
             self.logger.log(
-                "PaperService",
-                "error",
-                "Failed to retrieve papers.",
-                error=str(e)
+                "PaperService", "error", "Failed to retrieve papers.", error=str(e)
             )
             return None
 
@@ -279,17 +258,15 @@ class PaperService:
                 where={"block_id": str(block_id)}
             )
             if existing_paper:
-                raise ValueError(f"Block {block_id} is already associated with another Paper.")
+                raise ValueError(
+                    f"Block {block_id} is already associated with another Paper."
+                )
 
             # Update the Paper to associate with the Block
             updated_paper = await tx.paper.update(
                 where={"paper_id": str(paper_id)},
-                data={
-                    "block": {
-                        "connect": {"block_id": str(block_id)}
-                    }
-                },
-                include={"block": True}
+                data={"block": {"connect": {"block_id": str(block_id)}}},
+                include={"block": True},
             )
 
             self.logger.log(
@@ -297,7 +274,7 @@ class PaperService:
                 "info",
                 "Associated Paper with Block successfully.",
                 paper_id=paper_id,
-                block_id=block_id
+                block_id=block_id,
             )
             return updated_paper
         except Exception as e:
@@ -307,7 +284,7 @@ class PaperService:
                 "Failed to associate Paper with Block.",
                 error=str(e),
                 paper_id=paper_id,
-                block_id=block_id
+                block_id=block_id,
             )
             return None
 
@@ -328,19 +305,15 @@ class PaperService:
             # Update the Paper to disassociate the Block
             updated_paper = await tx.paper.update(
                 where={"paper_id": str(paper_id)},
-                data={
-                    "block": {
-                        "disconnect": True
-                    }
-                },
-                include={"block": True}
+                data={"block": {"disconnect": True}},
+                include={"block": True},
             )
 
             self.logger.log(
                 "PaperService",
                 "info",
                 "Disassociated Paper from Block successfully.",
-                paper_id=paper_id
+                paper_id=paper_id,
             )
             return updated_paper
         except Exception as e:
@@ -349,11 +322,13 @@ class PaperService:
                 "error",
                 "Failed to disassociate Paper from Block.",
                 error=str(e),
-                paper_id=paper_id
+                paper_id=paper_id,
             )
             return None
 
+
 # --------------------- Main Function for Testing ---------------------
+
 
 async def main():
     """
@@ -384,7 +359,7 @@ async def main():
             data={
                 "name": "Test Block",
                 "block_type": "model",
-                "description": "This is a test block."
+                "description": "This is a test block.",
             }
         )
         print("Block Created Successfully:")
@@ -405,10 +380,12 @@ async def main():
     mock_paper_data = {
         "pdf_url": "https://example.com/papers/test-paper.pdf",
         "title": "Test Paper Title",
-        "abstract": "This is an abstract for the test paper."
+        "abstract": "This is an abstract for the test paper.",
     }
     print(f"Mock Paper Data for Creation: {mock_paper_data}\n")
-    created_paper = await paper_service.create_paper(prisma, mock_paper_data, block_id=block_id)
+    created_paper = await paper_service.create_paper(
+        prisma, mock_paper_data, block_id=block_id
+    )
     if created_paper:
         print("Paper Created Successfully:")
         print(f"  ID: {created_paper.paper_id}")
@@ -428,7 +405,9 @@ async def main():
 
     # --------------------- Retrieve Paper ---------------------
     print(">>> Retrieving Paper...")
-    retrieved_paper = await paper_service.get_paper(prisma, paper_id, include_block=True)
+    retrieved_paper = await paper_service.get_paper(
+        prisma, paper_id, include_block=True
+    )
     if retrieved_paper:
         print("Paper Retrieved Successfully:")
         print(f"  ID: {retrieved_paper.paper_id}")
@@ -452,7 +431,7 @@ async def main():
     update_data = {
         "pdf_url": "https://example.com/papers/updated-test-paper.pdf",
         "title": "Updated Test Paper Title",
-        "abstract": "This is an updated abstract for the test paper."
+        "abstract": "This is an updated abstract for the test paper.",
     }
     print(f"Update Data: {update_data}\n")
     updated_paper = await paper_service.update_paper(prisma, paper_id, update_data)
@@ -475,7 +454,7 @@ async def main():
             data={
                 "name": "Another Test Block",
                 "block_type": "dataset",
-                "description": "This is another test block."
+                "description": "This is another test block.",
             }
         )
         another_block_id = UUID(another_block.block_id)
@@ -488,7 +467,9 @@ async def main():
         return
 
     # Associate the new block with the paper
-    associated_paper = await paper_service.associate_block_with_paper(prisma, paper_id, another_block_id)
+    associated_paper = await paper_service.associate_block_with_paper(
+        prisma, paper_id, another_block_id
+    )
     if associated_paper:
         print("Block Associated with Paper Successfully:")
         print(f"  Paper ID: {associated_paper.paper_id}")
@@ -498,7 +479,9 @@ async def main():
 
     # --------------------- Disassociate Block from Paper ---------------------
     print(">>> Disassociating Block from Paper...")
-    disassociated_paper = await paper_service.disassociate_block_from_paper(prisma, paper_id)
+    disassociated_paper = await paper_service.disassociate_block_from_paper(
+        prisma, paper_id
+    )
     if disassociated_paper:
         print("Block Disassociated from Paper Successfully:")
         print(f"  Paper ID: {disassociated_paper.paper_id}")
@@ -516,7 +499,9 @@ async def main():
 
     # --------------------- Confirm Deletion ---------------------
     print(">>> Confirming Deletion by Retrieving Paper Again...")
-    post_deletion_paper = await paper_service.get_paper(prisma, paper_id, include_block=True)
+    post_deletion_paper = await paper_service.get_paper(
+        prisma, paper_id, include_block=True
+    )
     if post_deletion_paper:
         print("Paper still exists after deletion attempt.")
     else:
@@ -547,12 +532,8 @@ async def main():
     # --------------------- Cleanup: Delete Blocks ---------------------
     print("\n>>> Cleaning Up: Deleting Created Blocks...")
     try:
-        await prisma.block.delete(
-            where={"block_id": str(block_id)}
-        )
-        await prisma.block.delete(
-            where={"block_id": str(another_block_id)}
-        )
+        await prisma.block.delete(where={"block_id": str(block_id)})
+        await prisma.block.delete(where={"block_id": str(another_block_id)})
         print("Blocks deleted successfully.\n")
     except Exception as e:
         print(f"Failed to delete blocks: {e}\n")
@@ -561,6 +542,7 @@ async def main():
     await prisma.disconnect()
     print("Disconnected from the database.")
     print("===== PaperService Test Completed =====")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

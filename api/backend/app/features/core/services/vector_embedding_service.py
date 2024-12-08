@@ -25,7 +25,9 @@ from haystack.components.embedders import OpenAITextEmbedder, OpenAIDocumentEmbe
 from haystack import Document
 from haystack.utils import Secret
 import os
-from backend.app.logger import ConstellationLogger  # Assuming the logger is similar to BlockService
+from backend.app.logger import (
+    ConstellationLogger,
+)  # Assuming the logger is similar to BlockService
 import PyPDF2
 
 
@@ -40,10 +42,14 @@ class VectorEmbeddingService:
         self.logger = ConstellationLogger()
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key:
-            raise ValueError("API key must be provided or set in the OPENAI_API_KEY environment variable.")
+            raise ValueError(
+                "API key must be provided or set in the OPENAI_API_KEY environment variable."
+            )
 
         self.text_embedder = OpenAITextEmbedder(api_key=Secret.from_token(self.api_key))
-        self.document_embedder = OpenAIDocumentEmbedder(api_key=Secret.from_token(self.api_key))
+        self.document_embedder = OpenAIDocumentEmbedder(
+            api_key=Secret.from_token(self.api_key)
+        )
 
     async def generate_text_embedding(self, text: str) -> Optional[List[float]]:
         """
@@ -58,13 +64,25 @@ class VectorEmbeddingService:
         try:
             result = self.text_embedder.run(text)
             embedding = result["embedding"]
-            self.logger.log("VectorEmbeddingService", "info", f"Text embedding generated successfully.", text=text)
+            self.logger.log(
+                "VectorEmbeddingService",
+                "info",
+                f"Text embedding generated successfully.",
+                text=text,
+            )
             return embedding
         except Exception as e:
-            self.logger.log("VectorEmbeddingService", "error", "Failed to generate text embedding", error=str(e))
+            self.logger.log(
+                "VectorEmbeddingService",
+                "error",
+                "Failed to generate text embedding",
+                error=str(e),
+            )
             return None
 
-    async def generate_document_embedding(self, pdf_file_path: str) -> Optional[List[float]]:
+    async def generate_document_embedding(
+        self, pdf_file_path: str
+    ) -> Optional[List[float]]:
         """
         Generates a vector embedding for the content of a PDF document.
 
@@ -79,10 +97,20 @@ class VectorEmbeddingService:
             document = Document(content=content, meta={"name": pdf_file_path})
             result = self.document_embedder.run([document])
             embedding = result["documents"][0].embedding
-            self.logger.log("VectorEmbeddingService", "info", "Document embedding generated successfully.", document_name=pdf_file_path)
+            self.logger.log(
+                "VectorEmbeddingService",
+                "info",
+                "Document embedding generated successfully.",
+                document_name=pdf_file_path,
+            )
             return embedding
         except Exception as e:
-            self.logger.log("VectorEmbeddingService", "error", "Failed to generate document embedding", error=str(e))
+            self.logger.log(
+                "VectorEmbeddingService",
+                "error",
+                "Failed to generate document embedding",
+                error=str(e),
+            )
             return None
 
     def _pdf_to_text(self, pdf_path: str) -> str:
@@ -95,12 +123,13 @@ class VectorEmbeddingService:
         Returns:
             str: Extracted text from the PDF.
         """
-        with open(pdf_path, 'rb') as file:
+        with open(pdf_path, "rb") as file:
             reader = PyPDF2.PdfReader(file)
             text = ""
             for page in reader.pages:
                 text += page.extract_text()
         return text
+
 
 async def main():
     """
@@ -119,17 +148,24 @@ async def main():
     text_to_embed = "The Earth is the only known planet that supports life."
     try:
         text_embedding = await embedding_service.generate_text_embedding(text_to_embed)
-        print(f"Generated text embedding: {text_embedding[:5]}... (truncated)")  # Showing only first 5 values for brevity
+        print(
+            f"Generated text embedding: {text_embedding[:5]}... (truncated)"
+        )  # Showing only first 5 values for brevity
     except Exception as e:
         print(f"Failed to generate text embedding: {e}")
 
     # Generate document embedding
     pdf_path = "/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api/backend/app/features/agent/scraped_papers/70 years of machine learning in geoscience in review.pdf"  # Assuming a sample PDF exists at this location
     try:
-        document_embedding = await embedding_service.generate_document_embedding(pdf_path)
-        print(f"Generated document embedding: {document_embedding[:5]}... (truncated)")  # Showing only first 5 values for brevity
+        document_embedding = await embedding_service.generate_document_embedding(
+            pdf_path
+        )
+        print(
+            f"Generated document embedding: {document_embedding[:5]}... (truncated)"
+        )  # Showing only first 5 values for brevity
     except Exception as e:
         print(f"Failed to generate document embedding: {e}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())
