@@ -37,6 +37,8 @@ class PipelineService:
             created_at = datetime.now(timezone.utc)
             updated_at = created_at
 
+            config = pipeline_data.get("config", {})
+
             pipeline = await tx.pipeline.create(
                 data={
                     "pipeline_id": pipeline_id,
@@ -45,6 +47,7 @@ class PipelineService:
                     "user_id": str(pipeline_data["user_id"]),
                     "created_at": created_at,
                     "updated_at": updated_at,
+                    "config": config,
                 }
             )
 
@@ -59,6 +62,7 @@ class PipelineService:
 
             return pipeline
         except UniqueViolationError as e:
+            print(f"error: {e}")
             self.logger.log(
                 "PipelineService",
                 "error",
@@ -67,6 +71,7 @@ class PipelineService:
             )
             return None
         except Exception as e:
+            print(f"error: {e}")
             self.logger.log(
                 "PipelineService", "error", "Error creating pipeline.", error=str(e)
             )
