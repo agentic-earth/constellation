@@ -1,5 +1,3 @@
-# app/features/agent/dev_crew.py
-
 """
 Dev Crew Module
 
@@ -17,7 +15,6 @@ Design Philosophy:
 
 import sys
 import os
-
 
 # Add the parent directory of 'backend' to the Python path
 # Before running, be sure to run the following command: `cd api` to get to the api directory
@@ -52,17 +49,26 @@ def create_dev_crew(github_repo_url: str):
 
 
 if __name__ == "__main__":
-    os.environ["OPENAI_API_KEY"] = (
-        "OPENAI_API_KEY"
-    )
+    # Load API keys and environment variables from system environment
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_KEY")
+    supabase_service_key = os.getenv("SUPABASE_SERVICE_KEY")
 
-    SUPABASE_URL = ""
-    SUPABASE_KEY = "SUPABASE_KEY"
-    SUPABASE_SERVICE_KEY = "SUPABASE_SERVICE_KEY"
-    os.environ["SUPABASE_URL"] = SUPABASE_URL
-    os.environ["SUPABASE_KEY"] = SUPABASE_KEY
-    os.environ["SUPABASE_SERVICE_KEY"] = SUPABASE_SERVICE_KEY
+    # Validate that all required environment variables are set
+    if not all([openai_api_key, supabase_url, supabase_key, supabase_service_key]):
+        raise EnvironmentError(
+            "Required environment variables are not set. Please ensure OPENAI_API_KEY, "
+            "SUPABASE_URL, SUPABASE_KEY, and SUPABASE_SERVICE_KEY are defined."
+        )
 
+    # Set the environment variables for runtime
+    os.environ["OPENAI_API_KEY"] = openai_api_key
+    os.environ["SUPABASE_URL"] = supabase_url
+    os.environ["SUPABASE_KEY"] = supabase_key
+    os.environ["SUPABASE_SERVICE_KEY"] = supabase_service_key
+
+    # Create and run the dev crew
     crew = create_dev_crew("https://github.com/MaartenGr/BERTopic")
     result = crew.kickoff()
     print(result)
