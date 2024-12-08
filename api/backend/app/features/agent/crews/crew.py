@@ -125,7 +125,6 @@ class LLMCrew:
             Output only the final JSON without additional explanation or formatting.
             """
         )
-        print(f"description: {description}")
         return Task(
             description=description,
             agent=agent,

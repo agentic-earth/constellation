@@ -26,33 +26,28 @@ def import_from_google_drive(
     # Import the data from Google Drive using gdown
     context.log.info("Starting import_from_google_drive...")
     download_url = f"https://drive.google.com/uc?id={file_id}"
-    try:
-        # Download the file using gdown
-        output = "download.zip"
-        gdown.download(download_url, output, quiet=False)
-        context.log.info("Downloaded file successfully using gdown.")
+    # Download the file using gdown
+    output = "download.zip"
+    gdown.download(download_url, output, quiet=False)
+    context.log.info("Downloaded file successfully using gdown.")
 
-        # Unzip the file
-        with zipfile.ZipFile(output, "r") as zip_ref:
-            zip_ref.extractall("data")
+    # Unzip the file
+    with zipfile.ZipFile(output, "r") as zip_ref:
+        zip_ref.extractall("data")
 
-        # Save files to a dictionary structure
-        data_dict = {}
-        for root, dirs, files in os.walk("data"):
-            for file in files:
-                file_path = os.path.join(root, file)
-                relative_path = os.path.relpath(file_path, "data")
+    # Save files to a dictionary structure
+    data_dict = {}
+    for root, dirs, files in os.walk("data"):
+        for file in files:
+            file_path = os.path.join(root, file)
+            relative_path = os.path.relpath(file_path, "data")
 
-                # Read the file in binary mode and store it in the dictionary
-                with open(file_path, "rb") as f:
-                    data_dict[relative_path] = f.read()
+            # Read the file in binary mode and store it in the dictionary
+            with open(file_path, "rb") as f:
+                data_dict[relative_path] = f.read()
 
-        context.log.info(f"Loaded {len(data_dict.values())} files into dictionary.")
-        return data_dict
-
-    except Exception as e:
-        context.log.error(f"An error occurred: {e}")
-        return {}
+    context.log.info(f"Loaded {len(data_dict.values())} files into dictionary.")
+    return data_dict
 
 
 @op(
@@ -215,8 +210,11 @@ def publish_failure(context: HookContext):
     publish_status(context.run_id, "failed", error_message)
 
 
-@op(name="publish_success", ins={"run_id": In(str), "message": In(str)})
-def publish_success(context: OpExecutionContext, run_id: str, message: str):
+@op(name="publish_success")
+def publish_success(context: OpExecutionContext):
+    run_id = context.run_id
+    message = "Run has been completed successfully"
+    context.log.info(f"Publishing success for run {run_id} with message: {message}")
     publish_status(run_id, "success", message)
 
 
