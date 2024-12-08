@@ -1,0 +1,79 @@
+.logoContainer {
+  position: relative;
+  padding: 20px 40px;
+  overflow: hidden;
+}
+
+.logoContainer::before,
+.logoContainer::after {
+  content: "";
+  position: absolute;
+  top: -100%;
+  bottom: -100%;
+  width: 200%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(var(--primary-rgb), 0.15) 0%,
+    rgba(var(--primary-rgb), 0.05) 40%,
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 1s ease, transform 1s ease;
+  pointer-events: none;
+}
+
+.logoContainer::before {
+  left: -100%;
+  transform: translate(-50%, -50%) scale(0);
+}
+
+.logoContainer::after {
+  right: -100%;
+  transform: translate(50%, -50%) scale(0);
+}
+
+.hoverEffect::before {
+  animation: pulsateLeft 8s ease-in-out infinite;
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.hoverEffect::after {
+  animation: pulsateRight 8s ease-in-out infinite;
+  opacity: 1;
+  transform: translate(50%, -50%) scale(1);
+}
+
+@keyframes pulsateLeft {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes pulsateRight {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translate(50%, -50%) scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(50%, -50%) scale(1);
+  }
+}
+
+.logoContainer img {
+  position: relative;
+  z-index: 2;
+  transition: transform 0.3s ease;
+}
+
+.hoverEffect img {
+  transform: scale(1.05);
+}
