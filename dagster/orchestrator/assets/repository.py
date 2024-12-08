@@ -117,22 +117,16 @@ def define_composite_job(name: str, raw_input: dict) -> Tuple[JobDefinition, Dic
         node_defs=filtered_op_defs,
         dependencies=deps,
     )
-    
-        # Attach the s3_resource so export_to_s3 can use it
 
-<<<<<<< Updated upstream
-    job_def = graph.to_job(
-        resource_defs={"s3_resource": s3_resource},
-        executor_def=in_process_executor
-=======
+    # Attach the s3_resource so export_to_s3 can use it
+
     return (
         graph.to_job(
             hooks=frozenset([publish_failure]),
+            resource_defs={"s3_resource": s3_resource},
         ),
         run_config,
->>>>>>> Stashed changes
     )
-    return job_def, run_config
 
 
 @op(config_schema={"raw_input": Field(Any)}, out=DynamicOut())
@@ -142,24 +136,38 @@ def generate_dynamic_job_configs(context: OpExecutionContext):
 
 
 @op
-def parse_and_execute_job(context: OpExecutionContext, instructions: list) -> List[TypingAny]:
+def parse_and_execute_job(
+    context: OpExecutionContext, instructions: list
+) -> List[TypingAny]:
     job_list = []
     run_configs = []
     for instruction in instructions:
         job, run_config = define_composite_job(
             name="dynamic_job", raw_input=instruction
-
         )
         context.log.info(f"Created dynamic job: {job.name}")
         job_list.append(job)
         run_configs.append(run_config)
 
-    
+    # Add final op to publish success
+    job_list.append(
+        (
+            GraphDefinition(
+                name="publish_success", node_defs=[publish_success]
+            ).to_job(),
+            None,
+        )
+    )
 
     all_results = []
     for job, run_config in zip(job_list, run_configs):
         context.log.info(f"Executing dynamic job with run_config: {run_config}")
-        result = job.execute_in_process(run_config=run_config)
+
+        if run_config:
+            result = job.execute_in_process(run_config=run_config)
+        else:
+            result = job.execute_in_process()
+
         for event in result.all_events:
             context.log.info(f"Event: {event.message}")
         try:
@@ -189,7 +197,7 @@ def parse_and_execute_job(context: OpExecutionContext, instructions: list) -> Li
                 }
             }
         }
-    }
+    },
 )
 def build_execute_job():
     dynamic_configs = generate_dynamic_job_configs()
@@ -208,7 +216,7 @@ def build_execute_job():
                 }
             }
         }
-    }
+    },
 )
 def test_import_from_google_drive_job():
     import_from_google_drive()

@@ -34,6 +34,7 @@ from prisma import Prisma
 from backend.app.logger import ConstellationLogger
 from prisma.models import AuditLog as PrismaAuditLog
 import traceback
+import json
 
 
 class BlockController:
@@ -419,7 +420,7 @@ class BlockController:
         try:
             async with self.prisma.tx() as tx:
                 blocks = await self.block_service.get_all_blocks(tx)
-                return [block.dict() for block in blocks]
+                return [block.model_dump() for block in blocks]
         except Exception as e:
             self.logger.log(
                 "BlockController",
@@ -428,6 +429,7 @@ class BlockController:
                 error=str(e),
                 extra=traceback.format_exc(),
             )
+            print(f"error: {e}")
             return None
 
     async def construct_pipeline(
