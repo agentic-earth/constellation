@@ -67,9 +67,11 @@ The Constellation API is a FastAPI-based application designed to manage pipeline
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from backend.app.features.core.routes import blocks, edges, pipelines
 from backend.app.database import connect_db, disconnect_db, prisma_client
 from backend.app.logger import ConstellationLogger
+
 # from backend.app.utils.helpers import SupabaseClientManager
 
 logger = ConstellationLogger()
@@ -80,13 +82,25 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Adjust this to your needs
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 @app.on_event("startup")
 async def on_startup():
     await connect_db()
 
+
 @app.on_event("shutdown")
 async def on_shutdown():
     await disconnect_db()
+
 
 # Include all the API routers
 app.include_router(blocks.router, prefix="/blocks", tags=["Blocks"])
@@ -94,9 +108,11 @@ app.include_router(edges.router, prefix="/edges", tags=["Edges"])
 app.include_router(pipelines.router, prefix="/pipelines", tags=["Pipelines"])
 # app.include_router(users.router, prefix="/users", tags=["Users"])
 
+
 @app.get("/", tags=["Root"])
 async def root():
     return {"message": "Welcome to the Constellation API!"}
+
 
 @app.get("/health", tags=["Health Check"])
 async def health_check():
@@ -106,12 +122,11 @@ async def health_check():
         if result:
             return {"status": "healthy"}
         else:
-            raise HTTPException(
-                status_code=503, detail="Database query failed."
-            )
+            raise HTTPException(status_code=503, detail="Database query failed.")
     except Exception as e:
         logger.log("main", "critical", f"Health check failed: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error.")
+
 
 def main():
     """

@@ -32,7 +32,9 @@ class EdgeController:
         self.edge_service = EdgeService()
         self.audit_service = AuditService()
 
-    async def create_edge(self, edge_data: Dict[str, Any], user_id: UUID) -> Optional[Dict[str, Any]]:
+    async def create_edge(
+        self, edge_data: Dict[str, Any], user_id: UUID
+    ) -> Optional[Dict[str, Any]]:
         """
         Create a new edge.
 
@@ -56,24 +58,31 @@ class EdgeController:
                     "action_type": "CREATE",
                     "entity_type": "edge",
                     "entity_id": str(edge.edge_id),
-                    "details": {"edge_data": edge_data}
+                    "details": {"edge_data": edge_data},
                 }
                 audit_log = await self.audit_service.create_audit_log(tx, audit_data)
                 if not audit_log:
                     raise Exception("Failed to create audit log")
-                
-                self.logger.log("EdgeController", "info", "Edge created successfully.", edge_id=str(edge.edge_id))
+
+                self.logger.log(
+                    "EdgeController",
+                    "info",
+                    "Edge created successfully.",
+                    edge_id=str(edge.edge_id),
+                )
                 return edge.dict()
         except Exception as e:
             self.logger.log(
                 "EdgeController",
                 "error",
                 f"Exception in create_edge: {str(e)}",
-                extra={"traceback": traceback.format_exc()}
+                extra={"traceback": traceback.format_exc()},
             )
             return None
 
-    async def get_edge_by_id(self, edge_id: UUID, user_id: UUID) -> Optional[Dict[str, Any]]:
+    async def get_edge_by_id(
+        self, edge_id: UUID, user_id: UUID
+    ) -> Optional[Dict[str, Any]]:
         """
         Retrieve an edge by its ID.
 
@@ -93,23 +102,35 @@ class EdgeController:
                         "action_type": "READ",
                         "entity_type": "edge",
                         "entity_id": str(edge.edge_id),
-                        "details": {"read_action": True}
+                        "details": {"read_action": True},
                     }
-                    audit_log = await self.audit_service.create_audit_log(tx, audit_data)
+                    audit_log = await self.audit_service.create_audit_log(
+                        tx, audit_data
+                    )
                     if not audit_log:
                         raise Exception("Failed to create audit log")
-                    
-                    self.logger.log("EdgeController", "info", "Edge retrieved successfully.", edge_id=str(edge.edge_id))
+
+                    self.logger.log(
+                        "EdgeController",
+                        "info",
+                        "Edge retrieved successfully.",
+                        edge_id=str(edge.edge_id),
+                    )
                     return edge.dict()
                 else:
-                    self.logger.log("EdgeController", "info", "Edge not found.", edge_id=str(edge_id))
+                    self.logger.log(
+                        "EdgeController",
+                        "info",
+                        "Edge not found.",
+                        edge_id=str(edge_id),
+                    )
                     return None
         except Exception as e:
             self.logger.log(
                 "EdgeController",
                 "error",
                 f"Exception in get_edge: {str(e)}",
-                extra={"traceback": traceback.format_exc()}
+                extra={"traceback": traceback.format_exc()},
             )
             return None
 
@@ -118,7 +139,7 @@ class EdgeController:
         user_id: UUID,
         filters: Optional[Dict[str, Any]] = None,
         limit: int = 100,
-        offset: int = 0
+        offset: int = 0,
     ) -> List[Dict[str, Any]]:
         """
         List edges with optional filtering, pagination.
@@ -137,31 +158,52 @@ class EdgeController:
                 if edges:
                     # Audit Logging
                     audit_data = {
-                        "user_id": str(user_id),  # Assuming system access; adjust as needed
+                        "user_id": str(
+                            user_id
+                        ),  # Assuming system access; adjust as needed
                         "action_type": "READ",
                         "entity_type": "edge",
-                        "entity_id": str(edges[0].edge_id), # TODO: temporarily use first edge id
-                        "details": {"filters": filters, "limit": limit, "offset": offset}
+                        "entity_id": str(
+                            edges[0].edge_id
+                        ),  # TODO: temporarily use first edge id
+                        "details": {
+                            "filters": filters,
+                            "limit": limit,
+                            "offset": offset,
+                        },
                     }
-                    audit_log = await self.audit_service.create_audit_log(tx, audit_data)
+                    audit_log = await self.audit_service.create_audit_log(
+                        tx, audit_data
+                    )
                     if not audit_log:
                         raise Exception("Failed to create audit log")
 
-                    self.logger.log("EdgeController", "info", f"Listed {len(edges)} edges.")
+                    self.logger.log(
+                        "EdgeController", "info", f"Listed {len(edges)} edges."
+                    )
                     return [edge.dict() for edge in edges]
                 else:
-                    self.logger.log("EdgeController", "info", "No edges found.", filters=filters, limit=limit, offset=offset)
+                    self.logger.log(
+                        "EdgeController",
+                        "info",
+                        "No edges found.",
+                        filters=filters,
+                        limit=limit,
+                        offset=offset,
+                    )
                     return []
         except Exception as e:
             self.logger.log(
                 "EdgeController",
                 "error",
                 f"Exception in list_edges: {str(e)}",
-                extra={"traceback": traceback.format_exc()}
+                extra={"traceback": traceback.format_exc()},
             )
             return []
 
-    async def update_edge(self, edge_id: UUID, update_data: Dict[str, Any], user_id: UUID) -> Optional[Dict[str, Any]]:
+    async def update_edge(
+        self, edge_id: UUID, update_data: Dict[str, Any], user_id: UUID
+    ) -> Optional[Dict[str, Any]]:
         """
         Update an existing edge.
 
@@ -178,23 +220,30 @@ class EdgeController:
         """
         try:
             async with self.prisma.tx() as tx:
-                edge = await self.edge_service.update_edge(tx, edge_id, update_data.copy())
+                edge = await self.edge_service.update_edge(
+                    tx, edge_id, update_data.copy()
+                )
                 if not edge:
                     raise ValueError("Failed to update edge.")
-                
+
                 # Audit Logging
                 audit_data = {
                     "user_id": str(user_id),
                     "action_type": "UPDATE",
                     "entity_type": "edge",
                     "entity_id": str(edge.edge_id),
-                    "details": {"update_data": update_data}
+                    "details": {"update_data": update_data},
                 }
                 audit_log = await self.audit_service.create_audit_log(tx, audit_data)
                 if not audit_log:
                     raise Exception("Failed to create audit log")
-                
-                self.logger.log("EdgeController", "info", "Edge updated successfully.", edge_id=str(edge.edge_id))
+
+                self.logger.log(
+                    "EdgeController",
+                    "info",
+                    "Edge updated successfully.",
+                    edge_id=str(edge.edge_id),
+                )
                 return edge.dict()
 
         except Exception as e:
@@ -202,7 +251,7 @@ class EdgeController:
                 "EdgeController",
                 "error",
                 f"Exception in update_edge: {str(e)}",
-                extra={"traceback": traceback.format_exc()}
+                extra={"traceback": traceback.format_exc()},
             )
             return None
 
@@ -222,20 +271,25 @@ class EdgeController:
                 success = await self.edge_service.delete_edge(tx, edge_id)
                 if not success:
                     raise ValueError("Failed to delete edge.")
-                
+
                 # Audit Logging
                 audit_data = {
                     "user_id": str(user_id),
                     "action_type": "DELETE",
                     "entity_type": "edge",
                     "entity_id": str(edge_id),
-                    "details": {"deletion_action": True}
+                    "details": {"deletion_action": True},
                 }
                 audit_log = await self.audit_service.create_audit_log(tx, audit_data)
                 if not audit_log:
                     raise Exception("Failed to create audit log")
-                
-                self.logger.log("EdgeController", "info", "Edge deleted successfully.", edge_id=str(edge_id))
+
+                self.logger.log(
+                    "EdgeController",
+                    "info",
+                    "Edge deleted successfully.",
+                    edge_id=str(edge_id),
+                )
                 return True
 
         except Exception as e:
@@ -243,7 +297,7 @@ class EdgeController:
                 "EdgeController",
                 "error",
                 f"Exception in delete_edge: {str(e)}",
-                extra={"traceback": traceback.format_exc()}
+                extra={"traceback": traceback.format_exc()},
             )
             return False
 
@@ -262,17 +316,17 @@ class EdgeController:
             block_data1 = {
                 "name": "Test Block1",
                 "block_type": "model",
-                "description": "This is a test block1."
+                "description": "This is a test block1.",
             }
             block_data2 = {
                 "name": "Test Block2",
                 "block_type": "model",
-                "description": "This is a test block2."
+                "description": "This is a test block2.",
             }
             block_data3 = {
                 "name": "Test Block3",
                 "block_type": "model",
-                "description": "This is a test block3."
+                "description": "This is a test block3.",
             }
             created_block1 = await block_controller.create_block(block_data1, user_id)
             created_block2 = await block_controller.create_block(block_data2, user_id)
@@ -292,16 +346,22 @@ class EdgeController:
             }
             created_edge = await self.create_edge(edge_create, user_id)
             if created_edge:
-                print(f"Created Edge: {created_edge["edge_id"]} - {created_edge["source_block_id"]} -> {created_edge["target_block_id"]}")
+                print(
+                    f"Created Edge: {created_edge["edge_id"]} - {created_edge["source_block_id"]} -> {created_edge["target_block_id"]}"
+                )
             else:
                 print("Failed to create Edge.")
 
             # Step 2: Retrieve the edge by ID
             if created_edge:
                 print(f"\nRetrieving Edge with ID: {created_edge["edge_id"]}")
-                retrieved_edge = await self.get_edge_by_id(created_edge["edge_id"], user_id)
+                retrieved_edge = await self.get_edge_by_id(
+                    created_edge["edge_id"], user_id
+                )
                 if retrieved_edge:
-                    print(f"Retrieved Edge: {retrieved_edge["edge_id"]} - {retrieved_edge["source_block_id"]} -> {retrieved_edge["target_block_id"]}")
+                    print(
+                        f"Retrieved Edge: {retrieved_edge["edge_id"]} - {retrieved_edge["source_block_id"]} -> {retrieved_edge["target_block_id"]}"
+                    )
                 else:
                     print("Failed to retrieve Edge.")
             else:
@@ -312,7 +372,9 @@ class EdgeController:
             edges = await self.list_edges(user_id)
             print(f"Total Edges: {len(edges)}")
             for edge in edges:
-                print(f"- ID: {edge["edge_id"]} - {edge["source_block_id"]} -> {edge["target_block_id"]}")
+                print(
+                    f"- ID: {edge["edge_id"]} - {edge["source_block_id"]} -> {edge["target_block_id"]}"
+                )
 
             # Step 4: Update the edge's description
             if created_edge:
@@ -321,9 +383,13 @@ class EdgeController:
                     "source_block_id": created_block3["block_id"],
                     "target_block_id": created_block1["block_id"],
                 }
-                updated_edge = await self.update_edge(created_edge["edge_id"], edge_update, user_id)
+                updated_edge = await self.update_edge(
+                    created_edge["edge_id"], edge_update, user_id
+                )
                 if updated_edge:
-                    print(f"Updated Edge: {updated_edge["edge_id"]} - {updated_edge["source_block_id"]} -> {updated_edge["target_block_id"]}")
+                    print(
+                        f"Updated Edge: {updated_edge["edge_id"]} - {updated_edge["source_block_id"]} -> {updated_edge["target_block_id"]}"
+                    )
                 else:
                     print("Failed to update Edge.")
             else:
@@ -332,7 +398,9 @@ class EdgeController:
             # Step 5: Delete the edge
             if created_edge:
                 print(f"\nDeleting Edge with ID: {created_edge["edge_id"]}")
-                deletion_success = await self.delete_edge(created_edge["edge_id"], user_id)
+                deletion_success = await self.delete_edge(
+                    created_edge["edge_id"], user_id
+                )
                 print(f"Edge deleted: {deletion_success}")
             else:
                 print("Skipping deletion since Edge creation failed.")
@@ -342,17 +410,29 @@ class EdgeController:
             edges_after_deletion = await self.list_edges(user_id)
             print(f"Total Edges: {len(edges_after_deletion)}")
             for edge in edges_after_deletion:
-                print(f"- ID: {edge["edge_id"]} - {edge["source_block_id"]} -> {edge["target_block_id"]}")
+                print(
+                    f"- ID: {edge["edge_id"]} - {edge["source_block_id"]} -> {edge["target_block_id"]}"
+                )
 
             # Step 7: Delete the blocks
             print("\nDeleting the blocks...")
-            deletion_success1 = await block_controller.delete_block(created_block1["block_id"], user_id)
-            deletion_success2 = await block_controller.delete_block(created_block2["block_id"], user_id)
-            deletion_success3 = await block_controller.delete_block(created_block3["block_id"], user_id)
-            print(f"Blocks deleted: {deletion_success1}, {deletion_success2}, {deletion_success3}")
+            deletion_success1 = await block_controller.delete_block(
+                created_block1["block_id"], user_id
+            )
+            deletion_success2 = await block_controller.delete_block(
+                created_block2["block_id"], user_id
+            )
+            deletion_success3 = await block_controller.delete_block(
+                created_block3["block_id"], user_id
+            )
+            print(
+                f"Blocks deleted: {deletion_success1}, {deletion_success2}, {deletion_success3}"
+            )
 
         except Exception as e:
-            self.logger.log("EdgeController", "error", "An error occurred in main.", error=str(e))
+            self.logger.log(
+                "EdgeController", "error", "An error occurred in main.", error=str(e)
+            )
             print(f"An error occurred: {e}")
         finally:
             print("\nDisconnecting from the database...")
@@ -363,6 +443,7 @@ class EdgeController:
 # -------------------
 # Testing Utility
 # -------------------
+
 
 async def run_edge_controller_tests():
     """
@@ -379,4 +460,5 @@ async def run_edge_controller_tests():
 
 if __name__ == "__main__":
     from backend.app.features.core.controllers.block_controller import BlockController
+
     asyncio.run(run_edge_controller_tests())

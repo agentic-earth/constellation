@@ -1,12 +1,14 @@
 from backend.app.features.agent.tools.vector_embed_tool import VectorEmbedTool
 from backend.app.features.agent.tools.similarity_search_tool import SimilaritySearchTool
+
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 from langchain_openai import ChatOpenAI
 
 @CrewBase
 class ResearchCrew:
-    '''Research Crew'''
+    """Research Crew"""
+
     agents_config = "agents_config.yaml"
     tasks_config = "tasks_config.yaml"
     llm = ChatOpenAI(model="gpt-4o")
@@ -25,18 +27,19 @@ class ResearchCrew:
             backstory="You are a researcher that help users look for papers realted to their query.",
             verbose=False,
         )
-    
-    @agent
-    def research_task(query: str, agent: Agent) -> Task:
+
+    @task
+    def research_task(self) -> Task:
         return Task(
-            # config=self.tasks_config["find_similar_paper"],
-            description=f"Find the most similar paper to user's query: '{query}', provide a summary of the paper, and also you should find the link to the GitHub repository of the paper. if the paper is not found, provide a message to the user that no papers have been found.",
-            # prompt_context='You are a researcher looking for similar papers to a given query.',
-            # description="Process the user query through vector embedding and similarity search, then analyze the results",
-            prompt_context='Process user query and analyze the results',
-            agent=agent,
-            # process=Process.sequential,
-            expected_output="JSON string of similar papers",
-            verbose=True,
-            # human_input=True,
+            config=self.tasks_config["find_similar_papers_task"],
+            agent=self.research_agent,
+            process=Process.sequential,
+        )
+
+    @crew
+    def research_crew(self) -> Crew:
+        return Crew(
+            agents=[self.research_agent],
+            tasks=[self.research_task],
+            verbose=2,
         )

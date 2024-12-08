@@ -21,6 +21,7 @@ Design Philosophy:
 - Ensure robustness through comprehensive error handling and logging.
 """
 
+import json
 import traceback
 from typing import List, Optional, Dict, Any
 from uuid import UUID
@@ -36,6 +37,7 @@ from backend.app.logger import ConstellationLogger
 from prisma import Prisma
 import asyncio
 from collections import defaultdict
+import requests
 
 
 class PipelineController:
@@ -61,13 +63,15 @@ class PipelineController:
     # Pipeline CRUD Operations
     # -------------------
 
-    async def create_pipeline(self, pipeline_data: Dict[str, Any], user_id: UUID) -> Optional[Dict[str, Any]]:
+    async def create_pipeline(
+        self, pipeline_data: Dict[str, Any], user_id: UUID
+    ) -> Optional[Dict[str, Any]]:
         """
         Creates a new pipeline.
 
         Args:
             pipeline_data (Dict[str, Any]): The data required to create a new pipeline.
-                Expected keys: 
+                Expected keys:
                     -'name': str
                     -'description': str
                     -'user_id': UUID
@@ -84,7 +88,9 @@ class PipelineController:
                 #     raise ValueError("User not found.")
 
                 # Create the pipeline using the PipelineService
-                pipeline = await self.pipeline_service.create_pipeline(tx, pipeline_data)
+                pipeline = await self.pipeline_service.create_pipeline(
+                    tx, pipeline_data
+                )
                 if not pipeline:
                     raise ValueError("Failed to create pipeline.")
 
@@ -121,7 +127,9 @@ class PipelineController:
             )
             return None
 
-    async def get_pipeline_by_id(self, pipeline_id: UUID, user_id: UUID) -> Optional[Dict[str, Any]]:
+    async def get_pipeline_by_id(
+        self, pipeline_id: UUID, user_id: UUID
+    ) -> Optional[Dict[str, Any]]:
         """
         Retrieves a pipeline by its unique identifier.
 
@@ -134,7 +142,9 @@ class PipelineController:
         try:
             async with self.prisma.tx() as tx:
                 # Retrieve the pipeline using the PipelineService
-                pipeline = await self.pipeline_service.get_pipeline_by_id(tx, pipeline_id)
+                pipeline = await self.pipeline_service.get_pipeline_by_id(
+                    tx, pipeline_id
+                )
                 if not pipeline:
                     raise ValueError("Pipeline not found.")
 
@@ -174,7 +184,9 @@ class PipelineController:
             )
             return None
 
-    async def update_pipeline(self, pipeline_id: UUID, update_data: Dict[str, Any], user_id: UUID) -> Dict[str, Any]:
+    async def update_pipeline(
+        self, pipeline_id: UUID, update_data: Dict[str, Any], user_id: UUID
+    ) -> Dict[str, Any]:
         """
         Updates an existing pipeline's information.
 
@@ -192,7 +204,9 @@ class PipelineController:
         try:
             async with self.prisma.tx() as tx:
                 # Update the pipeline using the PipelineService
-                pipeline = await self.pipeline_service.update_pipeline(tx, pipeline_id, update_data)
+                pipeline = await self.pipeline_service.update_pipeline(
+                    tx, pipeline_id, update_data
+                )
                 if not pipeline:
                     raise ValueError("Failed to update pipeline.")
 
@@ -246,7 +260,9 @@ class PipelineController:
         try:
             async with self.prisma.tx() as tx:
                 # Delete the pipeline using the PipelineService
-                deletion_success = await self.pipeline_service.delete_pipeline(tx, pipeline_id)
+                deletion_success = await self.pipeline_service.delete_pipeline(
+                    tx, pipeline_id
+                )
                 if not deletion_success:
                     raise ValueError("Failed to delete pipeline.")
 
@@ -272,7 +288,7 @@ class PipelineController:
                     extra={"pipeline_id": str(pipeline_id)},
                 )
                 return True
-    
+
         except Exception as e:
             # Log unexpected exceptions with critical level
             self.logger.log(
@@ -286,7 +302,13 @@ class PipelineController:
             )
             return False
 
-    async def list_pipelines(self, user_id: UUID, filters: Optional[Dict[str, Any]] = None, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
+    async def list_pipelines(
+        self,
+        user_id: UUID,
+        filters: Optional[Dict[str, Any]] = None,
+        limit: int = 10,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
         """
         Lists pipelines with optional filtering and pagination.
 
@@ -303,7 +325,9 @@ class PipelineController:
         try:
             async with self.prisma.tx() as tx:
                 # List pipelines using the PipelineService
-                pipelines = await self.pipeline_service.list_pipelines(tx, filters, limit, offset)
+                pipelines = await self.pipeline_service.list_pipelines(
+                    tx, filters, limit, offset
+                )
 
                 if pipelines:
                     # Log the listing in Audit Logs
@@ -311,14 +335,18 @@ class PipelineController:
                         "user_id": str(user_id),
                         "action_type": "READ",
                         "entity_type": "pipeline",
-                        "entity_id": str(pipelines[0].pipeline_id), # TODO: temporarily use first pipeline id
+                        "entity_id": str(
+                            pipelines[0].pipeline_id
+                        ),  # TODO: temporarily use first pipeline id
                         "details": {
                             "filters": filters,
                         },
                     }
                     audit_log = await self.audit_service.create_audit_log(tx, audit_log)
                     if not audit_log:
-                        raise Exception("Failed to create audit log for pipeline listing")
+                        raise Exception(
+                            "Failed to create audit log for pipeline listing"
+                        )
 
                     # Log the listing event
                     self.logger.log(
@@ -327,9 +355,25 @@ class PipelineController:
                         f"Listed {len(pipelines)} pipelines successfully.",
                         extra={"filters": filters},
                     )
-                    return [pipeline.dict() for pipeline in pipelines]
+                    pipelines = [
+                        {
+                            **pipeline.model_dump(),
+                            "config": json.dumps(
+                                pipeline.config
+                            ),  # Serialize config to JSON string
+                        }
+                        for pipeline in pipelines
+                    ]
+                    return pipelines
                 else:
-                    self.logger.log("PipelineController", "info", "No pipelines found.", filters=filters, limit=limit, offset=offset)
+                    self.logger.log(
+                        "PipelineController",
+                        "info",
+                        "No pipelines found.",
+                        filters=filters,
+                        limit=limit,
+                        offset=offset,
+                    )
                     return []
 
         except Exception as e:
@@ -351,7 +395,7 @@ class PipelineController:
         pipeline_data: Dict[str, Any],
         blocks: List[Dict[str, Any]],
         edges: List[Dict[str, Any]],
-        user_id: UUID
+        user_id: UUID,
     ) -> Optional[Dict[str, Any]]:
         """
         Creates a pipeline along with its associated blocks and edges.
@@ -368,7 +412,9 @@ class PipelineController:
         try:
             async with self.prisma.tx() as tx:
                 # Create the pipeline
-                pipeline = await self.pipeline_service.create_pipeline(tx, pipeline_data)
+                pipeline = await self.pipeline_service.create_pipeline(
+                    tx, pipeline_data
+                )
                 if not pipeline:
                     raise ValueError("Failed to create pipeline.")
 
@@ -381,21 +427,29 @@ class PipelineController:
 
                 # Assign blocks to the pipeline
                 for block_data in blocks:
-                    assigned_block = await self.block_service.get_block_by_name(tx, block_data["name"])
+                    assigned_block = await self.block_service.get_block_by_name(
+                        tx, block_data["name"]
+                    )
                     if not assigned_block:
-                        assigned_block = await self.block_service.create_block(tx, block_data)
+                        assigned_block = await self.block_service.create_block(
+                            tx, block_data
+                        )
 
                     if not assigned_block:
-                        raise ValueError(f"Failed to retrieve or create block: {block_data['name']}")
+                        raise ValueError(
+                            f"Failed to retrieve or create block: {block_data['name']}"
+                        )
 
                     # Assign the block to the pipeline
-                    assigned_pipeline_block = await self.pipeline_service.assign_block_to_pipeline(
-                        tx,
-                        assigned_block.block_id,
-                        pipeline.pipeline_id
+                    assigned_pipeline_block = (
+                        await self.pipeline_service.assign_block_to_pipeline(
+                            tx, assigned_block.block_id, pipeline.pipeline_id
+                        )
                     )
                     if not assigned_pipeline_block:
-                        raise ValueError(f"Failed to assign block {assigned_block.block_id} to pipeline.")
+                        raise ValueError(
+                            f"Failed to assign block {assigned_block.block_id} to pipeline."
+                        )
 
                     self.logger.log(
                         "PipelineController",
@@ -411,13 +465,15 @@ class PipelineController:
                         raise ValueError(f"Failed to create edge: {edge_data}")
 
                     # Assign the edge to the pipeline
-                    assigned_pipeline_edge = await self.pipeline_service.assign_edge_to_pipeline(
-                        tx,
-                        assigned_edge.edge_id,
-                        pipeline.pipeline_id
+                    assigned_pipeline_edge = (
+                        await self.pipeline_service.assign_edge_to_pipeline(
+                            tx, assigned_edge.edge_id, pipeline.pipeline_id
+                        )
                     )
                     if not assigned_pipeline_edge:
-                        raise ValueError(f"Failed to assign edge {edge_data['edge_id']} to pipeline.")
+                        raise ValueError(
+                            f"Failed to assign edge {edge_data['edge_id']} to pipeline."
+                        )
 
                     self.logger.log(
                         "PipelineController",
@@ -434,12 +490,14 @@ class PipelineController:
                     "details": {
                         "pipeline_name": pipeline.name,
                         "blocks": len(blocks),
-                        "edges": len(edges)
-                    }
+                        "edges": len(edges),
+                    },
                 }
                 audit_log = await self.audit_service.create_audit_log(tx, audit_log)
                 if not audit_log:
-                    raise Exception("Failed to create audit log for pipeline creation with dependencies")
+                    raise Exception(
+                        "Failed to create audit log for pipeline creation with dependencies"
+                    )
 
                 self.logger.log(
                     "PipelineController",
@@ -459,7 +517,9 @@ class PipelineController:
             )
             return None
 
-    async def delete_pipeline_with_dependencies(self, pipeline_id: UUID, user_id: UUID) -> bool:
+    async def delete_pipeline_with_dependencies(
+        self, pipeline_id: UUID, user_id: UUID
+    ) -> bool:
         """
         Deletes a pipeline along with all its associated blocks and edges.
 
@@ -473,24 +533,29 @@ class PipelineController:
         try:
             async with self.prisma.tx() as tx:
                 # Retrieve all blocks associated with the pipeline
-                pipeline_blocks = await self.pipeline_service.get_pipeline_blocks(tx, pipeline_id)
+                pipeline_blocks = await self.pipeline_service.get_pipeline_blocks(
+                    tx, pipeline_id
+                )
                 if pipeline_blocks is None:
                     raise ValueError("Failed to retrieve pipeline blocks.")
 
                 # Retrieve all edges associated with the pipeline
-                pipeline_edges = await self.pipeline_service.get_pipeline_edges(tx, pipeline_id)
+                pipeline_edges = await self.pipeline_service.get_pipeline_edges(
+                    tx, pipeline_id
+                )
                 if pipeline_edges is None:
                     raise ValueError("Failed to retrieve pipeline edges.")
 
                 # Delete all edges first to maintain referential integrity
                 for edge in pipeline_edges:
                     success = await self.pipeline_service.remove_edge_from_pipeline(
-                        tx,
-                        edge.pipeline_edge_id
+                        tx, edge.pipeline_edge_id
                     )
                     if not success:
-                        raise ValueError(f"Failed to delete edge {edge.pipeline_edge_id} from pipeline.")
-                    
+                        raise ValueError(
+                            f"Failed to delete edge {edge.pipeline_edge_id} from pipeline."
+                        )
+
                     self.logger.log(
                         "PipelineController",
                         "info",
@@ -511,12 +576,13 @@ class PipelineController:
                 # Delete all blocks
                 for block in pipeline_blocks:
                     success = await self.pipeline_service.remove_block_from_pipeline(
-                        tx,
-                        block.pipeline_block_id
+                        tx, block.pipeline_block_id
                     )
                     if not success:
-                        raise ValueError(f"Failed to delete block {block.pipeline_block_id} from pipeline.")
-                    
+                        raise ValueError(
+                            f"Failed to delete block {block.pipeline_block_id} from pipeline."
+                        )
+
                     self.logger.log(
                         "PipelineController",
                         "info",
@@ -548,12 +614,14 @@ class PipelineController:
                     "details": {
                         "description": "All blocks and edges associated with pipeline deleted.",
                         "blocks": len(pipeline_blocks),
-                        "edges": len(pipeline_edges)
-                    }
+                        "edges": len(pipeline_edges),
+                    },
                 }
                 audit_log = await self.audit_service.create_audit_log(tx, audit_log)
                 if not audit_log:
-                    raise Exception("Failed to create audit log for pipeline deletion with dependencies")
+                    raise Exception(
+                        "Failed to create audit log for pipeline deletion with dependencies"
+                    )
 
                 # Log the deletion event
                 self.logger.log(
@@ -593,16 +661,18 @@ class PipelineController:
         """
         try:
             async with self.prisma.tx() as tx:
-                pipeline_edges = await self.pipeline_service.get_pipeline_edges(tx, pipeline_id)
+                pipeline_edges = await self.pipeline_service.get_pipeline_edges(
+                    tx, pipeline_id
+                )
                 if pipeline_edges is None:
                     raise ValueError("Failed to retrieve pipeline edges.")
-                
+
                 self.logger.log(
                     "PipelineController",
                     "info",
                     "Pipeline edges retrieved successfully.",
                     pipeline_id=str(pipeline_id),
-                    edges_found=len(pipeline_edges)
+                    edges_found=len(pipeline_edges),
                 )
 
                 # 1. check if no cycles exist in the graph
@@ -619,14 +689,14 @@ class PipelineController:
                         raise ValueError(f"Edge {edge.edge_id} not found.")
 
                     graph[edge.source_block_id].append(edge.target_block_id)
-                
+
                 def connected_blocks(graph: Dict[UUID, List[UUID]]) -> bool:
                     """
                     Check if all blocks are connected using DFS.
                     """
                     visited = set()
                     stack = set()
-                    
+
                     def dfs(node: UUID):
                         visited.add(node)
                         stack.add(node)
@@ -636,7 +706,7 @@ class PipelineController:
 
                     dfs(next(iter(graph)))
                     return len(visited) == len(graph)
-                
+
                 if not connected_blocks(graph):
                     raise ValueError("Blocks are not connected.")
 
@@ -647,12 +717,14 @@ class PipelineController:
                     "entity_id": str(pipeline_id),
                     "details": {
                         "description": "Pipeline is valid.",
-                    }
+                    },
                 }
 
                 audit_log = await self.audit_service.create_audit_log(tx, audit_log)
                 if not audit_log:
-                    raise Exception("Failed to create audit log for pipeline verification")
+                    raise Exception(
+                        "Failed to create audit log for pipeline verification"
+                    )
 
                 self.logger.log(
                     "PipelineController",
@@ -660,7 +732,7 @@ class PipelineController:
                     "Pipeline is valid.",
                     pipeline_id=str(pipeline_id),
                 )
-                
+
                 return True
 
         except Exception as e:
@@ -672,6 +744,108 @@ class PipelineController:
                 extra={"traceback": traceback.format_exc()},
             )
             return False
+
+    async def update_pipeline_status_by_run_id(self, run_id: UUID, status: str) -> bool:
+        """
+        Updates the status of a pipeline based on its run ID.
+
+        Args:
+            run_id (UUID): The run ID of the pipeline to update.
+            status (str): The new status to set for the pipeline.
+
+        Returns:
+            bool: True if the status update is successful, False otherwise.
+        """
+        try:
+            async with self.prisma.tx() as tx:
+                # Retrieve the pipeline using the run_id
+                pipeline = await self.pipeline_service.get_pipeline_by_run_id(
+                    tx, run_id
+                )
+                if not pipeline:
+                    raise ValueError(f"Pipeline with run_id {run_id} not found.")
+
+                # Update the pipeline status
+                update_success = await self.pipeline_service.update_pipeline_status(
+                    tx, pipeline.pipeline_id, status
+                )
+                if not update_success:
+                    raise ValueError("Failed to update pipeline status.")
+
+                # Log the update event
+                self.logger.log(
+                    "PipelineController",
+                    "info",
+                    f"Pipeline status updated successfully.",
+                    extra={
+                        "run_id": str(run_id),
+                        "pipeline_id": str(pipeline.pipeline_id),
+                        "status": status,
+                    },
+                )
+                return True
+
+        except Exception as e:
+            # Log unexpected exceptions with critical level
+            self.logger.log(
+                "PipelineController",
+                "critical",
+                f"Exception during pipeline status update: {str(e)}",
+                extra={
+                    "traceback": traceback.format_exc(),
+                    "run_id": str(run_id),
+                    "status": status,
+                },
+            )
+            return False
+
+    async def run_pipeline(self, config: str, user_id: UUID) -> bool:
+        """
+        Runs a pipeline with the given config.
+        """
+        # Based on the config, store the pipeline in the database
+        pipeline_data = {
+            "user_id": str(user_id),
+            "config": json.dumps(config),
+        }
+        pipeline = await self.pipeline_service.create_pipeline(
+            self.prisma, pipeline_data
+        )
+
+        try:
+            print(f"config: {config}")
+            response = requests.post(
+                "http://dagster_api:8001/execute", json={"instructions": config}
+            )
+
+            response = response.json()
+            print(f"response: {response}")
+
+            if response["status"] == "success":
+                run_id = response["run_id"]
+                async with self.prisma.tx() as tx:
+                    # assign the run_id to the pipeline
+                    await self.pipeline_service.update_pipeline(
+                        tx, pipeline.pipeline_id, {"run_id": run_id}
+                    )
+                    # change the pipeline status to running
+                    await self.pipeline_service.update_pipeline_status(
+                        tx, pipeline.pipeline_id, "running"
+                    )
+
+                return True
+
+            elif response["status"] == "failure":
+                # delete the pipeline
+                delete_result = await self.delete_pipeline(pipeline.pipeline_id)
+                if not delete_result:
+                    raise Exception("Failed to delete pipeline.")
+
+                return False
+
+        except HTTPException as e:
+            print(f"HTTPException: {e}")
+            raise e
 
     async def main(self):
         from backend.app.features.core.services.block_service import BlockService
@@ -687,18 +861,18 @@ class PipelineController:
                 {
                     "name": "Test Block 1",
                     "block_type": "dataset",
-                    "description": "Test Block 1 Description"
+                    "description": "Test Block 1 Description",
                 },
                 {
                     "name": "Test Block 2",
                     "block_type": "model",
-                    "description": "Test Block 2 Description"
+                    "description": "Test Block 2 Description",
                 },
                 {
                     "name": "Test Block 3",
                     "block_type": "dataset",
-                    "description": "Test Block 3 Description"
-                }
+                    "description": "Test Block 3 Description",
+                },
             ]
             created_blocks = []
             for block in blocks:
@@ -707,32 +881,31 @@ class PipelineController:
                     raise Exception("Failed to create block.")
                 created_blocks.append(created_block.dict())
                 print("Created block: ", created_block.block_id)
-            
+
             edges = [
                 {
                     "source_block_id": created_blocks[0]["block_id"],
-                    "target_block_id": created_blocks[1]["block_id"]
+                    "target_block_id": created_blocks[1]["block_id"],
                 },
                 {
                     "source_block_id": created_blocks[1]["block_id"],
-                    "target_block_id": created_blocks[2]["block_id"]
-                }
+                    "target_block_id": created_blocks[2]["block_id"],
+                },
             ]
             print("Edges to add: ", edges)
 
-            pipeline_data = {
-                "user_id": user_id,
-                "name": "Test Pipeline"
-            }
-            
+            pipeline_data = {"user_id": user_id, "name": "Test Pipeline"}
+
             # 2. Create pipeline with dependencies
             print("\nCreating pipeline with dependencies...")
-            pipeline = await self.create_pipeline_with_dependencies(pipeline_data, blocks, edges, user_id)
+            pipeline = await self.create_pipeline_with_dependencies(
+                pipeline_data, blocks, edges, user_id
+            )
             if pipeline:
                 print("Pipeline created successfully.")
             else:
                 raise Exception("Failed to create pipeline.")
-            
+
             # 3. test get pipeline by id
             print("\nGetting pipeline by id...")
             pipeline = await self.get_pipeline_by_id(pipeline["pipeline_id"], user_id)
@@ -740,15 +913,17 @@ class PipelineController:
                 print("Pipeline retrieved successfully.")
             else:
                 raise Exception("Failed to retrieve pipeline.")
-            
+
             # 4. test update pipeline
             print("\nUpdating pipeline...")
-            pipeline = await self.update_pipeline(pipeline["pipeline_id"], {"name": "Updated Test Pipeline"}, user_id)
+            pipeline = await self.update_pipeline(
+                pipeline["pipeline_id"], {"name": "Updated Test Pipeline"}, user_id
+            )
             if pipeline:
                 print("Pipeline updated successfully.")
             else:
                 raise Exception("Failed to update pipeline.")
-            
+
             # 5. verify pipeline
             print("\nVerifying pipeline...")
             expected = True
@@ -757,24 +932,29 @@ class PipelineController:
                 print("Pipeline is valid.")
             else:
                 raise Exception("Pipeline is not valid. Expected it to be valid.")
-            
+
             # 6. add an edge that creates a cycle
             print("\nAdding an edge to the pipeline that creates a cycle...")
-            edge = await edge_service.create_edge(self.prisma, {
-                "source_block_id": created_blocks[2]["block_id"],
-                "target_block_id": created_blocks[0]["block_id"]
-            })
+            edge = await edge_service.create_edge(
+                self.prisma,
+                {
+                    "source_block_id": created_blocks[2]["block_id"],
+                    "target_block_id": created_blocks[0]["block_id"],
+                },
+            )
             if edge:
                 print("Edge created successfully.")
             else:
                 raise Exception("Failed to create edge.")
-            
-            pipeline_edge = await self.pipeline_service.assign_edge_to_pipeline(self.prisma, edge.edge_id, pipeline["pipeline_id"])
+
+            pipeline_edge = await self.pipeline_service.assign_edge_to_pipeline(
+                self.prisma, edge.edge_id, pipeline["pipeline_id"]
+            )
             if pipeline_edge:
                 print("Edge assigned to pipeline successfully.")
             else:
                 raise Exception("Failed to assign edge to pipeline.")
-            
+
             # 7. verify pipeline
             print("\nVerifying pipeline...")
             expected = False
@@ -783,14 +963,16 @@ class PipelineController:
                 print("Pipeline is not valid.")
             else:
                 raise Exception("Pipeline is valid. Expected it to be invalid.")
-            
+
             # 8. delete pipeline with dependencies
             print("\nDeleting pipeline with dependencies...")
-            success = await self.delete_pipeline_with_dependencies(pipeline["pipeline_id"], user_id)
+            success = await self.delete_pipeline_with_dependencies(
+                pipeline["pipeline_id"], user_id
+            )
             if success:
                 print("Pipeline deleted successfully.")
             else:
-                raise Exception("Failed to delete pipeline.")            
+                raise Exception("Failed to delete pipeline.")
 
             print("\nPipeline tests completed successfully.")
         except Exception as e:
@@ -799,11 +981,10 @@ class PipelineController:
             print("Disconnecting from the database...")
             await self.prisma.disconnect()
             print("Disconnected from the database.")
-        
 
 
 if __name__ == "__main__":
-    
+
     async def run_pipeline_controller_tests():
         """
         Function to run PipelineController tests.
@@ -815,7 +996,5 @@ if __name__ == "__main__":
 
         pipeline_controller = PipelineController(prisma)
         await pipeline_controller.main()
-    
-    asyncio.run(run_pipeline_controller_tests())
 
-        
+    asyncio.run(run_pipeline_controller_tests())

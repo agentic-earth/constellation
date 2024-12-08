@@ -1,24 +1,28 @@
-ARG PYTHON_VERSION=3.9-slim
+# Use Python 3.9-slim as the base image
+ARG PYTHON_VERSION=3.10-slim
 FROM python:${PYTHON_VERSION}
 
-# Checkout and install dagster libraries needed to run the gRPC server
-# exposing your repository to dagster-webserver and dagster-daemon, and to load the DagsterInstance
+# Install necessary packages
+RUN apt-get update && apt-get install -y \
+    tree \
+    && rm -rf /var/lib/apt/lists/*
 
+# Install required Python packages, including pillow for image processing
 RUN pip install \
     dagster \
     dagster-postgres \
     dagster-docker \
-    pandas
-# Add repository code
+    pandas 
 
+RUN pip install gdown
+RUN pip install dagster_aws
+
+# Set the working directory
 WORKDIR /opt/dagster/app
 
+# Copy your application code into the container
 COPY . /opt/dagster/app
 
-# Run dagster gRPC server on port 4000
+# Expose the port and run the dagster gRPC server
 EXPOSE 4000
-
-# CMD allows this to be overridden from run launchers or executors that want
-# to run other commands against your repository
-# CMD ["dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "4000", "-f", "repository.py"]
 CMD ["dagster", "code-server", "start", "-h", "0.0.0.0", "-p", "4000", "-f", "./orchestrator/assets/repository.py"]

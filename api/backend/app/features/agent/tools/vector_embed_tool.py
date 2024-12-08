@@ -6,6 +6,7 @@ from langchain.tools import BaseTool
 from typing import List, Optional
 import asyncio
 
+<<<<<<< HEAD
 def _run(query: str) -> List[float]:
     """Synchronous run method"""
     try:
@@ -34,6 +35,22 @@ VectorEmbedTool = StructuredTool.from_function(
     description="Embeds text into vector space",
     func=_run,  # Use the synchronous version as the primary entry point
     coroutine=_arun  # Optionally include the asynchronous version
+=======
+
+async def vector_embed(query: str) -> List[float]:
+    """
+    Embeds the user's query into a vector space.
+    """
+    block_service = BlockService()
+    vector = await block_service.generate_embedding(query)
+    return vector
+
+
+VectorEmbedTool = StructuredTool.from_function(
+    func=vector_embed,
+    name="VectorEmbedTool",
+    description="Embeds the user's query into a vector space.",
+>>>>>>> main
 )
      
 if __name__ == "__main__":
