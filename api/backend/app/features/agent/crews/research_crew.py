@@ -1,22 +1,17 @@
-import logging
-from typing import Any, Dict, List
 from backend.app.features.agent.tools.vector_embed_tool import VectorEmbedTool
 from backend.app.features.agent.tools.similarity_search_tool import SimilaritySearchTool
-from crewai import Agent, Task, Crew, Process
+from crewai import Agent, Crew, Process, Task
+from crewai.project import CrewBase, agent, crew, task
 from langchain_openai import ChatOpenAI
-import yaml
 
+@CrewBase
 class ResearchCrew:
     '''Research Crew'''
-
-    def __init__(self):
-        with open("C:/Users/JXPARATROOPER/Desktop/CourseCode/CSCI 2340/constellation-backend/api/backend/app/features/agent/config/agents.yaml", "r") as file:
-            self.agents_config = yaml.safe_load(file)
-        with open("C:/Users/JXPARATROOPER/Desktop/CourseCode/CSCI 2340/constellation-backend/api/backend/app/features/agent/config/tasks.yaml", "r") as file:
-            self.tasks_config = yaml.safe_load(file)
-        self.llm = ChatOpenAI(model="gpt-4o")
-
-    @staticmethod
+    agents_config = "agents_config.yaml"
+    tasks_config = "tasks_config.yaml"
+    llm = ChatOpenAI(model="gpt-4o")
+    
+    @agent
     def research_agent() -> Agent:
         return Agent(
             # config=self.agents_config["Researcher_agent"],
@@ -31,7 +26,7 @@ class ResearchCrew:
             verbose=False,
         )
     
-    @staticmethod
+    @agent
     def research_task(query: str, agent: Agent) -> Task:
         return Task(
             # config=self.tasks_config["find_similar_paper"],
