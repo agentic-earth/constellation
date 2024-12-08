@@ -354,7 +354,7 @@ class PipelineController:
                         f"Listed {len(pipelines)} pipelines successfully.",
                         extra={"filters": filters},
                     )
-                    return [pipeline.dict() for pipeline in pipelines]
+                    return [pipeline.model_dump() for pipeline in pipelines]
                 else:
                     self.logger.log(
                         "PipelineController",

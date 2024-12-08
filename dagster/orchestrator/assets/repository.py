@@ -117,10 +117,10 @@ def define_composite_job(name: str, raw_input: dict) -> Tuple[JobDefinition, Dic
         node_defs=filtered_op_defs,
         dependencies=deps,
     )
+    graph = graph.with_hooks({publish_failure})
 
     return (
         graph.to_job(
-            hooks=frozenset([publish_failure]),
             resource_defs={"s3_resource": s3_resource},
         ),
         run_config,
