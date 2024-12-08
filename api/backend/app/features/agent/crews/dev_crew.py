@@ -1,10 +1,10 @@
-from crewai import Crew, Agent, Process, Task
+from crewai import Agent, Crew, Process, Task
+from crewai.project import CrewBase, agent, crew, task
 from langchain_openai import ChatOpenAI
 
 @CrewBase
 class DevCrew:
     '''Developer Crew'''
-
     agents_config = "agents_config.yaml"
     tasks_config = "tasks_config.yaml"
     llm = ChatOpenAI(model="gpt-4o")
