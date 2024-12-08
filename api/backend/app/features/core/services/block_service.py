@@ -50,6 +50,7 @@ from haystack.utils import Secret
 from backend.app.features.core.services.vector_embedding_service import (
     VectorEmbeddingService,
 )
+from backend.app.features.agent.crews.crew_process import CrewProcess
 
 
 class BlockService:
@@ -63,6 +64,7 @@ class BlockService:
             search_strategy="hnsw",
         )
         self.retriever = PgvectorEmbeddingRetriever(document_store=self.document_store)
+        self.crew = CrewProcess()
 
     async def create_block(
         self,
@@ -526,30 +528,28 @@ class BlockService:
 
     async def get_llm_output(
         self, query: str, blocks: List[PrismaBlock]
-    ) -> Optional[str]:
+    ) -> Optional[dict]:
         """
         Retrieves the output of the LLM model for a given query and list of blocks.
         Args:
             query (str): The input query.
             blocks (List[PrismaBlock]): The list of blocks.
         Returns:
-            str: The output of the LLM model.
+            dict: The output of the LLM model.
         """
         try:
             crew_process = self.crew.make_crews(query, blocks)
             result = crew_process.kickoff()
 
-            self.logger.log(
-                "BlockService",
-                "info",
-                f"LLM output retrieved successfully: {len(result)}.",
-            )
+            if not result.raw:
+                raise Exception("Failed to generate LLM output")
 
-            return result
+            return result.raw
         except Exception as e:
             self.logger.log(
                 "BlockService", "error", "Failed to generate LLM output", error=str(e)
             )
+            print(f"error: {e}")
             return None
 
 

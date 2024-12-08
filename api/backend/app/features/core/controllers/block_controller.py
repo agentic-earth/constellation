@@ -34,6 +34,7 @@ from prisma import Prisma
 from backend.app.logger import ConstellationLogger
 from prisma.models import AuditLog as PrismaAuditLog
 import traceback
+import json
 
 
 class BlockController:
@@ -414,7 +415,7 @@ class BlockController:
                 extra=traceback.format_exc(),
             )
             return None
-    
+
     async def get_all_blocks(self, user_id: UUID) -> Optional[List[Dict[str, Any]]]:
         try:
             async with self.prisma.tx() as tx:
@@ -429,6 +430,64 @@ class BlockController:
                 extra=traceback.format_exc(),
             )
             return None
+
+    async def construct_pipeline(
+        self, query: str, user_id: UUID
+    ) -> Optional[Dict[str, Any]]:
+        try:
+            # retrieve all blocks and organize the pipeline file with LLM
+            async with self.prisma.tx() as tx:
+                blocks = await self.block_service.get_all_blocks(tx)
+                dataset_model_blocks = [
+                    block
+                    for block in blocks
+                    if block.block_type == "dataset"
+                    or block.block_type == "model"
+                    or block.block_type == "exports"
+                ]
+                self.logger.log(
+                    "BlockController",
+                    "info",
+                    "dataset_model_blocks",
+                    dataset_model_blocks=dataset_model_blocks,
+                )
+                output = await self.block_service.get_llm_output(
+                    query, dataset_model_blocks
+                )
+
+                if output is None:
+                    raise Exception("Failed to get response from LLM")
+
+                # Audit Logging for Search by vector
+                audit_log = {
+                    "user_id": str(user_id),
+                    "action_type": "READ",  # Use 'READ' for searches
+                    "entity_type": "block",  # If 'block_search' is not in enum, use 'block'
+                    "entity_id": (
+                        dataset_model_blocks[0].block_id
+                        if dataset_model_blocks
+                        else str(UUID(int=0))
+                    ),
+                    "details": {"results_count": len(output)},
+                }
+                audit_log_result = await self.audit_service.create_audit_log(
+                    tx, audit_log
+                )
+                if not audit_log_result:
+                    raise Exception("Failed to create audit log for construct pipeline")
+
+                return {"pipeline": json.loads(output)}
+        except Exception as e:
+            self.logger.log(
+                "BlockController",
+                "error",
+                "Failed to construct_pipeline",
+                error=str(e),
+                extra=traceback.format_exc(),
+            )
+            print(f"error: {e}")
+            return None
+
 
 # -------------------
 # Testing Utility
