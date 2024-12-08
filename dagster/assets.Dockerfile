@@ -15,6 +15,7 @@ RUN pip install \
     pandas 
     
 RUN pip install gdown
+RUN pip install dagster_aws
 
 # Set the working directory
 WORKDIR /opt/dagster/app

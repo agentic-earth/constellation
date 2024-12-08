@@ -12,7 +12,7 @@ import zipfile
 import os
 import sys
 import gdown
-
+import json
 
 @op(
     name="import_from_google_drive",
@@ -163,6 +163,23 @@ def write_csv(context: OpExecutionContext, result: pd.DataFrame) -> str:
     context.log.info(f"Data written to output.csv")
     return "output.csv"
 
+@op(
+    name="export_to_s3",
+    ins={"inference_results": In(dict)},
+    out=Out(str),
+    description="Exports inference results to S3 as a JSON file.",
+    required_resource_keys={"s3_resource"}
+)
+def export_to_s3(context, inference_results):
+    bucket_name = "agenticexportbucket"
+    key = "inference_results.json"
+
+    data = json.dumps(inference_results, indent=2)
+    s3 = context.resources.s3_resource
+    s3.put_object(Bucket=bucket_name, Key=key, Body=data.encode("utf-8"))
+
+    context.log.info(f"Uploaded inference results to s3://{bucket_name}/{key}")
+    return f"s3://{bucket_name}/{key}"
 
 @op(
     name="math_block",
