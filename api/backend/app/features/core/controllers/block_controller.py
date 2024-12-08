@@ -414,7 +414,7 @@ class BlockController:
                 extra=traceback.format_exc(),
             )
             return None
-    
+
     async def get_all_blocks(self, user_id: UUID) -> Optional[List[Dict[str, Any]]]:
         try:
             async with self.prisma.tx() as tx:
@@ -430,8 +430,6 @@ class BlockController:
             )
             return None
 
-<<<<<<< Updated upstream
-=======
     async def construct_pipeline(
         self, query: str, user_id: UUID
     ) -> Optional[Dict[str, Any]]:
@@ -492,7 +490,6 @@ class BlockController:
             return None
 
 
->>>>>>> Stashed changes
 # -------------------
 # Testing Utility
 # -------------------

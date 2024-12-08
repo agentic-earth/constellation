@@ -216,6 +216,34 @@ class PipelineService:
             )
             return False
 
+    async def update_pipeline_status(
+        self, tx: Prisma, pipeline_id: UUID, status: str
+    ) -> bool:
+        """
+        Updates the status of a pipeline.
+
+        Args:
+            tx (Prisma): The Prisma client instance.
+            pipeline_id (UUID): The UUID of the pipeline to update.
+            status (str): The status to update the pipeline to.
+
+        Returns:
+            bool: True if the pipeline status was updated successfully, False otherwise.
+        """
+        try:
+            await tx.pipeline.update(
+                where={"pipeline_id": str(pipeline_id)}, data={"status": status}
+            )
+            return True
+        except Exception as e:
+            self.logger.log(
+                "PipelineService",
+                "error",
+                "Error updating pipeline status.",
+                error=str(e),
+            )
+            return False
+
     async def search_pipelines(
         self, tx: Prisma, search_params: Dict[str, Any]
     ) -> List[PrismaPipeline]:
@@ -495,7 +523,9 @@ class PipelineService:
             )
             return False
 
-    async def get_pipeline_by_run_id(self, tx: Prisma, run_id: UUID) -> Optional[PrismaPipeline]:
+    async def get_pipeline_by_run_id(
+        self, tx: Prisma, run_id: UUID
+    ) -> Optional[PrismaPipeline]:
         """
         Retrieves a pipeline by its run ID.
 
@@ -526,7 +556,10 @@ class PipelineService:
             return pipeline
         except Exception as e:
             self.logger.log(
-                "PipelineService", "error", "Error retrieving pipeline by run_id.", error=str(e)
+                "PipelineService",
+                "error",
+                "Error retrieving pipeline by run_id.",
+                error=str(e),
             )
             return None
 

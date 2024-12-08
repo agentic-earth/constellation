@@ -736,7 +736,7 @@ class PipelineController:
                 extra={"traceback": traceback.format_exc()},
             )
             return False
-    
+
     async def update_pipeline_status_by_run_id(self, run_id: UUID, status: str) -> bool:
         """
         Updates the status of a pipeline based on its run ID.
@@ -751,7 +751,9 @@ class PipelineController:
         try:
             async with self.prisma.tx() as tx:
                 # Retrieve the pipeline using the run_id
-                pipeline = await self.pipeline_service.get_pipeline_by_run_id(tx, run_id)
+                pipeline = await self.pipeline_service.get_pipeline_by_run_id(
+                    tx, run_id
+                )
                 if not pipeline:
                     raise ValueError(f"Pipeline with run_id {run_id} not found.")
 
@@ -788,7 +790,7 @@ class PipelineController:
                 },
             )
             return False
-        
+
     async def run_pipeline(self, config: str, user_id: UUID) -> bool:
         """
         Runs a pipeline with the given config.
@@ -797,7 +799,9 @@ class PipelineController:
         pipeline_data = {
             "user_id": str(user_id),
         }
-        pipeline = await self.pipeline_service.create_pipeline(self.prisma, pipeline_data)
+        pipeline = await self.pipeline_service.create_pipeline(
+            self.prisma, pipeline_data
+        )
 
         try:
             print(f"config: {config}")
@@ -812,10 +816,14 @@ class PipelineController:
                 run_id = response["run_id"]
                 async with self.prisma.tx() as tx:
                     # assign the run_id to the pipeline
-                    self.pipeline_service.update_pipeline(tx, pipeline.pipeline_id, {"run_id": run_id})
+                    self.pipeline_service.update_pipeline(
+                        tx, pipeline.pipeline_id, {"run_id": run_id}
+                    )
                     # change the pipeline status to running
-                    self.pipeline_service.update_pipeline_status_by_run_id(tx, run_id, "running")
-                
+                    self.pipeline_service.update_pipeline_status(
+                        tx, pipeline.pipeline_id, "running"
+                    )
+
                 return True
 
             elif response["status"] == "failure":
@@ -823,9 +831,8 @@ class PipelineController:
                 delete_result = await self.delete_pipeline(pipeline.pipeline_id)
                 if not delete_result:
                     raise Exception("Failed to delete pipeline.")
-                
-                return False
 
+                return False
 
         except HTTPException as e:
             raise e
