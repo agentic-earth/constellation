@@ -485,7 +485,7 @@ class BlockService:
                 extra=traceback.format_exc(),
             )
             return None
-    
+
     async def get_all_blocks(self, tx: Prisma) -> List[PrismaBlock]:
         """
         Retrieves all blocks.
@@ -523,6 +523,34 @@ class BlockService:
                 "BlockService", "error", "Failed to retrieve all vectors", error=str(e)
             )
             return []
+
+    async def get_llm_output(
+        self, query: str, blocks: List[PrismaBlock]
+    ) -> Optional[str]:
+        """
+        Retrieves the output of the LLM model for a given query and list of blocks.
+        Args:
+            query (str): The input query.
+            blocks (List[PrismaBlock]): The list of blocks.
+        Returns:
+            str: The output of the LLM model.
+        """
+        try:
+            crew_process = self.crew.make_crews(query, blocks)
+            result = crew_process.kickoff()
+
+            self.logger.log(
+                "BlockService",
+                "info",
+                f"LLM output retrieved successfully: {len(result)}.",
+            )
+
+            return result
+        except Exception as e:
+            self.logger.log(
+                "BlockService", "error", "Failed to generate LLM output", error=str(e)
+            )
+            return None
 
 
 async def main():
