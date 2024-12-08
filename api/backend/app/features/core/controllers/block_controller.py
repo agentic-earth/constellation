@@ -420,7 +420,8 @@ class BlockController:
         try:
             async with self.prisma.tx() as tx:
                 blocks = await self.block_service.get_all_blocks(tx)
-                return [block.model_dump() for block in blocks]
+                result = [block.model_dump() for block in blocks]
+                return result
         except Exception as e:
             self.logger.log(
                 "BlockController",
