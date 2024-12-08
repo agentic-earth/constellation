@@ -2,80 +2,47 @@
 
 ## 🚀 **Overview**
 
-Welcome to the **Constellation Master Program**! 🌟 This master application orchestrates a suite of specialized microservices to provide a comprehensive backend solution for managing machine learning models, data pipelines, and intelligent interactions within the **Constellation** ecosystem. By seamlessly integrating various microservices, Constellation offers a scalable, modular, and efficient platform tailored for advanced data processing and analytics.
+Welcome to the **Constellation Master Program**! 🌟 This master application orchestrates a suite of microservices to automate the use of machine learning models for satellite image inference. Our service allows users to connect datasets with models, and evaluate their outputs through a simple drag-and-drop interface supported by an integrated LLM. 
 
-## 🛠️ **Architecture Overview**
+## 🛠️ **High-Level Design**
 
-Constellation's architecture is built upon a collection of interdependent microservices, each responsible for distinct functionalities. This modular approach ensures scalability, maintainability, and flexibility, allowing each component to evolve independently while contributing to the overall system's robustness.
+Constellation relies on a Microservice Architecture with four component services: A Dagster Microservice, a Core-Backend Microservice, a Large Language Model (LLM) Microservice, and a Model Hosting Microservice.
 
 ### 📦 **Microservices Composition**
 
-1. **Core Microservice**
+1. **Core Backend Microservice**
 
-   - **Role**: Acts as the backbone of Constellation, managing all CRUD operations and data interactions with the Supabase backend.
+   - **Role**: Acts as the backbone of Constellation, this microservice provides data persistence, and facilitates interactions between other microservices as well as the front-end of our application.
    - **Responsibilities**:
-     - Data persistence and retrieval.
-     - Advanced search functionalities.
-     - Dependency and relationship management between entities.
+     - Stores datasets, models, and user-created pipelines.
+     - Manages interactions between the Dagster, LLM, and Model Hosting Microservice
 
-2. **Docker Microservice**
+2. **Model Hosting Microservice**
 
-   - **Role**: Manages the packaging, deployment, and integrity of machine learning models using Docker containers.
+   - **Role**: Leverages the Modal Cloud compute platform to  facilitate the containerization and deployment of machine learning models. 
    - **Responsibilities**:
      - Model containerization and versioning.
      - Deployment of inference endpoints.
-     - Integration with Dagster pipelines for automated environment management.
+     - Manages the deletion and creation of deployed model services.
 
 3. **Dagster Microservice**
 
-   - **Role**: Oversees the creation, compilation, and deployment of data pipelines utilizing Dagster.
+   - **Role**: Utilizes the task orchestration capabilities of Dagster to create end-to-end piplines starting with data preprocessing and outputting the results of model inference.
    - **Responsibilities**:
-     - Pipeline generation from interconnected blocks.
-     - Automated deployment and monitoring of pipelines.
-     - Error handling and performance tracking.
+     - Imports data from cloud storage platforms
+     - Automates data preprocessing and transformation.
+     - Exports model inference results to cloud storage platforms
 
 4. **Agent (LLM) Microservice**
-   - **Role**: Facilitates intelligent conversations and interactions with Language Learning Models (LLMs).
+   - **Role**: Leverages Large Language Model (LLM) capabilities to present users with database and model options that meet their prompt constraints.
    - **Responsibilities**:
-     - Managing chat sessions and message exchanges.
-     - Dynamic JSON generation for API communications.
-     - Integration with other microservices for enhanced functionalities.
-
-## 🔗 **Integration Workflow**
-
-The Constellation Master Program leverages the strengths of each microservice to deliver a unified and powerful backend solution. Here's how the components interact seamlessly:
-
-1. **User Interaction and Data Management**
-
-   - Users interact with the frontend interface to define and manage data entities.
-   - The **Core Microservice** handles all data-related operations, ensuring data integrity and providing necessary data to other services through well-defined APIs.
-
-2. **Model Deployment and Management**
-
-   - When deploying machine learning models, the **Docker Microservice** packages the models into Docker containers, versioning them appropriately.
-   - These containers are then deployed as inference endpoints, managed and scaled as needed.
-
-3. **Pipeline Orchestration**
-
-   - The **Dagster Microservice** takes user-defined blocks and compiles them into executable data pipelines.
-   - These pipelines are deployed and monitored, ensuring efficient data processing and workflow management.
-
-4. **Intelligent Interactions**
-   - The **Agent (LLM) Microservice** enables intelligent conversations, leveraging LLMs to assist users in building and suggesting pipelines.
-   - It dynamically generates JSON structures for seamless API communication with other microservices, enhancing the system's adaptability and extensibility.
+     - Streamlines model and database selection for the user.
+     - Dynamic JSON generation for pipline invocation.
 
 ## 🗝️ **Core Types and Schemas**
 
 At the heart of Constellation lies the **Core Microservice**, which defines essential data types and schemas critical for the seamless operation of all microservices. These types ensure consistent data handling and facilitate communication between different components of the system.
 
-### 🔍 **Key Types Defined in Core**
-
-- **UserResponseSchema**
-  - Represents user information, including identifiers and metadata.
-- **PipelineResponseSchema**
-  - Encapsulates details about data pipelines, their configurations, and statuses.
-- **BlockResponseSchema & EdgeResponseSchema**
-  - Define the structure and relationships of modular components within pipelines.
 
 ### 📂 **Type Integration Across Microservices**
 
