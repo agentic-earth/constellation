@@ -112,12 +112,24 @@ async def search_blocks_by_vector(
     return results
 
 
-@router.get("/get-all-blocks", response_model=List[BlockBasicInfo])
+@router.get("/get-all-blocks/", response_model=List[BlockBasicInfoWithID])
 async def get_all_blocks(
-    user_id: UUID,
+    user_id: str,
     controller: BlockController = Depends(get_block_controller),
 ):
     blocks = await controller.get_all_blocks(user_id)
     if blocks is None:
         raise HTTPException(status_code=500, detail="Failed to get all blocks.")
     return blocks
+
+
+@router.get("/construct-pipeline/", response_model=Dict[str, Any])
+async def construct_pipeline(
+    query: str,
+    user_id: UUID,
+    controller: BlockController = Depends(get_block_controller),
+):
+    results = await controller.construct_pipeline(query, user_id)
+    if results is None:
+        raise HTTPException(status_code=500, detail="Construct pipeline failed.")
+    return results

@@ -38,8 +38,6 @@ import asyncio
 from collections import defaultdict
 import requests
 
-from dagster.orchestrator.app.main import run_dagster_job_with_config
-
 
 class PipelineController:
     """

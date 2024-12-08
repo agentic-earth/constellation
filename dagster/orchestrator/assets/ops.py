@@ -4,7 +4,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 import base64
-from dagster import Any, In, OpExecutionContext, Out, op
+from dagster import Any, In, OpExecutionContext, Out, op, HookContext, failure_hook
 import requests
 import pandas as pd
 import operator
@@ -13,6 +13,7 @@ import os
 import sys
 import gdown
 import json
+
 
 @op(
     name="import_from_google_drive",
@@ -163,12 +164,13 @@ def write_csv(context: OpExecutionContext, result: pd.DataFrame) -> str:
     context.log.info(f"Data written to output.csv")
     return "output.csv"
 
+
 @op(
     name="export_to_s3",
     ins={"inference_results": In(dict)},
     out=Out(str),
     description="Exports inference results to S3 as a JSON file.",
-    required_resource_keys={"s3_resource"}
+    required_resource_keys={"s3_resource"},
 )
 def export_to_s3(context, inference_results):
     bucket_name = "agenticexportbucket"
@@ -180,6 +182,7 @@ def export_to_s3(context, inference_results):
 
     context.log.info(f"Uploaded inference results to s3://{bucket_name}/{key}")
     return f"s3://{bucket_name}/{key}"
+
 
 @op(
     name="math_block",
@@ -203,3 +206,20 @@ def math_block(
     result_df = data.map(lambda x: operation_func(x, constant))
     context.log.info(f"Resulting DataFrame:\n{result_df}")
     return result_df
+
+
+@failure_hook(name="publish_failure")
+def publish_failure(context: HookContext):
+    context.log.error(f"An error occurred: {context.op_exception}")
+    error_message = str(context.op_exception)
+    publish_status(context.run_id, "failed", error_message)
+
+
+@op(name="publish_success", ins={"run_id": In(str), "message": In(str)})
+def publish_success(context: OpExecutionContext, run_id: str, message: str):
+    publish_status(run_id, "success", message)
+
+
+def publish_status(run_id: str, status: str, message: str):
+    url = f"http://main_api:8000/status/{run_id}/{status}"
+    requests.post(url, json={"message": message})
