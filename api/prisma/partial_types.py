@@ -8,9 +8,12 @@ from prisma.models import (
     Paper,
 )
 
-Block.create_partial("BlockBasicInfo", include=["name", "block_type", "description"])
 Block.create_partial(
-    "BlockBasicInfoWithID", include=["block_id", "name", "block_type", "description"]
+    "BlockBasicInfo", include=["name", "block_type", "description", "filepath"]
+)
+Block.create_partial(
+    "BlockBasicInfoWithID",
+    include=["block_id", "name", "block_type", "description", "filepath"],
 )
 Block.create_partial(
     "BlockUpdateInfo",
