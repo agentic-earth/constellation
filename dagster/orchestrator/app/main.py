@@ -11,7 +11,6 @@ async def run_dagster_job_with_config(request: Request):
     """
     Run a Dagster job with a specific config for ops.
     """
-
     # Parse the request body
     instructions = await request.json()
     instructions = instructions.get("instructions")
@@ -21,9 +20,7 @@ async def run_dagster_job_with_config(request: Request):
 
     # Define the custom configuration for the ops
     job_config = {
-        "ops": {
-            "generate_dynamic_job_configs": {"config": {"instructions": instructions}}
-        }
+        "ops": {"generate_dynamic_job_configs": {"config": {"raw_input": instructions}}}
     }
 
     # Define the GraphQL mutation for launching the job with config

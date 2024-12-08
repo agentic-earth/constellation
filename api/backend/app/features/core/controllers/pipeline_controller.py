@@ -800,11 +800,13 @@ class PipelineController:
         pipeline = await self.pipeline_service.create_pipeline(self.prisma, pipeline_data)
 
         try:
+            print(f"config: {config}")
             response = requests.post(
-                "http://localhost:8082/execute", json={"instructions": config}
+                "http://dagster_api:8001/execute", json={"instructions": config}
             )
 
             response = response.json()
+            print(f"response: {response}")
 
             if response["status"] == "success":
                 run_id = response["run_id"]

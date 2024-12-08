@@ -120,9 +120,17 @@ def define_composite_job(name: str, raw_input: dict) -> Tuple[JobDefinition, Dic
     
         # Attach the s3_resource so export_to_s3 can use it
 
+<<<<<<< Updated upstream
     job_def = graph.to_job(
         resource_defs={"s3_resource": s3_resource},
         executor_def=in_process_executor
+=======
+    return (
+        graph.to_job(
+            hooks=frozenset([publish_failure]),
+        ),
+        run_config,
+>>>>>>> Stashed changes
     )
     return job_def, run_config
 
