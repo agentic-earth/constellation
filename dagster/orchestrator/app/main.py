@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Request
 import requests
+import uuid
 
 app = FastAPI()
 
@@ -18,9 +19,16 @@ async def run_dagster_job_with_config(request: Request):
     if not instructions or not isinstance(instructions, list):
         raise HTTPException(status_code=400, detail="No instructions provided")
 
+    # Generate a unique ID for the job
+    unique_id = str(uuid.uuid4())
+
     # Define the custom configuration for the ops
     job_config = {
-        "ops": {"generate_dynamic_job_configs": {"config": {"raw_input": instructions}}}
+        "ops": {
+            "generate_dynamic_job_configs": {
+                "config": {"raw_input": instructions, "unique_id": unique_id}
+            }
+        }
     }
 
     # Define the GraphQL mutation for launching the job with config
@@ -42,6 +50,7 @@ async def run_dagster_job_with_config(request: Request):
                 ... on LaunchPipelineRunSuccess {
                     run {
                         runId
+                        pipelineName
                     }
                 }
                 ... on PythonError {
@@ -68,9 +77,12 @@ async def run_dagster_job_with_config(request: Request):
             .get("__typename")
             == "LaunchRunSuccess"
         ):
-            run_id = response_data["data"]["launchPipelineExecution"]["run"]["runId"]
-            return {"status": "success", "run_id": run_id}
+            return {
+                "status": "success",
+                "run_id": unique_id,
+            }
         else:
+            print(response_data)
             error_message = response_data["data"]["launchPipelineExecution"].get(
                 "message", "Unknown error"
             )
@@ -79,7 +91,9 @@ async def run_dagster_job_with_config(request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 import uvicorn
+
 
 def main():
     """

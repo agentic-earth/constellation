@@ -13,7 +13,7 @@ RUN pip install \
     dagster-postgres \
     dagster-docker \
     pandas 
-    
+
 RUN pip install gdown
 RUN pip install dagster_aws
 

@@ -148,6 +148,7 @@ model Pipeline {
   run_id        String?         @unique
   status        String?
   message       String?
+  config        Json?           @default("{}")
   Profile       Profile         @relation(fields: [user_id], references: [auth_uid], onDelete: Cascade, onUpdate: NoAction, map: "fk_pipeline_user")
   PipelineBlock PipelineBlock[]
   PipelineEdge  PipelineEdge[]

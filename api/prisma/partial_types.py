@@ -44,6 +44,7 @@ Pipeline.create_partial(
         "message",
         "PipelineBlock",
         "PipelineEdge",
+        "config",
     ],
 )
 

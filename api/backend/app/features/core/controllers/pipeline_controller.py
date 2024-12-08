@@ -21,6 +21,7 @@ Design Philosophy:
 - Ensure robustness through comprehensive error handling and logging.
 """
 
+import json
 import traceback
 from typing import List, Optional, Dict, Any
 from uuid import UUID
@@ -354,7 +355,16 @@ class PipelineController:
                         f"Listed {len(pipelines)} pipelines successfully.",
                         extra={"filters": filters},
                     )
-                    return [pipeline.model_dump() for pipeline in pipelines]
+                    pipelines = [
+                        {
+                            **pipeline.model_dump(),
+                            "config": json.dumps(
+                                pipeline.config
+                            ),  # Serialize config to JSON string
+                        }
+                        for pipeline in pipelines
+                    ]
+                    return pipelines
                 else:
                     self.logger.log(
                         "PipelineController",
@@ -796,6 +806,7 @@ class PipelineController:
         # Based on the config, store the pipeline in the database
         pipeline_data = {
             "user_id": str(user_id),
+            "config": json.dumps(config),
         }
         pipeline = await self.pipeline_service.create_pipeline(
             self.prisma, pipeline_data
@@ -814,11 +825,11 @@ class PipelineController:
                 run_id = response["run_id"]
                 async with self.prisma.tx() as tx:
                     # assign the run_id to the pipeline
-                    self.pipeline_service.update_pipeline(
+                    await self.pipeline_service.update_pipeline(
                         tx, pipeline.pipeline_id, {"run_id": run_id}
                     )
                     # change the pipeline status to running
-                    self.pipeline_service.update_pipeline_status(
+                    await self.pipeline_service.update_pipeline_status(
                         tx, pipeline.pipeline_id, "running"
                     )
 
@@ -833,6 +844,7 @@ class PipelineController:
                 return False
 
         except HTTPException as e:
+            print(f"HTTPException: {e}")
             raise e
 
     async def main(self):

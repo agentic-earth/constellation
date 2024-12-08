@@ -157,6 +157,7 @@ async def list_pipelines(
         raise HTTPException(status_code=500, detail="Failed to retrieve pipelines.")
     return pipelines
 
+
 @router.put("/status/{run_id}/{status}", status_code=200)
 async def update_pipeline_status_by_run_id(
     run_id: str,
@@ -175,9 +176,7 @@ async def update_pipeline_status_by_run_id(
     """
     success = await controller.update_pipeline_status_by_run_id(run_id, status)
     if not success:
-        raise HTTPException(
-            status_code=400, detail="Failed to update pipeline status."
-        )
+        raise HTTPException(status_code=400, detail="Failed to update pipeline status.")
     return {"message": "Pipeline status updated successfully."}
 
 
@@ -194,7 +193,9 @@ async def run_pipeline(
         config = request_body.get("config")
         user_id = request_body.get("user_id")
         if not config or not user_id:
-            raise HTTPException(status_code=400, detail="Config or user_id not provided.")
+            raise HTTPException(
+                status_code=400, detail="Config or user_id not provided."
+            )
 
         result = await controller.run_pipeline(config, user_id)
         if not result:

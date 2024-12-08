@@ -4,6 +4,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from dagster import (
+    DagsterInstance,
     mem_io_manager,
     in_process_executor,
     Any,
@@ -21,6 +22,7 @@ from dagster import (
 )
 from dataclasses import dataclass
 from typing import Any as TypingAny, Dict, Tuple, Optional, List
+import uuid
 
 from dagster_aws.s3 import s3_resource
 
@@ -35,6 +37,7 @@ OP_DEFS = [
     model_inference,
     mock_csv_data,
     write_csv,
+    publish_success,
 ]
 
 
@@ -64,7 +67,7 @@ def parse_instructions(input: dict) -> CallableOperation:
 
 
 def generate_dependencies_and_run_config(
-    instruction: CallableOperation,
+    instruction: CallableOperation, unique_id: str
 ) -> Tuple[Dict, Dict]:
     result = {}
     run_config = {"ops": {}}
@@ -91,6 +94,12 @@ def generate_dependencies_and_run_config(
             run_config["ops"][alias] = {  # Retained copy of error if needed
                 "inputs": {k: {"value": v} for k, v in input_values.items()}
             }
+        else:
+            run_config["ops"][alias] = {}
+            run_config["ops"][alias]["inputs"] = {}
+
+        # Add unique_id to the run_config
+        run_config["ops"][alias]["inputs"]["unique_id"] = {"value": unique_id}
 
         result[current_node] = dependencies if dependencies else {}
 
@@ -100,11 +109,15 @@ def generate_dependencies_and_run_config(
     return result, run_config
 
 
-def define_composite_job(name: str, raw_input: dict) -> Tuple[JobDefinition, Dict]:
+def define_composite_job(
+    name: str, raw_input: dict, unique_id: str
+) -> Tuple[JobDefinition, Dict]:
     instruction: CallableOperation = parse_instructions(input=raw_input)
     deps = {}
     run_config = {}
-    deps, run_config = generate_dependencies_and_run_config(instruction)
+    deps, run_config = generate_dependencies_and_run_config(
+        instruction, unique_id=unique_id
+    )
 
     filtered_op_defs = [
         op
@@ -117,7 +130,6 @@ def define_composite_job(name: str, raw_input: dict) -> Tuple[JobDefinition, Dic
         node_defs=filtered_op_defs,
         dependencies=deps,
     )
-    graph = graph.with_hooks({publish_failure})
 
     return (
         graph.to_job(
@@ -127,31 +139,38 @@ def define_composite_job(name: str, raw_input: dict) -> Tuple[JobDefinition, Dic
     )
 
 
-@op(config_schema={"raw_input": Field(Any)}, out=DynamicOut())
+@op(config_schema={"raw_input": Field(Any), "unique_id": Field(str)}, out=DynamicOut())
 def generate_dynamic_job_configs(context: OpExecutionContext):
     raw_input = context.op_config["raw_input"]
-    yield DynamicOutput(raw_input, mapping_key="dynamic_config")
+    unique_id = context.op_config["unique_id"]
+    yield DynamicOutput((raw_input, unique_id), mapping_key="dynamic_config")
 
 
 @op
 def parse_and_execute_job(
-    context: OpExecutionContext, instructions: list
+    context: OpExecutionContext, data: tuple[list, str]
 ) -> List[TypingAny]:
+    instructions, unique_id = data
     job_list = []
     run_configs = []
     for instruction in instructions:
         job, run_config = define_composite_job(
-            name="dynamic_job", raw_input=instruction
+            name="dynamic_job", raw_input=instruction, unique_id=unique_id
         )
         context.log.info(f"Created dynamic job: {job.name}")
         job_list.append(job)
         run_configs.append(run_config)
 
     # Add final op to publish success
-    job_list.append(
-        GraphDefinition(name="publish_success", node_defs=[publish_success]).to_job()
+    success_raw_input = {
+        "operation": "publish_success",
+        "parameters": {},
+    }
+    success_job, success_run_config = define_composite_job(
+        name="publish_success", raw_input=success_raw_input, unique_id=unique_id
     )
-    run_configs.append(None)
+    job_list.append(success_job)
+    run_configs.append(success_run_config)
 
     all_results = []
     for job, run_config in zip(job_list, run_configs):
@@ -188,7 +207,8 @@ def parse_and_execute_job(
                             },
                         }
                     ],
-                }
+                    "unique_id": "123-123-123",
+                },
             }
         }
     },
@@ -205,8 +225,11 @@ def build_execute_job():
             "import_from_google_drive": {
                 "inputs": {
                     "file_id": {
-                        "value": "1ulPG5mev9EuznRtOjjNgIZRcRrqfzreJ"
-                    }  # Correctly pass the file_id under inputs
+                        "value": "1ulPG5mev9EuznRtOjjNgIZRcRrqfzreJ",
+                    },
+                    "unique_id": {
+                        "value": "123-123-123",
+                    },
                 }
             }
         }
