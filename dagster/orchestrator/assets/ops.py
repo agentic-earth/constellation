@@ -203,7 +203,7 @@ def math_block(
     return result_df
 
 
-@failure_hook(name="publish_failure")
+@failure_hook
 def publish_failure(context: HookContext):
     context.log.error(f"An error occurred: {context.op_exception}")
     error_message = str(context.op_exception)
