@@ -1,27 +1,34 @@
-# Dagster libraries to run both dagster-webserver and the dagster-daemon. Does not
-# need to have access to any pipeline code.
+# Dagster libraries to run both dagster-webserver and the dagster-daemon.
+# Does not need to have access to any pipeline code.
 ARG PYTHON_VERSION=3.10-slim
 FROM python:${PYTHON_VERSION}
 
+# Install necessary Python packages
 RUN pip install \
     dagster \
     dagster-graphql \
     dagster-webserver \
     dagster-postgres \
     dagster-docker \
-    pandas 
+    pandas \
+    gdown \
+    dagster_aws
 
-RUN pip install gdown
-
-RUN pip install dagster_aws
-# Set $DAGSTER_HOME and copy dagster instance and workspace YAML there
+# Set DAGSTER_HOME and copy configuration files
 ENV DAGSTER_HOME=/opt/dagster/dagster_home/
 
 RUN mkdir -p $DAGSTER_HOME
-
 COPY dagster.yaml workspace.yaml $DAGSTER_HOME
 
-ENV AWS_ACCESS_KEY_ID=AKIASE5KQ2YESPUIVLWS
-ENV AWS_SECRET_ACCESS_KEY=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
+# Copy the .env file into the image
+COPY .env $DAGSTER_HOME/.env
 
+# Copy the load_env.sh script into the image
+COPY load_env.sh /usr/local/bin/load_env.sh
+RUN chmod +x /usr/local/bin/load_env.sh
+
+# Set working directory
 WORKDIR $DAGSTER_HOME
+
+# Run the load_env.sh script as the container's entrypoint
+CMD ["/usr/local/bin/load_env.sh"]
