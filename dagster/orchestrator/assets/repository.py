@@ -118,8 +118,6 @@ def define_composite_job(name: str, raw_input: dict) -> Tuple[JobDefinition, Dic
         dependencies=deps,
     )
 
-    # Attach the s3_resource so export_to_s3 can use it
-
     return (
         graph.to_job(
             hooks=frozenset([publish_failure]),
@@ -151,13 +149,9 @@ def parse_and_execute_job(
 
     # Add final op to publish success
     job_list.append(
-        (
-            GraphDefinition(
-                name="publish_success", node_defs=[publish_success]
-            ).to_job(),
-            None,
-        )
+        GraphDefinition(name="publish_success", node_defs=[publish_success]).to_job()
     )
+    run_configs.append(None)
 
     all_results = []
     for job, run_config in zip(job_list, run_configs):
