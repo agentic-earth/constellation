@@ -20,13 +20,15 @@ from dagster import (
     DagsterInvariantViolationError,
 )
 from dataclasses import dataclass
-from typing import Any as TypingAny, Dict, Tuple, Optional
+from typing import Any as TypingAny, Dict, Tuple, Optional, List
+
+from dagster_aws.s3 import s3_resource
 
 from orchestrator.assets.ops import *
-from orchestrator.assets.jobs import *
 
 OP_DEFS = [
     import_from_google_drive,
+    export_to_s3,
     deploy_model,
     delete_model,
     dict_to_list,
@@ -115,8 +117,14 @@ def define_composite_job(name: str, raw_input: dict) -> Tuple[JobDefinition, Dic
         node_defs=filtered_op_defs,
         dependencies=deps,
     )
+    
+        # Attach the s3_resource so export_to_s3 can use it
 
-    return graph.to_job(), run_config
+    job_def = graph.to_job(
+        resource_defs={"s3_resource": s3_resource},
+        executor_def=in_process_executor
+    )
+    return job_def, run_config
 
 
 @op(config_schema={"raw_input": Field(Any)}, out=DynamicOut())
@@ -126,40 +134,47 @@ def generate_dynamic_job_configs(context: OpExecutionContext):
 
 
 @op
-def parse_and_execute_job(context: OpExecutionContext, instructions: list):
-    # Dynamically generate a job based on the input
+def parse_and_execute_job(context: OpExecutionContext, instructions: list) -> List[TypingAny]:
     job_list = []
+    run_configs = []
     for instruction in instructions:
         job, run_config = define_composite_job(
             name="dynamic_job", raw_input=instruction
+
         )
         context.log.info(f"Created dynamic job: {job.name}")
-        job_list.append((job, run_config))
+        job_list.append(job)
+        run_configs.append(run_config)
 
-    for job, run_config in job_list:
+    
+
+    all_results = []
+    for job, run_config in zip(job_list, run_configs):
         context.log.info(f"Executing dynamic job with run_config: {run_config}")
         result = job.execute_in_process(run_config=run_config)
-
         for event in result.all_events:
             context.log.info(f"Event: {event.message}")
-
         try:
             dynamic_result = result.output_value()
             context.log.info(f"Dynamic job result: {dynamic_result}")
+            all_results.append(dynamic_result)
         except DagsterInvariantViolationError:
             context.log.info("Dynamic job executed without outputs.")
+            all_results.append(None)
+    return all_results
 
 
 @job(
+    resource_defs={"s3_resource": s3_resource},
     config={
         "ops": {
             "generate_dynamic_job_configs": {
                 "config": {
                     "raw_input": [
-                        {  # Wrap the dictionary in a list
+                        {
                             "operation": "import_from_google_drive",
                             "parameters": {
-                                "file_id": "1ulPG5mev9EuznRtOjjNgIZRcRrqfzreJ",  # Test Directory of photos from before I went to college... lol
+                                "file_id": "1ulPG5mev9EuznRtOjjNgIZRcRrqfzreJ",
                             },
                         }
                     ],
@@ -174,6 +189,7 @@ def build_execute_job():
 
 
 @job(
+    resource_defs={"s3_resource": s3_resource},
     config={
         "ops": {
             "import_from_google_drive": {

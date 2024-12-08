@@ -300,3 +300,23 @@ def test_define_composite_job_delete_model():
         # Execute the job
         result = job.execute_in_process(run_config=run_config)
         assert result.success
+
+def test_export_to_s3_op():
+    from orchestrator.assets.ops import export_to_s3
+    import json
+    inference_results = {"label": "cat", "confidence": 0.95}
+    bucket_name = "agenticexportbucket"
+    key = "inference_results.json"
+    expected_data = json.dumps(inference_results, indent=2).encode("utf-8")
+    expected_uri = f"s3://{bucket_name}/{key}"
+    mock_s3 = mock.Mock()
+    context = build_op_context(resources={"s3_resource": mock_s3})
+    output = export_to_s3(context, inference_results)
+    # Verify that put_object was called correctly
+    mock_s3.put_object.assert_called_once_with(
+        Bucket=bucket_name,
+        Key=key,
+        Body=expected_data
+    )
+    # Verify the output from the op
+    assert output == expected_uri, "The returned S3 URI does not match the expected value."
