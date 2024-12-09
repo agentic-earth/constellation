@@ -3,6 +3,9 @@
 ##  **Overview**
 
 Welcome to the **Constellation Master Program**! This master application orchestrates a suite of microservices to automate the use of machine learning models for satellite image inference. Our service allows users to connect datasets with models, and evaluate their outputs through a simple drag-and-drop interface supported by an integrated LLM. 
+<p align="center">
+  <img src="Front_End_Short.gif" alt="Front_End_short">
+</p>
 
 ---
 
@@ -11,10 +14,9 @@ Welcome to the **Constellation Master Program**! This master application orchest
 2. [High-Level Design](#high-level-design)
 3. [Prerequisites](#prerequisites)
 4. [Installation Steps](#installation-steps)
-5. [Usage](#usage)
+4. [Codebase Navigation and Project Structure](#codebase-navigation-and-project-structure)
 6. [Future Enhancements](#future-enhancements)
 7. [Technologies and Tools](#technologies-and-tools)
-
 
 ## **High-Level Design**
 
@@ -22,19 +24,19 @@ Constellation relies on a Microservice Architecture with four component services
 
 ![Dagster-Design-Diagram](High-Level-Design.png)
 
-### **Microservices Composition**
+## **Microservices Composition**
 
 1. **Core Backend Microservice**
 
   - **Role**: Acts as the backbone of Constellation, this microservice provides data persistence, and facilitates interactions between other microservices as well as the front-end of our application.
   - **Responsibilities**:
     - Stores datasets, models, and user-created pipelines.
-    - Allows for data retrieval from supabase backend
-    - Manages interactions between the Dagster, LLM, and Model Hosting Microservice
+    - Allows for data retrieval from Supabase backend.
+    - Manages interactions between the Dagster, LLM, and Model Hosting Microservice.
 
 2. **Model Hosting Microservice**
 
-  - **Role**: Leverages the Modal Cloud compute platform to  facilitate the containerization and deployment of machine learning models. 
+  - **Role**: Leverages the Modal Cloud compute platform to facilitate the containerization and deployment of machine learning models.
   - **Responsibilities**:
     - Model containerization and versioning.
     - Deployment of inference endpoints.
@@ -42,20 +44,20 @@ Constellation relies on a Microservice Architecture with four component services
 
 3. **Dagster Microservice**
 
-  - **Role**: Utilizes the task orchestration capabilities of Dagster to create end-to-end piplines starting with data preprocessing and outputting the results of model inference.
+  - **Role**: Utilizes the task orchestration capabilities of Dagster to create end-to-end pipelines starting with data preprocessing and outputting the results of model inference.
   - **Responsibilities**:
-    - Imports data from cloud storage platforms
+    - Imports data from cloud storage platforms.
     - Automates data preprocessing and transformation.
-    - Exports model inference results to cloud storage platforms
+    - Exports model inference results to cloud storage platforms.
 
 4. **Agent (LLM) Microservice**
+
   - **Role**: Leverages Large Language Model (LLM) capabilities to present users with database and model options that meet their prompt constraints.
   - **Responsibilities**:
     - Streamlines model and database selection for the user.
-    - Dynamic JSON generation for pipline invocation.
+    - Dynamic JSON generation for pipeline invocation.
 
-
-### Prerequisites
+## Prerequisites
 
 Before getting started with installation, ensure you have the following installed and configured:
 
@@ -64,31 +66,28 @@ Before getting started with installation, ensure you have the following installe
 - **Supabase Account**
 - **AWS S3 Account** 
 
-### Installation Steps
+## Installation Steps
 
 1. **Clone the Repository**
 
-    ```
-    git clone https://github.com/your-repo/constellation-backend.git
-    cd constellation-backend
-    ```
+   ```
+   git clone https://github.com/your-repo/constellation-backend.git
+   cd constellation-backend
+   ```
 
 2. **Set Up Environment Variables**
 
-   - Create an `.env` file in the root directory with the following:
-   ```
-   SUPABASE_URL=your_supabase_url
-   SUPABASE_KEY=your_supabase_anon_key
-   DATABASE_URL=your_database_url
-   REDIS_URL=redis://localhost:6379
-   ```
-   
-   - Create an `.env` file in the Dagster directory with the following:
-   ```
-   ENV AWS_ACCESS_KEY_ID=your_aws_access_key
-   ENV AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
+    - Create an `.env` file in the `root` directory with the following:
+    ```
+    SUPABASE_URL=your_supabase_url
+    SUPABASE_KEY=your_supabase_anon_key
+    ```
 
-   ```
+    - Create an `.env` file in the `dagster` directory with the following:
+    ```
+    AWS_ACCESS_KEY_ID=your_aws_access_key
+    AWS_SECRET_ACCESS_KEY=your_secret_access_key
+    ```
 
 4. **Run Docker Containers**
 
@@ -97,15 +96,35 @@ Before getting started with installation, ensure you have the following installe
     ```
 
 5. **Access Services**
-  - **Core Microservice**: `http://localhost:8000/core/`
-  - **Docker Microservice**: `http://localhost:8001/docker/`
-  - **Dagster Microservice**: `http://localhost:8002/dagster/`
-  - **Agent Microservice**: `http://localhost:8003/agent/`
 
+  Once the docker-compose containers are built, the frontend can be accessed at: `http://localhost:3005
 
----
+## Codebase Navigation and Project Structure
 
-## **Usage** *(To be added)*
+For those of you who want to understand how our software works, key code files are distributed across various parts of the repository. This section aims to facilitate quick navigation of our codebase. The "Core Code" section pinpoints the locations of essential code files that are crucial for understanding the primary functionality of each microservice.
+
+### Dagster Task Orchestrator
+- **Directory**: `dagster/orchestrator`
+- **Core Code**: Located in the `assets` folder (`repository.py` and `orchestrator.py`).
+- **API Endpoints**: Located in the `app` directory.
+
+### Modal Service
+- **Directory**: `modal`
+- **Core Code**: Model construction, inference, and deconstruction logic is implemented in `utils.py`.
+- **API Endpoints**: Available in the `app` directory.
+
+### Frontend
+- **Framework**: Built using Next.js.
+- **Core Code**: Primarily resides in the `frontend/src` directory.
+
+### Core-Backend Microservice
+- **Directory**: `api`
+- **Core Code**: Supabase-related functionality is in `backend/app` and `backend/app/utils`.
+- **API Sublayer**: APIs that facilitate interaction between microservices are located in `app/feature/core`.
+
+### LLM Microservice
+- **Directory**: `api`
+- **Core Code**: Implemented in `app/features/agent/crews`.
 
 ## **Future Enhancements** 
 
