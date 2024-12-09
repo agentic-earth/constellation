@@ -26,7 +26,7 @@ while providing a clean API for block operations.
 import re
 from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 import asyncio
 
 from prisma.errors import UniqueViolationError

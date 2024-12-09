@@ -1,3 +1,6 @@
+# Ignore the virtual environment directory
+**/constellation_backend
+
 # Ignore Python cache files
 __pycache__/
 *.py[cod]

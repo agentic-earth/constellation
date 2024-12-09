@@ -1,0 +1,11 @@
+# Ignore Python cache files
+__pycache__/
+*.py[cod]
+dist/
+*.DS_Store
+api/backend/app/features/agent/scraped_papers/*
+
+# Ignore the logs and database
+logs/
+db/
+*.log

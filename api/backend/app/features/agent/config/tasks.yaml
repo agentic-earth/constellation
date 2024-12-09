@@ -8,3 +8,13 @@ find_similar_paper:
     - "User's query"
   outputs:
     - "Paper summary"
+
+generate_pseudocode:
+  description: "Search for information in the GitHub repository: {github_repo_url}, Focus on codebase."
+  steps:
+    - "Retrieve the codebase from the GitHub repository."
+    - "Generate pseudocode."
+  inputs:
+    - "GitHub repository URL"
+  outputs:
+    - "Pseudocode"

@@ -22,6 +22,7 @@ class Settings(BaseSettings):
         LOG_FORMAT (str): The format string for log messages.
         SECRET_KEY (str): The secret key for JWT token generation.
         OPENAI_API_KEY (str): The OpenAI API key.
+        OPENAI_API_KEY (str): The OpenAI API key.
     """
 
     SUPABASE_URL: AnyHttpUrl = Field(default=os.getenv("SUPABASE_URL"))
