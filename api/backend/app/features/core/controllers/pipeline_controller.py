@@ -328,7 +328,6 @@ class PipelineController:
                 pipelines = await self.pipeline_service.list_pipelines(
                     tx, filters, limit, offset
                 )
-
                 if pipelines:
                     # Log the listing in Audit Logs
                     audit_log = {
@@ -343,10 +342,6 @@ class PipelineController:
                         },
                     }
                     audit_log = await self.audit_service.create_audit_log(tx, audit_log)
-                    if not audit_log:
-                        raise Exception(
-                            "Failed to create audit log for pipeline listing"
-                        )
 
                     # Log the listing event
                     self.logger.log(
@@ -364,6 +359,7 @@ class PipelineController:
                         }
                         for pipeline in pipelines
                     ]
+                    print(pipelines)
                     return pipelines
                 else:
                     self.logger.log(
