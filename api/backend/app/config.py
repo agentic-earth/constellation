@@ -49,14 +49,6 @@ class Settings(BaseSettings):
     DATABASE_URL: PostgresDsn = Field(
         default=(os.getenv("DATABASE_URL") if os.getenv("DATABASE_URL") else "")
     )
-<<<<<<< HEAD
-    SECRET_KEY: str = Field(default="default-secret-key", validation_alias="SECRET_KEY")
-    OPENAI_API_KEY: str = Field(default=os.getenv("OPENAI_API_KEY"), validation_alias="OPENAI_API_KEY")
-    OPENAI_API_KEY: str = Field(default=os.getenv("OPENAI_API_KEY"), validation_alias="OPENAI_API_KEY")
-    # Add more configuration variables as needed
-    DATABASE_URL: PostgresDsn = Field(..., validation_alias="DATABASE_URL")
-=======
->>>>>>> main
 
     model_config = SettingsConfigDict(
         env_file=ROOT_DIR / ".env",
@@ -68,12 +60,3 @@ class Settings(BaseSettings):
 
 # Initialize the settings object
 settings = Settings()
-<<<<<<< HEAD
-
-#print("Loaded settings:", settings.dict())
-# Uncomment these lines for debugging
-print("Loaded settings:", settings.dict())
-print("ENV file path:", ROOT_DIR / ".env")
-print("DATABASE_URL:", settings.DATABASE_URL)
-=======
->>>>>>> main
