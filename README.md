@@ -81,13 +81,12 @@ Before getting started with installation, ensure you have the following installe
     ```
     SUPABASE_URL=your_supabase_url
     SUPABASE_KEY=your_supabase_anon_key
-    ```
 
-    - Create an `.env` file in the `dagster` directory with the following:
-    ```
     AWS_ACCESS_KEY_ID=your_aws_access_key
     AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
 
+    DATABASE_URL=your_postgresql_url
+    OPENAI_API_KEY=your_openai_api_key
     ```
 
 4. **Run Docker Containers**
