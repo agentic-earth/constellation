@@ -4,7 +4,7 @@
 
 Welcome to the **Constellation Master Program**! This master application orchestrates a suite of microservices to automate the use of machine learning models for satellite image inference. Our service allows users to connect datasets with models, and evaluate their outputs through a simple drag-and-drop interface supported by an integrated LLM. 
 <p align="center">
-  <img src="Front_End_Short.gif" alt="Front_End_short">
+  <img src="Front_End.png" alt="Front_End_short">
 </p>
 
 ---
@@ -86,7 +86,8 @@ Before getting started with installation, ensure you have the following installe
     - Create an `.env` file in the `dagster` directory with the following:
     ```
     AWS_ACCESS_KEY_ID=your_aws_access_key
-    AWS_SECRET_ACCESS_KEY=your_secret_access_key
+    AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
+
     ```
 
 4. **Run Docker Containers**
