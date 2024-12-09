@@ -3,7 +3,6 @@ from crewai import Agent, Task
 from langchain_openai import ChatOpenAI
 from prisma.models import Block as PrismaBlock
 
-
 class LLMCrew:
     """LLM Crew"""
 

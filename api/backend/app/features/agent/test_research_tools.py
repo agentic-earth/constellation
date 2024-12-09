@@ -1,4 +1,13 @@
+import sys
+
+from backend.app.features.agent.crews.crew_process import CrewProcess
+
+sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api")
+sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api/backend")
+
 import asyncio
+from prisma import Prisma
+from backend.app.config import Settings
 from backend.app.features.agent.tools.vector_embed_tool import VectorEmbedTool
 from backend.app.features.agent.tools.similarity_search_tool import SimilaritySearchTool
 from backend.app.features.core.services.block_service import BlockService
@@ -6,7 +15,11 @@ from backend.app.features.core.services.block_service import BlockService
 
 async def test_tools():
     block_service = BlockService()
-    await block_service.connect()
+    settings = Settings()
+    prisma = Prisma(datasource={"url": str(settings.DATABASE_URL)})
+    crew_process = CrewProcess()
+    # dev_crew = DevCrew()
+    await prisma.connect()
     print("Connected to db")
 
     try:
@@ -50,9 +63,7 @@ async def test_tools():
                 if block_vector:
                     print(f"Vector for {created_block.name}: {block_vector[:5]}")
                 else:
-                    print(f"No vector found for {created_block.name}")
-            else:
-                print(f"Failed to create block for {paper['name']}")
+                    print(f"Failed to create block for {paper['title']}")
 
         # Test SimilaritySearchTool
         print("\nTesting SimilaritySearchTool:")
@@ -73,7 +84,7 @@ async def test_tools():
         print(traceback.format_exc())
 
     finally:
-        await block_service.disconnect()
+        await prisma.disconnect()
         print("Disconnected from the database")
 
 

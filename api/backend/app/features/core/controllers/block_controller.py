@@ -16,8 +16,13 @@ Responsibilities:
 - Ensure transactional safety and data consistency.
 """
 
+import sys
+sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api")
+sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api/backend")
+
+import traceback
 from prisma import Prisma
-from uuid import UUID
+from uuid import UUID, uuid4
 from typing import Optional, List, Dict, Any
 from backend.app.features.core.services.block_service import BlockService
 from backend.app.features.core.services.taxonomy_service import TaxonomyService

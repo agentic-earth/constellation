@@ -1,286 +1,212 @@
-# LLM Microservice for Constellation Backend
+#LLM Subsystem Design, Architecture, and Usage
 
-## Overview
+## Table of Contents
 
-This microservice is a crucial component of the Constellation Backend, designed to manage interactions with Language Learning Models (LLMs). It facilitates intelligent conversations, enabling reasoning over our graph of models and data sources to assist in building and suggesting pipelines.
+- [Background](#background)
+- [Install](#install)
+- [Usage](#usage)
+  - [API Invocation](#api-invocation)
+  - [Manual Invocation](#manual-invocation)
+- [LLMCrew and CrewProcess](#llmcrew-and-crewprocess)
+  - [CrewProcess](#crewprocess)
+  - [LLMCrew](#llmcrew)
+  - [How It Works](#how-it-works)
+- [Unit Testing](#unit-testing)
+- [Areas of Future Improvement](#areas-of-future-improvement)
+- [Developer Information](#developer-information)
+  - [Adding New Agents or Models](#adding-new-agents-or-models)
+  - [Adding New Dependencies](#adding-new-dependencies)
 
-## Design Considerations for Engineers
 
-1. **Schema Integration**:
+## Background
+The LLM subsystem is responsible for connecting user queries and associated data blocks (datasets, models, etc.) to a Large Language Model (LLM) agent. Within the larger Agentic Earth software ecosystem, this subsystem transforms user input and accompanying metadata into a structured JSON output that can be consumed by the core, given to downstream services (such as the Dagster), and cointainerized by Docker for tasks like model deployment, data import, and inference execution.
 
-   - Utilize existing schemas from `app/schemas.py`.
-   - Define new schemas as needed, following the established patterns.
-   - Key schemas to consider:
-     - `UserResponseSchema` for user information
-     - `PipelineResponseSchema` for pipeline details
-     - `BlockResponseSchema` and `EdgeResponseSchema` for graph components
+This component leverages a CrewAI's abstraction to manage "agents" and "tasks." An agent (powered by an LLM) is configured to follow user instructions, and a task guides the agent with a detailed description of what to do with the user’s query and associated data blocks. The final output is a JSON structure that Dagster can then use to orchestrate dynamic pipelines. By separating the orchestration logic (handled by Dagster) from the language and reasoning capabilities (handled by the LLM subsystem), we maintain a clear boundary between concerns.
 
-2. **State Management**:
+## Install
 
-   - Implement efficient session state handling.
-   - Consider using Redis or a similar in-memory data store for fast access.
+This subsystem is designed to run as a service within a dockerized environment. It is not meant to be executed independently but rather as part of a larger stack defined by the [Docker-Compose](../docker-compose.yml). 
 
-3. **Concurrency**:
+From the project root directory:
 
-   - Design for high concurrency using asynchronous programming.
-   - Implement proper locking mechanisms for shared resources.
+```bash
+docker-compose up --build
+```
+Once running, the LLM subsystem’s endpoint will be available at the configured internal network interface. Other services (e.g. front-end) will call into this subsystem to retrieve results.
 
-4. **LLM Integration**:
+## Usage
 
-   - Abstract LLM interactions to allow easy switching between providers.
-   - Implement retry logic and error handling for LLM API calls.
+The LLM subsystem is primarily invoked via API calls from an upstream service, typically the FastAPI component that receives user input from the front-end interface. Manual invocations can be done for testing or debugging purposes.
 
-5. **Scalability**:
+## API Invocation
 
-   - Design with horizontal scalability in mind.
-   - Implement stateless architecture where possible.
+When a user submits a query (e.g., "Find me a model that can handle image classification tasks and a dataset that matches a particular keyword"), the front-end sends this query along with a list of data blocks to the API. The API then constructs a call to the LLM subsystem’s endpoint, providing:
 
-6. **Security**:
+-  The user query (query)
+- A list of blocks representing models and datasets (each block contains fields like name, block_type, description, and filepath)
 
-   - Ensure proper authentication and authorization.
-   - Implement rate limiting to prevent abuse.
+The LLM subsystem, using the CrewProcess class, will instantiate an agent (via LLMCrew) and create a Crew object configured with the given tasks. The agent’s underlying LLM (e.g., GPT-3.5-turbo) will then analyze the query and the blocks to determine which model and dataset match the query, and output a final JSON that fits the downstream Dagster pipeline’s expected format.
 
-7. **Logging and Monitoring**:
-   - Use structured logging for easy parsing and analysis.
-   - Implement comprehensive monitoring and alerting.
+For example, a request might look like this (from another service’s perspective):
 
-## Technical Stack
-
-### Core Framework
-
-- **FastAPI**: High-performance, easy-to-use framework for building APIs with Python 3.6+ based on standard Python type hints.
-
-### ASGI Server
-
-- **Uvicorn**: Lightweight ASGI server, for use with asyncio frameworks.
-
-### Database
-
-- **Supabase**: PostgreSQL database with real-time capabilities.
-
-### Caching
-
-- **Redis**: In-memory data structure store, used for caching and session management.
-
-### LLM Integration
-
-Options to consider:
-
-1. **Haystack**: many great build in features and easy to use API and switch between models easy
-2. **Raw GPT API**: enough said
-3. **Langchain**: also enough said
-
-### Additional Libraries
-
-- **Pydantic**: Data validation using Python type annotations.
-- **SQLAlchemy**: SQL toolkit and Object-Relational Mapping (ORM) library.
-- **Alembic**: Database migration tool for SQLAlchemy.
-- **Loguru**: Logging library offering a simple API.
-- **Pytest**: Testing framework for writing and running tests.
-
-## API Endpoints
-
-1. **Start Conversation**
-
-   - `POST /llm/chat/`
-   - Payload: `{"user_id": UUID, "initial_message": str}`
-   - Response: `{"session_id": UUID, "message": str}`
-
-2. **Send Message**
-
-   - `POST /llm/chat/{session_id}/message/`
-   - Payload: `{"user_message": str}`
-   - Response: `{"response_message": str, "updated_session": str}`
-
-3. **Retrieve Conversation History**
-
-   - `GET /llm/chat/{session_id}/history/`
-   - Response: List of message objects
-
-4. **End Conversation**
-
-   - `DELETE /llm/chat/{session_id}/`
-   - Response: Confirmation message
-
-5. **List Active Sessions**
-   - `GET /llm/chat/sessions/`
-   - Response: List of active session objects
-
-# LLM Microservice for Constellation Backend
-
-## Critical Requirement: Dynamic JSON Generation for API Communication
-
-A key feature of this microservice is the ability to have the LLM dynamically generate JSON structures for communication with other APIs in the Constellation Backend. This capability is crucial for several reasons:
-
-1. **Flexible Integration**: It allows the LLM to interact with various components of the system without hardcoding API structures.
-2. **Adaptive Responses**: The LLM can generate appropriate API calls based on user input and context.
-3. **Extensibility**: As new APIs are added to the system, the LLM can be trained to generate JSON for these without code changes.
-
-We will use Pydantic for defining and validating these dynamic JSON structures. This approach offers several advantages:
-
-- **Type Safety**: Pydantic ensures that the generated JSON conforms to expected schemas.
-- **Automatic Validation**: Invalid structures are caught early, preventing downstream errors.
-- **Clear Documentation**: Pydantic models serve as both runtime validators and clear documentation of expected data structures.
-
-### Pydantic Models for Dynamic JSON
-
-Create a set of Pydantic models that represent the various API request and response structures in your system. For example:
-
-```python
-from pydantic import BaseModel
-from typing import List, Optional
-from uuid import UUID
-
-class BlockAPIRequest(BaseModel):
-    block_type: str
-    name: str
-    description: Optional[str] = None
-
-class EdgeAPIRequest(BaseModel):
-    source_block_id: UUID
-    target_block_id: UUID
-    edge_type: str
-
-class PipelineAPIRequest(BaseModel):
-    name: str
-    blocks: List[UUID]
-    edges: List[EdgeAPIRequest]
-
-# ... more models as needed ...
+```json
+{
+    "query": "Find a model related to 'fire detection' and a relevant dataset.",
+    "blocks": [
+        {
+            "name": "vit-fire-detection",
+            "block_type": "model",
+            "description": "A vision transformer model for detecting fires.",
+            "filepath": ""
+        },
+        {
+            "name": "wildfire_dataset",
+            "block_type": "dataset",
+            "description": "Images of wildfires for testing inference.",
+            "filepath": "1aniasD6RcD3Zr7K8DSWiiqtXCRbFx7gU"
+        }
+    ]
+}
 ```
 
-The LLM will be responsible for generating JSON that conforms to these models. You can then use Pydantic to validate and process the LLM's output:
+On receiving this input, the LLM subsystem will return a structured JSON ready for a Dagster execution pipeline, substituting the {xxx} and {yyy} placeholders with the identified model name and dataset filepath.
 
-```python
-async def process_llm_output(llm_json_str: str) -> PipelineAPIRequest:
-    try:
-        # Parse and validate the LLM's JSON output
-        pipeline_request = PipelineAPIRequest.parse_raw(llm_json_str)
-        # Use the validated object to make API calls or process further
-        return pipeline_request
-    except ValidationError as e:
-        # Handle validation errors, possibly by asking the LLM to correct its output
-        logger.error(f"LLM generated invalid JSON: {e}")
-        # Implement error handling strategy (e.g., retry, fallback, or user notification)
+## Manual Invocation
+
+For testing, you can manually invoke the LLM subsystem’s endpoint (if exposed) using tools like curl or Postman. Since the subsystem is configured for inter-service communication, you may need to set up appropriate networking or run it in isolation for direct testing. Once accessible, you can POST a similar JSON payload as shown above and verify that the response is a properly formatted JSON pipeline configuration.
+
+## CrewProcess and Crew 
+
+CrewProcess
+The CrewProcess class is responsible for instantiating and configuring a Crew object. Given a user query and a list of Block objects (representing models, datasets, and other resources):
+- Builds an Agent (via LLMCrew) configured with a Large Language Model (LLM).
+- Constructs a Task that guides the agent on how to interpret the query and blocks.
+- Returns a Crew object that, when invoked, leverages the LLM to produce the required JSON structure (e.g., pipelines with deploy/execute/delete instructions).
+LLMCrew
+
+Crew
+The Crew class encapsulates the logic required to:
+- Define how an Agent should behave (including role, goal, and backstory).
+- Construct a Task that instructs the agent on how to parse the user query and the provided blocks, ultimately producing a dynamic JSON pipeline configuration.
+
+The LLMCrew uses a standard prompt template that instructs the LLM to identify which blocks are relevant to the query, extract the needed model and dataset information, and integrate them into a JSON template. The resulting JSON is intended for seamless integration with downstream services, particularly Dagster, to dynamically orchestrate data pipelines.
+
+## How It Works
+
+#Inputs:
+
+- Query: A user-provided query asking for certain models or datasets.
+- Blocks: A list of PrismaBlock objects containing metadata (name, type, description, and filepath).
+
+#Process:
+
+1. CrewProcess instantiates an LLM-backed Agent via LLMCrew.
+2. A Task is built, embedding instructions into the agent’s context. These instructions detail how to:
+- Identify relevant models and datasets from the block list.
+- Insert the identified model and dataset into placeholders within a pre-defined JSON schema.
+- Output only the final JSON structure without additional explanation.
+
+#Outputs:
+
+The LLM returns a structured JSON payload containing operations like deploy_model, import_from_google_drive, model_inference, and delete_model.
+This JSON is then validated and passed downstream, e.g., to the Dagster subsystem, to execute the specified pipeline of operations.
+
+Example Use Case:
+
+For instance, if a user queries: "Find a model related to fire detection and a relevant dataset," and the Blocks include a model block named "vit-fire-detection" and a dataset block named "wildfire_dataset", the LLMCrew and CrewProcess will produce a JSON structure similar to:
+
+```json
+{
+    "ops": {
+        "generate_dynamic_job_configs": {
+            "config": {
+                "raw_input": [
+                    {
+                        "operation": "deploy_model",
+                        "parameters": {
+                            "model": "vit-fire-detection"
+                        }
+                    },
+                    {
+                        "operation": "export_to_s3",
+                        "parameters": {
+                            "inference_results": {
+                                "operation": "model_inference",
+                                "parameters": {
+                                    "data": {
+                                        "operation": "dict_to_list",
+                                        "parameters": {
+                                            "data": {
+                                                "operation": "import_from_google_drive",
+                                                "parameters": {
+                                                    "file_id": "1aniasD6RcD3Zr7K8DSWiiqtXCRbFx7gU"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "model": "vit-fire-detection"
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "operation": "delete_model",
+                        "parameters": {
+                            "model": "vit-fire-detection"
+                        }
+                    }
+                ]
+            }
+        }
+    }
+}
+```
+This JSON can then be passed to the Dagster subsystem to dynamically construct and execute the necessary pipeline steps.
+
+
+## Unit Testing
+Unit tests for the LLM subsystem should be written to ensure that the CrewProcess, LLMCrew, and underlying agents and tasks produce the correct output. To run tests:
+
+```bash
+pytest
+```
+We have implemented a set of unit tests in `test_crew.py` to ensure the `LLMCrew` and `CrewProcess` classes behave as expected. These tests cover:
+
+- **Agent Creation**: Verifying that the agent is instantiated with the correct properties (role, goal, etc.).
+- **Task Description Integrity**: Ensuring that the generated task description includes the user query, the blocks' details, and expected placeholders.
+- **Crew Assembly**: Confirming that a `Crew` object is correctly constructed with the given agent and task.
+- **JSON Structure Validation**: Checking that the final JSON structure and placeholders (`{xxx}` and `{yyy}`) appear as intended.
+
+To run the tests, navigate to your project’s root directory and run:
+
+
+## Developer Information
+
+Adding New Agents or Models
+
+Create a New Agent: 
+- In Crew, add another method similar to build_agent() that configures a different LLM or adjusts parameters (e.g., temperature, model version).
+
+Create a New Task:
+- Add another method to Crew similar to build_task() for a different prompt structure, suited to another use case.
+
+Register and Invoke:
+- Update CrewProcess to optionally select between different agents or tasks based on configuration or user input.
+
+## Adding New Dependencies
+
+To add new Python dependencies, update the `pyproject.toml` file used by Poetry. Once you have specified the new dependencies there, run:
+
+```bash
+poetry update
 ```
 
-By implementing this dynamic JSON generation with Pydantic validation, you create a powerful and flexible system for LLM-driven API interactions within the Constellation Backend.
+## Areas of Future Improvement
 
-## Schema Usage and Definition
+- Multiple Models/Datasets & Error Handling: Vector similarity search can be used to handle scenarios with multiple matches or no obvious candidates. Documenting the thresholds and metrics used, as well as fallback strategies is probably good practice.
 
-1. Utilize existing schemas from `app/schemas.py`:
+- Configuration Management: Introduce environment variables or configuration files for switching LLM providers or changing prompt templates without modifying code.
 
-   ```python
-   from app.schemas import UserResponseSchema, PipelineResponseSchema, BlockResponseSchema, EdgeResponseSchema
-   ```
+- Testing & Validation: Add test cases for edge scenarios, such as no matched blocks and multiple equally relevant matches.
 
-2. Define new schemas specific to LLM interactions:
 
-   ```python
-   from pydantic import BaseModel, Field
-   from uuid import UUID
-   from datetime import datetime
-
-   class ChatSessionSchema(BaseModel):
-       session_id: UUID = Field(..., description="Unique identifier for the chat session")
-       user_id: UUID = Field(..., description="UUID of the user associated with this session")
-       created_at: datetime = Field(..., description="Timestamp of session creation")
-       last_active: datetime = Field(..., description="Timestamp of last activity in the session")
-
-   class ChatMessageSchema(BaseModel):
-       message_id: UUID = Field(..., description="Unique identifier for the message")
-       session_id: UUID = Field(..., description="UUID of the associated chat session")
-       sender: str = Field(..., description="Identifier of the message sender (user or LLM)")
-       content: str = Field(..., description="Content of the message")
-       timestamp: datetime = Field(..., description="Timestamp of when the message was sent/received")
-   ```
-
-## LLM Integration Considerations
-
-1. **API Abstraction**:
-   Create an abstract base class for LLM interactions to allow easy switching between providers:
-
-   ```python
-   from abc import ABC, abstractmethod
-
-   class LLMProvider(ABC):
-       @abstractmethod
-       async def generate_response(self, prompt: str) -> str:
-           pass
-
-   class OpenAIProvider(LLMProvider):
-       async def generate_response(self, prompt: str) -> str:
-           # Implementation for OpenAI
-
-   class HuggingFaceProvider(LLMProvider):
-       async def generate_response(self, prompt: str) -> str:
-           # Implementation for Hugging Face
-   ```
-
-2. **Prompt Engineering**:
-   Develop a robust system for constructing prompts that incorporate context from the Constellation graph:
-
-   ```python
-   async def construct_prompt(user_message: str, context: dict) -> str:
-       # Logic to construct a prompt using user message and graph context
-   ```
-
-3. **Response Parsing**:
-   Implement parsing logic to extract structured information from LLM responses:
-   ```python
-   async def parse_llm_response(response: str) -> dict:
-       # Logic to parse LLM response into structured data
-   ```
-
-## Concurrency and State Management
-
-1. Use FastAPI's built-in support for asynchronous request handling.
-2. Implement a Redis-based session store:
-
-   ```python
-   import aioredis
-
-   redis = aioredis.from_url("redis://localhost")
-
-   async def get_session(session_id: UUID) -> dict:
-       return await redis.get(str(session_id))
-
-   async def update_session(session_id: UUID, data: dict):
-       await redis.set(str(session_id), data)
-   ```
-
-## Testing Strategy
-
-1. Unit Tests: Test individual components in isolation.
-2. Integration Tests: Test the interaction between components.
-3. End-to-End Tests: Test the entire flow from user input to LLM response.
-
-## Deployment Considerations
-
-1. Use Docker for containerization to ensure consistency across environments.
-2. Implement a CI/CD pipeline for automated testing and deployment.
-3. Consider using Kubernetes for orchestration in a production environment.
-
-## Monitoring and Logging
-
-1. Implement structured logging using Loguru:
-
-   ```python
-   from loguru import logger
-
-   logger.add("llm_service.log", rotation="500 MB")
-
-   async def some_function():
-       logger.info("Processing request", extra={"user_id": user_id, "session_id": session_id})
-   ```
-
-2. Set up monitoring using Prometheus and Grafana for real-time insights into service performance.
-
-## Future Enhancements
-
-1. Implement more sophisticated context management for multi-turn conversations.
-2. Explore fine-tuning LLMs on domain-specific data for improved performance.
-3. Implement a feedback loop system for continuous improvement of LLM responses.
-4. Consider streaming efficiently to the frontend!!!
-
-By following these guidelines and considerations, you'll be well-equipped to develop a robust and scalable LLM microservice for the Constellation Backend. Remember to maintain clear documentation and adhere to established coding standards throughout the development process.
