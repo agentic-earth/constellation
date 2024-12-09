@@ -54,6 +54,8 @@ export const getPipelineRuns = async () => {
     );
     const data = await response.json();
 
+    console.log(data);
+
     // Create pipeline run objects with the correct type
     const pipelines = data.map((pipeline: any) => ({
       id: pipeline.pipeline_id,
@@ -62,6 +64,8 @@ export const getPipelineRuns = async () => {
       config: { raw_input: pipeline.config } as DagsterConfig,
       message: pipeline.message || "No message available",
     }));
+
+    console.log(pipelines);
 
     return pipelines;
   } catch (error) {
