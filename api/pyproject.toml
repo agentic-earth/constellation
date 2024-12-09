@@ -22,18 +22,10 @@ pandas = "^2.2.3"
 PyPDF2 = "^3.0.0"
 scikit-learn = "^1.0.2"
 numpy = "^1.22.0"
-crewai = "0.1.24"
 pgvector-haystack = "^1.0.0"
-<<<<<<< HEAD
-sentence-transformers = "^3.2.1"
-langchain-openai = "^0.0.5"
-prisma = "^0.15.0"
-nest-asyncio = "^1.6.0"
-=======
 sentence-transformers = "^3.3.1"
 gdown = "^5.2.0"
 crewai = "^0.86.0"
->>>>>>> main
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
