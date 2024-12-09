@@ -6,6 +6,13 @@ services:
       POSTGRES_USER: "postgres_user"
       POSTGRES_PASSWORD: "postgres_password"
       POSTGRES_DB: "postgres_db"
+      SUPABASE_URL: "${SUPABASE_URL}"
+      SUPABASE_KEY: "${SUPABASE_KEY}"
+      SUPABASE_SERVICE_KEY: "${SUPABASE_SERVICE_KEY}"
+      DATABASE_URL: "${DATABASE_URL}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY}"
     networks:
       - dagster_network
     healthcheck:
@@ -28,6 +35,13 @@ services:
       DAGSTER_POSTGRES_PASSWORD: "postgres_password"
       DAGSTER_POSTGRES_DB: "postgres_db"
       DAGSTER_CURRENT_IMAGE: "dagster_assets"
+      SUPABASE_URL: "${SUPABASE_URL}"
+      SUPABASE_KEY: "${SUPABASE_KEY}"
+      SUPABASE_SERVICE_KEY: "${SUPABASE_SERVICE_KEY}"
+      DATABASE_URL: "${DATABASE_URL}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY}"
     volumes:
       - ./dagster/:/opt/dagster/app
     networks:
@@ -56,11 +70,16 @@ services:
       DAGSTER_POSTGRES_USER: "postgres_user"
       DAGSTER_POSTGRES_PASSWORD: "postgres_password"
       DAGSTER_POSTGRES_DB: "postgres_db"
-
+      SUPABASE_URL: "${SUPABASE_URL}"
+      SUPABASE_KEY: "${SUPABASE_KEY}"
+      SUPABASE_SERVICE_KEY: "${SUPABASE_SERVICE_KEY}"
+      DATABASE_URL: "${DATABASE_URL}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/io_manager_storage:/tmp/io_manager_storage
-      # - ./dagster/orchestrator/assets/:/opt/dagster/dagster_home/assets/
     networks:
       - dagster_network
     depends_on:
@@ -84,12 +103,16 @@ services:
       DAGSTER_POSTGRES_USER: "postgres_user"
       DAGSTER_POSTGRES_PASSWORD: "postgres_password"
       DAGSTER_POSTGRES_DB: "postgres_db"
-
+      SUPABASE_URL: "${SUPABASE_URL}"
+      SUPABASE_KEY: "${SUPABASE_KEY}"
+      SUPABASE_SERVICE_KEY: "${SUPABASE_SERVICE_KEY}"
+      DATABASE_URL: "${DATABASE_URL}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY}"
     volumes:
-      # Make docker client accessible so we can launch containers using host docker
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/io_manager_storage:/tmp/io_manager_storage
-      # - ./dagster/orchestrator/assets/:/opt/dagster/dagster_home/assets/
     networks:
       - dagster_network
     depends_on:
@@ -109,6 +132,13 @@ services:
       - "8001:8001"
     environment:
       API_HOME: /opt/api/app
+      SUPABASE_URL: "${SUPABASE_URL}"
+      SUPABASE_KEY: "${SUPABASE_KEY}"
+      SUPABASE_SERVICE_KEY: "${SUPABASE_SERVICE_KEY}"
+      DATABASE_URL: "${DATABASE_URL}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY}"
     networks:
       - dagster_network
     volumes:
@@ -130,6 +160,13 @@ services:
       - "8000"
     environment:
       API_HOME: /opt/api/app
+      SUPABASE_URL: "${SUPABASE_URL}"
+      SUPABASE_KEY: "${SUPABASE_KEY}"
+      SUPABASE_SERVICE_KEY: "${SUPABASE_SERVICE_KEY}"
+      DATABASE_URL: "${DATABASE_URL}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY}"
     networks:
       - dagster_network
     depends_on:
@@ -149,6 +186,13 @@ services:
       - "8002"
     environment:
       API_HOME: /opt/api/app
+      SUPABASE_URL: "${SUPABASE_URL}"
+      SUPABASE_KEY: "${SUPABASE_KEY}"
+      SUPABASE_SERVICE_KEY: "${SUPABASE_SERVICE_KEY}"
+      DATABASE_URL: "${DATABASE_URL}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY}"
     networks:
       - dagster_network
     depends_on:
@@ -163,6 +207,14 @@ services:
       - "3005:3005"
     expose:
       - "3005"
+    environment:
+      SUPABASE_URL: "${SUPABASE_URL}"
+      SUPABASE_KEY: "${SUPABASE_KEY}"
+      SUPABASE_SERVICE_KEY: "${SUPABASE_SERVICE_KEY}"
+      DATABASE_URL: "${DATABASE_URL}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY}"
     networks:
       - dagster_network
 
