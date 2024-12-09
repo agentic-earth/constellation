@@ -170,8 +170,15 @@ Unit tests for the LLM subsystem should be written to ensure that the CrewProces
 ```bash
 pytest
 ```
+We have implemented a set of unit tests in `test_crew.py` to ensure the `LLMCrew` and `CrewProcess` classes behave as expected. These tests cover:
 
-Tests will verify that, given a query and a set of blocks, the LLM subsystem returns the expected JSON structure. As you add new agents, tasks, or logic, corresponding tests should be added or updated to maintain coverage.
+- **Agent Creation**: Verifying that the agent is instantiated with the correct properties (role, goal, etc.).
+- **Task Description Integrity**: Ensuring that the generated task description includes the user query, the blocks' details, and expected placeholders.
+- **Crew Assembly**: Confirming that a `Crew` object is correctly constructed with the given agent and task.
+- **JSON Structure Validation**: Checking that the final JSON structure and placeholders (`{xxx}` and `{yyy}`) appear as intended.
+
+To run the tests, navigate to your project’s root directory and run:
+
 
 ## Developer Information
 
@@ -200,6 +207,6 @@ poetry update
 
 - Configuration Management: Introduce environment variables or configuration files for switching LLM providers or changing prompt templates without modifying code.
 
-- Testing & Validation: Add test cases for edge scenarios, such as no matched blocks, multiple equally relevant matches, or invalid responses.
+- Testing & Validation: Add test cases for edge scenarios, such as no matched blocks and multiple equally relevant matches.
 
 
