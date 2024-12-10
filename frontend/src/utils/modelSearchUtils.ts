@@ -23,7 +23,7 @@ export const getItemsPerPage = (width: number): number => {
 
 export const updateSearchQuery = (
   prevQuery: SearchQuery,
-  updates: Partial<SearchQuery>
+  updates: Partial<SearchQuery>,
 ): SearchQuery => {
   return {
     ...prevQuery,

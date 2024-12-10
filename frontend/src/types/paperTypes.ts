@@ -187,7 +187,7 @@ enum SatelliteSource {
   FY_4 = "FY-4",
   NAIP = "NAIP",
   NA = "N/A",
-  CMIP6 = 'CMIP6',
+  CMIP6 = "CMIP6",
 }
 
 enum ClimateWeatherDataSource {
@@ -224,7 +224,7 @@ interface SearchQuery {
   };
   limit: number;
   offset: number;
-  searchTerm?: string; 
+  searchTerm?: string;
 }
 
 interface FullPaper {

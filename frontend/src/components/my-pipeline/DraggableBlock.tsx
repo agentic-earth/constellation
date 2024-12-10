@@ -22,7 +22,7 @@ export const DraggableBlock = ({ block }: { block: Block }) => {
         isDragging: !!monitor.isDragging(),
       }),
     }),
-    [block]
+    [block],
   );
 
   return (

@@ -1,6 +1,6 @@
-import axios from 'axios';
+import axios from "axios";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 export async function getChatResponse(message: string) {
   try {
@@ -9,7 +9,7 @@ export async function getChatResponse(message: string) {
     });
     return response.data;
   } catch (error) {
-    console.error('Error getting chat response:', error);
+    console.error("Error getting chat response:", error);
     throw error;
   }
 }

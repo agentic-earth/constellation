@@ -27,13 +27,13 @@ export function PipelineSidebar() {
 
   useEffect(() => {
     setDatasetBlocks(
-      allBlocks.filter((block) => block.type === BlockTypes.DATASET)
+      allBlocks.filter((block) => block.type === BlockTypes.DATASET),
     );
     setModelBlocks(
-      allBlocks.filter((block) => block.type === BlockTypes.MODEL)
+      allBlocks.filter((block) => block.type === BlockTypes.MODEL),
     );
     setExportBlocks(
-      allBlocks.filter((block) => block.type === BlockTypes.EXPORT)
+      allBlocks.filter((block) => block.type === BlockTypes.EXPORT),
     );
   }, [allBlocks, setDatasetBlocks, setModelBlocks, setExportBlocks]);
 

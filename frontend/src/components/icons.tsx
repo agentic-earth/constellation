@@ -6,7 +6,7 @@ export {
   Github as GithubIcon,
   HeartHandshake as HeartHandshakeIcon,
   Satellite as SatelliteIcon, // Add this line
-} from 'lucide-react';
+} from "lucide-react";
 
 export const ArrowRightIcon = (props) => (
   <svg

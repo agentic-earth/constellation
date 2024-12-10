@@ -20,7 +20,7 @@ export const DataSourceFilter: React.FC<DataSourceFilterProps> = ({
     setSelectedDataSources((prev) =>
       prev.includes(value)
         ? prev.filter((ds) => ds !== value)
-        : [...prev, value]
+        : [...prev, value],
     );
   };
 

@@ -105,8 +105,6 @@ class PipelineController:
                     },
                 }
                 audit_log = await self.audit_service.create_audit_log(tx, audit_log)
-                if not audit_log:
-                    raise Exception("Failed to create audit log for pipeline creation")
 
                 # Log the creation event
                 self.logger.log(
@@ -159,8 +157,6 @@ class PipelineController:
                     },
                 }
                 audit_log = await self.audit_service.create_audit_log(tx, audit_log)
-                if not audit_log:
-                    raise Exception("Failed to create audit log for pipeline retrieval")
 
                 # Log the retrieval event
                 self.logger.log(
@@ -222,8 +218,6 @@ class PipelineController:
                     },
                 }
                 audit_log = await self.audit_service.create_audit_log(tx, audit_log)
-                if not audit_log:
-                    raise Exception("Failed to create audit log for pipeline update")
 
                 # Log the update event
                 self.logger.log(
@@ -277,8 +271,6 @@ class PipelineController:
                     },
                 }
                 audit_log = await self.audit_service.create_audit_log(tx, audit_log)
-                if not audit_log:
-                    raise Exception("Failed to create audit log for pipeline deletion")
 
                 # Log the deletion event
                 self.logger.log(
@@ -359,7 +351,6 @@ class PipelineController:
                         }
                         for pipeline in pipelines
                     ]
-                    print(pipelines)
                     return pipelines
                 else:
                     self.logger.log(
@@ -490,10 +481,6 @@ class PipelineController:
                     },
                 }
                 audit_log = await self.audit_service.create_audit_log(tx, audit_log)
-                if not audit_log:
-                    raise Exception(
-                        "Failed to create audit log for pipeline creation with dependencies"
-                    )
 
                 self.logger.log(
                     "PipelineController",
@@ -614,10 +601,6 @@ class PipelineController:
                     },
                 }
                 audit_log = await self.audit_service.create_audit_log(tx, audit_log)
-                if not audit_log:
-                    raise Exception(
-                        "Failed to create audit log for pipeline deletion with dependencies"
-                    )
 
                 # Log the deletion event
                 self.logger.log(
@@ -717,10 +700,6 @@ class PipelineController:
                 }
 
                 audit_log = await self.audit_service.create_audit_log(tx, audit_log)
-                if not audit_log:
-                    raise Exception(
-                        "Failed to create audit log for pipeline verification"
-                    )
 
                 self.logger.log(
                     "PipelineController",

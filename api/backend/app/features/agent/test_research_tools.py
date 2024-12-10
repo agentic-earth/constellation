@@ -2,8 +2,12 @@ import sys
 
 from backend.app.features.agent.crews.crew_process import CrewProcess
 
-sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api")
-sys.path.append("/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api/backend")
+sys.path.append(
+    "/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api"
+)
+sys.path.append(
+    "/Users/justinxiao/Downloads/coursecode/CSCI2340/constellation-backend/api/backend"
+)
 
 import asyncio
 from prisma import Prisma

@@ -7,6 +7,7 @@ from backend.app.features.agent.crews.crew import LLMCrew
 from backend.app.features.agent.crews.crew_process import CrewProcess
 from prisma.models import Block as PrismaBlock
 
+
 @pytest.fixture
 def mock_blocks() -> List[PrismaBlock]:
     """
@@ -26,15 +27,19 @@ def mock_blocks() -> List[PrismaBlock]:
 
     return [block1, block2]
 
+
 def test_build_agent():
     """
     Test that LLMCrew.build_agent() creates an Agent with the expected attributes.
     """
     agent = LLMCrew.build_agent()
     assert agent is not None, "Agent should not be None"
-    assert hasattr(agent, 'llm'), "Agent should have an LLM"
+    assert hasattr(agent, "llm"), "Agent should have an LLM"
     assert agent.role == "Analyst", "Agent role should be 'Analyst'"
-    assert agent.goal == "Follow the instructions", "Agent goal should match the given string"
+    assert (
+        agent.goal == "Follow the instructions"
+    ), "Agent goal should match the given string"
+
 
 def test_build_task(mock_blocks):
     """
@@ -45,10 +50,17 @@ def test_build_task(mock_blocks):
     query = "Find relevant data"
     task = LLMCrew.build_task(query, mock_blocks, agent)
     assert task is not None, "Task should not be None"
-    assert hasattr(task, 'description'), "Task should have a description"
-    assert "Find relevant data" in task.description, "Task description should contain the query"
-    assert "Block Type: model" in task.description, "Task description should list model block"
-    assert "Block Type: dataset" in task.description, "Task description should list dataset block"
+    assert hasattr(task, "description"), "Task should have a description"
+    assert (
+        "Find relevant data" in task.description
+    ), "Task description should contain the query"
+    assert (
+        "Block Type: model" in task.description
+    ), "Task description should list model block"
+    assert (
+        "Block Type: dataset" in task.description
+    ), "Task description should list dataset block"
+
 
 def test_crew_process(mock_blocks):
     """
@@ -61,7 +73,10 @@ def test_crew_process(mock_blocks):
     assert len(crew.agents) == 1
     assert len(crew.tasks) == 1
     assert crew.tasks[0].agent is crew.agents[0]
-    assert "Find relevant data" in crew.tasks[0].description, "Crew's task description should contain the query"
+    assert (
+        "Find relevant data" in crew.tasks[0].description
+    ), "Crew's task description should contain the query"
+
 
 def test_task_json_structure(mock_blocks):
     """
@@ -70,8 +85,16 @@ def test_task_json_structure(mock_blocks):
     agent = LLMCrew.build_agent()
     query = "Find relevant data"
     task = LLMCrew.build_task(query, mock_blocks, agent)
-    assert "{xxx}" in task.description, "Task description should contain the {xxx} placeholder for the model."
-    assert "{yyy}" in task.description, "Task description should contain the {yyy} placeholder for the dataset file_id."
+    assert (
+        "{xxx}" in task.description
+    ), "Task description should contain the {xxx} placeholder for the model."
+    assert (
+        "{yyy}" in task.description
+    ), "Task description should contain the {yyy} placeholder for the dataset file_id."
     assert '"ops": {' in task.description, "Expected 'ops' key in the JSON structure."
-    assert '"generate_dynamic_job_configs": {' in task.description, "Expected 'generate_dynamic_job_configs' key in the JSON structure."
-    assert '"raw_input": [' in task.description, "Expected 'raw_input' array in the JSON structure."
+    assert (
+        '"generate_dynamic_job_configs": {' in task.description
+    ), "Expected 'generate_dynamic_job_configs' key in the JSON structure."
+    assert (
+        '"raw_input": [' in task.description
+    ), "Expected 'raw_input' array in the JSON structure."

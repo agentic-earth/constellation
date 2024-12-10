@@ -9,7 +9,7 @@ export const createGeneratedPipeline = async (query: string) => {
       `${API_URL}/blocks/construct-pipeline/?user_id=36906826-9558-4631-b4a6-c34d6109856d&query=${query}`,
       {
         method: "GET",
-      }
+      },
     );
 
     const data = await response.json();
@@ -50,11 +50,9 @@ export const runPipeline = async (dagsterConfig: DagsterConfig) => {
 export const getPipelineRuns = async () => {
   try {
     const response = await fetch(
-      `${API_URL}/pipelines/?user_id=36906826-9558-4631-b4a6-c34d6109856d`
+      `${API_URL}/pipelines/?user_id=36906826-9558-4631-b4a6-c34d6109856d`,
     );
     const data = await response.json();
-
-    console.log(data);
 
     // Create pipeline run objects with the correct type
     const pipelines = data.map((pipeline: any) => ({
@@ -64,8 +62,6 @@ export const getPipelineRuns = async () => {
       config: { raw_input: pipeline.config } as DagsterConfig,
       message: pipeline.message || "No message available",
     }));
-
-    console.log(pipelines);
 
     return pipelines;
   } catch (error) {
@@ -80,11 +76,12 @@ export const getPipelineRuns = async () => {
 export const clearPipelines = async (pipelineIds: string[]) => {
   try {
     for (const pipelineId of pipelineIds) {
+      console.log(pipelineId);
       const response = await fetch(
         `${API_URL}/pipelines/${pipelineId}/?user_id=36906826-9558-4631-b4a6-c34d6109856d`,
         {
           method: "DELETE",
-        }
+        },
       );
     }
   } catch (error) {

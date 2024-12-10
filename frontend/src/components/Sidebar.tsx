@@ -50,7 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [filter, setFilter] = useState("");
 
   const filteredModels = weatherModels.filter((model) =>
-    model.name.toLowerCase().includes(filter.toLowerCase())
+    model.name.toLowerCase().includes(filter.toLowerCase()),
   );
 
   return (

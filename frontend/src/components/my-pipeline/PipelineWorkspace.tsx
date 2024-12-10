@@ -133,7 +133,7 @@ export function PipelineWorkspace({ onClearAll }: PipelineWorkspaceProps) {
         console.log("New block added:", newBlock);
       }
     },
-    [setBlocks, zoomLevel]
+    [setBlocks, zoomLevel],
   );
 
   const [, drop] = useDrop(
@@ -141,7 +141,7 @@ export function PipelineWorkspace({ onClearAll }: PipelineWorkspaceProps) {
       accept: [BlockTypes.MODEL, BlockTypes.DATASET, BlockTypes.EXPORT],
       drop: handleDrop,
     }),
-    [handleDrop]
+    [handleDrop],
   );
 
   // Handle dragging blocks
@@ -173,8 +173,8 @@ export function PipelineWorkspace({ onClearAll }: PipelineWorkspaceProps) {
                     y: block.position.y + deltaY,
                   },
                 }
-              : block
-          )
+              : block,
+          ),
         );
         setDragStart({ x: e.pageX, y: e.pageY });
 
@@ -196,7 +196,7 @@ export function PipelineWorkspace({ onClearAll }: PipelineWorkspaceProps) {
       isPanning,
       panStart,
       scrollStart,
-    ]
+    ],
   );
 
   const handleMouseUp = useCallback(() => {
@@ -254,7 +254,7 @@ export function PipelineWorkspace({ onClearAll }: PipelineWorkspaceProps) {
       const existingConnection = connections.find(
         (conn) =>
           (conn.source === selectedBlockId && conn.target === blockId) ||
-          (conn.source === blockId && conn.target === selectedBlockId)
+          (conn.source === blockId && conn.target === selectedBlockId),
       );
       if (!existingConnection) {
         // setConnections((prevConnections) => [
@@ -317,12 +317,12 @@ export function PipelineWorkspace({ onClearAll }: PipelineWorkspaceProps) {
   // Handle delete block
   const handleDeleteBlock = (blockId: string) => {
     setBlocks((prevBlocks) =>
-      prevBlocks.filter((block) => block.id !== blockId)
+      prevBlocks.filter((block) => block.id !== blockId),
     );
     setConnections((prevConnections) =>
       prevConnections.filter(
-        (conn) => conn.source !== blockId && conn.target !== blockId
-      )
+        (conn) => conn.source !== blockId && conn.target !== blockId,
+      ),
     );
     if (selectedBlockId === blockId) {
       setSelectedBlockId(null);
@@ -375,13 +375,13 @@ export function PipelineWorkspace({ onClearAll }: PipelineWorkspaceProps) {
         [id]: { width, height },
       }));
     },
-    []
+    [],
   );
 
   // Add a delete connection handler
   const handleDeleteConnection = (connectionId: string) => {
     setConnections((prevConnections) =>
-      prevConnections.filter((conn) => conn.id !== connectionId)
+      prevConnections.filter((conn) => conn.id !== connectionId),
     );
   };
 

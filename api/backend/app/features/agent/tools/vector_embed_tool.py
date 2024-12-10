@@ -1,7 +1,9 @@
 import asyncio
 import nest_asyncio
 from langchain.tools import StructuredTool
-from backend.app.features.core.services.vector_embedding_service import VectorEmbeddingService
+from backend.app.features.core.services.vector_embedding_service import (
+    VectorEmbeddingService,
+)
 from langchain.tools import BaseTool
 from typing import List, Optional
 import asyncio
@@ -21,6 +23,6 @@ VectorEmbedTool = StructuredTool.from_function(
     name="VectorEmbedTool",
     description="Embeds the user's query into a vector space.",
 )
-     
+
 if __name__ == "__main__":
-   print(VectorEmbedTool.arun({"query": "climate change mitigation strategies"}))
+    print(VectorEmbedTool.arun({"query": "climate change mitigation strategies"}))

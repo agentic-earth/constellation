@@ -19,7 +19,7 @@ export function usePanning(workspaceRef: React.RefObject<HTMLDivElement>) {
         });
       }
     },
-    [workspaceRef]
+    [workspaceRef],
   );
 
   const pan = useCallback(
@@ -30,7 +30,7 @@ export function usePanning(workspaceRef: React.RefObject<HTMLDivElement>) {
       workspaceRef.current.scrollLeft = scrollStart.x - dx;
       workspaceRef.current.scrollTop = scrollStart.y - dy;
     },
-    [isPanning, start, scrollStart, workspaceRef]
+    [isPanning, start, scrollStart, workspaceRef],
   );
 
   const stopPanning = useCallback(() => {

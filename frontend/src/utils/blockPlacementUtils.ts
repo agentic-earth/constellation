@@ -11,7 +11,7 @@ export function calculatePosition(
   index: number,
   totalBlocks: number,
   type: BlockType,
-  blockDimensions: { width: number; height: number }
+  blockDimensions: { width: number; height: number },
 ): { x: number; y: number } {
   if (type === BlockTypes.DATASET) {
     return {
@@ -39,7 +39,7 @@ export function calculateConnectionPoints(
   sourceBlock: Block,
   targetBlock: Block,
   sourceDimensions: { width: number; height: number },
-  targetDimensions: { width: number; height: number }
+  targetDimensions: { width: number; height: number },
 ): { sourceX: number; sourceY: number; targetX: number; targetY: number } {
   // Determine centers of source and target blocks
   const sourceCenterX = sourceBlock.position.x + sourceDimensions.width / 2;
@@ -50,7 +50,7 @@ export function calculateConnectionPoints(
   // Calculate the angle between source and target centers
   const angle = Math.atan2(
     targetCenterY - sourceCenterY,
-    targetCenterX - sourceCenterX
+    targetCenterX - sourceCenterX,
   );
 
   // Calculate points on the perimeter based on angle

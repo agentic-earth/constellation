@@ -27,7 +27,7 @@ export function usePipelineSidebar() {
     (e: React.ChangeEvent<HTMLInputElement>) => {
       setSearchTerm(e.target.value);
     },
-    []
+    [],
   );
 
   const loadMoreItems = useCallback(() => {

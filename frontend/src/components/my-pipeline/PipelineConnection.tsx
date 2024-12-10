@@ -32,7 +32,7 @@ export function PipelineConnection({
       sourceBlock,
       targetBlock,
       sourceDimensions,
-      targetDimensions
+      targetDimensions,
     );
 
     // Calculate the distance between source and target
