@@ -7,7 +7,7 @@ export const handleBlockDrop = (
   offset: { x: number; y: number },
   workspaceRect: DOMRect,
   scrollPosition: { x: number; y: number },
-  zoomLevel: number
+  zoomLevel: number,
 ): Block => {
   const x = (offset.x - workspaceRect.left + scrollPosition.x) / zoomLevel;
   const y = (offset.y - workspaceRect.top + scrollPosition.y) / zoomLevel;
@@ -22,7 +22,7 @@ export const handleBlockConnection = (
   selectedBlockId: string,
   targetBlockId: string,
   blocks: Block[],
-  connections: Connection[]
+  connections: Connection[],
 ): { newConnection: Connection | null; error: string | null } => {
   const sourceBlock = blocks.find((b) => b.id === selectedBlockId);
   const targetBlock = blocks.find((b) => b.id === targetBlockId);
@@ -47,22 +47,22 @@ export const handleBlockConnection = (
 export const updateBlockPosition = (
   blocks: Block[],
   id: string,
-  position: { x: number; y: number; width?: number; height?: number }
+  position: { x: number; y: number; width?: number; height?: number },
 ): Block[] => {
   return blocks.map((block) =>
-    block.id === id ? { ...block, position: { ...position } } : block
+    block.id === id ? { ...block, position: { ...position } } : block,
   );
 };
 
 export const deleteBlock = (
   blocks: Block[],
   connections: Connection[],
-  blockId: string
+  blockId: string,
 ): { updatedBlocks: Block[]; updatedConnections: Connection[] } => {
   const updatedBlocks = blocks.filter((block) => block.id !== blockId);
   const updatedConnections = connections.filter(
     (connection) =>
-      connection.source !== blockId && connection.target !== blockId
+      connection.source !== blockId && connection.target !== blockId,
   );
   return { updatedBlocks, updatedConnections };
 };
@@ -73,7 +73,7 @@ export const stopEventPropagation = (e: React.MouseEvent) => {
 
 export const calculateScaledPosition = (
   position: { x: number; y: number },
-  zoomLevel: number
+  zoomLevel: number,
 ) => ({
   x: position.x * zoomLevel,
   y: position.y * zoomLevel,

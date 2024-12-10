@@ -28,7 +28,7 @@ export function PipelineBuilderHeader() {
         dagsterConfig,
         allBlocks,
         setBlocks,
-        setConnections
+        setConnections,
       );
     }
 

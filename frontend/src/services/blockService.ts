@@ -47,7 +47,7 @@ export const parseDagsterConfigToBlocks = (
   dagsterConfig: DagsterConfig,
   allBlocks: Block[],
   setBlocks: Dispatch<SetStateAction<Block[]>>,
-  setConnections: Dispatch<SetStateAction<Connection[]>>
+  setConnections: Dispatch<SetStateAction<Connection[]>>,
 ) => {
   const blocks: Block[] = [];
   const connections: Connection[] = [];
@@ -60,7 +60,7 @@ export const parseDagsterConfigToBlocks = (
         if (typeof operation.parameters[key] === "object") {
           traverseDagsterConfig(
             operation.parameters[key] as Operation,
-            parents
+            parents,
           );
         }
       }
@@ -70,10 +70,10 @@ export const parseDagsterConfigToBlocks = (
     if (operation.operation == "import_from_google_drive") {
       const datasetName = operation.parameters.file_id;
       const datasetBlocks: DatasetBlock[] = allBlocks.filter(
-        (block) => block.type === BlockTypes.DATASET
+        (block) => block.type === BlockTypes.DATASET,
       ) as DatasetBlock[];
       const datasetBlock: DatasetBlock | undefined = datasetBlocks.find(
-        (block) => block.filepath === datasetName
+        (block) => block.filepath === datasetName,
       );
 
       if (datasetBlock) {
@@ -95,7 +95,7 @@ export const parseDagsterConfigToBlocks = (
 
     if (operation.operation == "export_to_s3") {
       const exportToS3 = allBlocks.find(
-        (block) => block.name === "export-to-S3"
+        (block) => block.name === "export-to-S3",
       );
       if (exportToS3) {
         blocks.push(exportToS3 as Block);

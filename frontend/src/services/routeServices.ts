@@ -26,10 +26,13 @@ interface CreatePipelineRequest {
 
 // Service Classes
 export class BlockService {
-  async createBlock(blockData: CreateBlockRequest, userId: UUID): Promise<Block> {
+  async createBlock(
+    blockData: CreateBlockRequest,
+    userId: UUID,
+  ): Promise<Block> {
     try {
       const response = await apiClient.post<Block>("/blocks", blockData, {
-        headers: { "user-id": userId }
+        headers: { "user-id": userId },
       });
       return response.data;
     } catch (error) {
@@ -38,14 +41,22 @@ export class BlockService {
     }
   }
 
-  async searchBlocksByVector(query: string, userId: UUID, topK: number = 10): Promise<Block[]> {
+  async searchBlocksByVector(
+    query: string,
+    userId: UUID,
+    topK: number = 10,
+  ): Promise<Block[]> {
     try {
-      const response = await apiClient.post<Block[]>("/blocks/search-by-vector", {
-        query,
-        top_k: topK
-      }, {
-        headers: { "user-id": userId }
-      });
+      const response = await apiClient.post<Block[]>(
+        "/blocks/search-by-vector",
+        {
+          query,
+          top_k: topK,
+        },
+        {
+          headers: { "user-id": userId },
+        },
+      );
       return response.data;
     } catch (error) {
       console.error("Error searching blocks by vector:", error);
@@ -55,9 +66,12 @@ export class BlockService {
 
   async getBlockVector(blockId: UUID, userId: UUID): Promise<number[]> {
     try {
-      const response = await apiClient.get<number[]>(`/blocks/${blockId}/vector`, {
-        headers: { "user-id": userId }
-      });
+      const response = await apiClient.get<number[]>(
+        `/blocks/${blockId}/vector`,
+        {
+          headers: { "user-id": userId },
+        },
+      );
       return response.data;
     } catch (error) {
       console.error("Error getting block vector:", error);
@@ -67,10 +81,13 @@ export class BlockService {
 }
 
 export class EdgeService {
-  async createEdge(edgeData: CreateEdgeRequest, userId: UUID): Promise<Connection> {
+  async createEdge(
+    edgeData: CreateEdgeRequest,
+    userId: UUID,
+  ): Promise<Connection> {
     try {
       const response = await apiClient.post<Connection>("/edges", edgeData, {
-        headers: { "user-id": userId }
+        headers: { "user-id": userId },
       });
       return response.data;
     } catch (error) {
@@ -82,7 +99,7 @@ export class EdgeService {
   async getEdge(edgeId: UUID, userId: UUID): Promise<Connection> {
     try {
       const response = await apiClient.get<Connection>(`/edges/${edgeId}`, {
-        headers: { "user-id": userId }
+        headers: { "user-id": userId },
       });
       return response.data;
     } catch (error) {
@@ -96,7 +113,7 @@ export class PipelineService {
   async createPipeline(pipelineData: CreatePipelineRequest, userId: UUID) {
     try {
       const response = await apiClient.post("/pipelines", pipelineData, {
-        headers: { "user-id": userId }
+        headers: { "user-id": userId },
       });
       return response.data;
     } catch (error) {
@@ -110,7 +127,7 @@ export class PipelineService {
       const response = await apiClient.post(
         `/pipelines/verify/${pipelineId}`,
         {},
-        { headers: { "user-id": userId } }
+        { headers: { "user-id": userId } },
       );
       return response.data.verified;
     } catch (error) {
@@ -148,7 +165,7 @@ export class UserService {
   async revokeApiKey(userId: UUID, apiKeyId: UUID): Promise<boolean> {
     try {
       const response = await apiClient.delete(
-        `/users/${userId}/api-keys/${apiKeyId}`
+        `/users/${userId}/api-keys/${apiKeyId}`,
       );
       return response.data.success;
     } catch (error) {

@@ -32,29 +32,29 @@ describe("Backend Connection Tests", () => {
     try {
       const papers = await getAllPapers();
       console.log(`Retrieved ${papers.length} papers from backend`);
-      
+
       // Verify paper structure
       if (papers.length > 0) {
         const firstPaper = papers[0];
-        expect(firstPaper).toHaveProperty('id');
-        expect(firstPaper).toHaveProperty('name');
-        expect(firstPaper).toHaveProperty('block_type');
-        
+        expect(firstPaper).toHaveProperty("id");
+        expect(firstPaper).toHaveProperty("name");
+        expect(firstPaper).toHaveProperty("block_type");
+
         // Log sample paper for debugging
         console.log("Sample paper structure:", {
           id: firstPaper.id,
           name: firstPaper.title,
-          type: firstPaper.block_type
+          type: firstPaper.block_type,
         });
       }
-      
+
       expect(Array.isArray(papers)).toBe(true);
     } catch (error) {
       if (axios.isAxiosError(error)) {
         console.error("Paper retrieval failed:", {
           status: error.response?.status,
           data: error.response?.data,
-          message: error.message
+          message: error.message,
         });
       }
       throw error;
@@ -68,13 +68,13 @@ describe("Backend Connection Tests", () => {
     console.log("Testing error handling...");
     try {
       // Intentionally cause an error by requesting an invalid endpoint
-      await axios.get('/invalid-endpoint');
+      await axios.get("/invalid-endpoint");
     } catch (error) {
       if (axios.isAxiosError(error)) {
         expect(error.response?.status).toBeDefined();
         console.log("Error handled successfully:", {
           status: error.response?.status,
-          message: error.message
+          message: error.message,
         });
       }
     }

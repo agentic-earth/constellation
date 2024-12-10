@@ -27,7 +27,7 @@ export default function PipelineList() {
   const [isLoading, setIsLoading] = useState(true);
   const [pipelines, setPipelines] = useState<PipelineRun[]>([]);
   const [expandedPipelineId, setExpandedPipelineId] = useState<string | null>(
-    null
+    null,
   );
 
   const fetchPipelines = () => {
@@ -37,10 +37,9 @@ export default function PipelineList() {
       .finally(() => setIsLoading(false));
   };
 
-  const handleClearPipelines = (pipelineIds: string[]) => {
-    clearPipelines(pipelineIds);
+  const handleClearPipelines = async (pipelineIds: string[]) => {
+    await clearPipelines(pipelineIds);
     setPipelines([]);
-    fetchPipelines();
   };
 
   const handleReRun = async (pipelineId: string) => {
@@ -89,7 +88,7 @@ export default function PipelineList() {
 
   const toggleExpand = (pipelineId: string) => {
     setExpandedPipelineId((prevId) =>
-      prevId === pipelineId ? null : pipelineId
+      prevId === pipelineId ? null : pipelineId,
     );
   };
 
@@ -165,8 +164,8 @@ export default function PipelineList() {
                   pipeline.status === "completed"
                     ? "text-green-500"
                     : pipeline.status === "running"
-                    ? "text-yellow-500"
-                    : "text-red-500"
+                      ? "text-yellow-500"
+                      : "text-red-500"
                 }`}
               >
                 Status: {capitalizeFirstLetter(pipeline.status)}

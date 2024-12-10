@@ -45,14 +45,11 @@ import {
  * @returns {Promise<SearchResult>} - The search result object.
  */
 export const searchPapers = async (
-  searchQuery: SearchQuery
+  searchQuery: SearchQuery,
 ): Promise<SearchResult> => {
   try {
     console.log("Sending search request with query:", searchQuery);
-    const response = await apiClient.post<SearchResult>(
-      "/search",
-      searchQuery
-    );
+    const response = await apiClient.post<SearchResult>("/search", searchQuery);
     console.log("Received search response:", response.data);
     return response.data;
   } catch (error) {
@@ -260,15 +257,15 @@ export const getDatabaseStats = async (): Promise<DatabaseStats> => {
  * }
  */
 export const generateEOWorkflow = async (
-  prompt: string
+  prompt: string,
 ): Promise<{ workflow: string }> => {
   try {
     console.log(
-      `Sending request to generate EO workflow with prompt: "${prompt}"`
+      `Sending request to generate EO workflow with prompt: "${prompt}"`,
     );
     const response = await apiClient.post<{ workflow: string }>(
       "/generate_eo_workflow",
-      { prompt }
+      { prompt },
     );
     console.log("Received EO workflow response:", response.data);
     return response.data;

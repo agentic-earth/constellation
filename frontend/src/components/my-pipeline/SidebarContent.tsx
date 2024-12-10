@@ -27,8 +27,8 @@ export function SidebarContent({
     activeTab === BlockTypes.DATASET
       ? datasetBlocks.slice(0, visibleItems)
       : activeTab === BlockTypes.MODEL
-      ? modelBlocks.slice(0, visibleItems)
-      : exportBlocks.slice(0, visibleItems);
+        ? modelBlocks.slice(0, visibleItems)
+        : exportBlocks.slice(0, visibleItems);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const bottom =
@@ -60,8 +60,8 @@ export function SidebarContent({
             {activeTab === BlockTypes.DATASET
               ? "datasets"
               : activeTab === BlockTypes.MODEL
-              ? "models"
-              : "exports"}{" "}
+                ? "models"
+                : "exports"}{" "}
             found.
           </p>
         )}

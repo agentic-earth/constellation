@@ -74,7 +74,7 @@ export function ModelTaxonomyForm({ onSubmit }: ModelTaxonomyFormProps) {
   }, [formData.paper_type]);
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -86,7 +86,7 @@ export function ModelTaxonomyForm({ onSubmit }: ModelTaxonomyFormProps) {
   const handleCheckboxChange = (
     name: string,
     value: string,
-    checked: boolean
+    checked: boolean,
   ) => {
     setFormData((prevData) => {
       const currentValues =
@@ -107,7 +107,7 @@ export function ModelTaxonomyForm({ onSubmit }: ModelTaxonomyFormProps) {
   const renderCheckboxGroup = (
     name: string,
     options: string[],
-    label: string
+    label: string,
   ) => (
     <div className="space-y-2">
       <Label>{label}</Label>
@@ -133,7 +133,7 @@ export function ModelTaxonomyForm({ onSubmit }: ModelTaxonomyFormProps) {
   const renderSelectWithOther = (
     name: string,
     options: string[],
-    label: string
+    label: string,
   ) => (
     <div className="space-y-2">
       <Label htmlFor={name}>{label}</Label>
@@ -196,17 +196,17 @@ export function ModelTaxonomyForm({ onSubmit }: ModelTaxonomyFormProps) {
       {renderSelectWithOther(
         "paper_type",
         Object.values(PaperType),
-        "Paper Type"
+        "Paper Type",
       )}
       {renderSelectWithOther(
         "spatial_scale",
         Object.values(SpatialScale),
-        "Spatial Scale"
+        "Spatial Scale",
       )}
       {renderSelectWithOther(
         "temporal_scale",
         Object.values(TemporalScale),
-        "Temporal Scale"
+        "Temporal Scale",
       )}
 
       {formData.paper_type !== PaperType.DATASET && (
@@ -214,42 +214,42 @@ export function ModelTaxonomyForm({ onSubmit }: ModelTaxonomyFormProps) {
           {renderCheckboxGroup(
             "input_data_types",
             Object.values(InputDataType),
-            "Input Data Types"
+            "Input Data Types",
           )}
           {renderSelectWithOther(
             "output_data_type",
             Object.values(OutputDataType),
-            "Output Data Type"
+            "Output Data Type",
           )}
           {renderSelectWithOther(
             "model_type",
             Object.values(ModelType),
-            "Model Type"
+            "Model Type",
           )}
           {renderSelectWithOther(
             "architecture",
             Object.values(Architecture),
-            "Architecture"
+            "Architecture",
           )}
           {renderSelectWithOther(
             "application_readiness",
             Object.values(ApplicationReadiness),
-            "Application Readiness"
+            "Application Readiness",
           )}
           {renderSelectWithOther(
             "spatial_resolution",
             Object.values(SpatialResolution),
-            "Spatial Resolution"
+            "Spatial Resolution",
           )}
           {renderSelectWithOther(
             "temporal_resolution",
             Object.values(TemporalResolution),
-            "Temporal Resolution"
+            "Temporal Resolution",
           )}
           {renderSelectWithOther(
             "processing_level",
             Object.values(ProcessingLevel),
-            "Processing Level"
+            "Processing Level",
           )}
         </>
       )}
@@ -258,14 +258,14 @@ export function ModelTaxonomyForm({ onSubmit }: ModelTaxonomyFormProps) {
         renderCheckboxGroup(
           "satellite_data_sources",
           Object.values(SatelliteSource),
-          "Satellite Data Sources"
+          "Satellite Data Sources",
         )}
 
       {formData.paper_type === PaperType.WEATHER_CLIMATE &&
         renderCheckboxGroup(
           "climate_weather_data_sources",
           Object.values(ClimateWeatherDataSource),
-          "Climate/Weather Data Sources"
+          "Climate/Weather Data Sources",
         )}
 
       <Button type="submit" className="w-full">

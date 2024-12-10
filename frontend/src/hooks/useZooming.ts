@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback } from "react";
 
 export function useZooming() {
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -22,7 +22,7 @@ export function useZooming() {
         }
       }
     },
-    [handleZoomIn, handleZoomOut]
+    [handleZoomIn, handleZoomOut],
   );
 
   return { zoomLevel, handleZoomIn, handleZoomOut, handleWheel };

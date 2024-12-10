@@ -59,7 +59,7 @@ export function canConnect(sourceBlock: Block, targetBlock: Block): boolean {
     targetBlock.type === BlockTypes.MODEL
   ) {
     return sourceBlock.dataSources.some((source) =>
-      targetBlock.dataSources.includes(source)
+      targetBlock.dataSources.includes(source),
     );
   }
 
@@ -71,7 +71,7 @@ export function calculateConnectionPoints(
   sourceBlock,
   targetBlock,
   sourceDimensions,
-  targetDimensions
+  targetDimensions,
 ) {
   // Get positions and sizes
   const sourceX = sourceBlock.position.x;

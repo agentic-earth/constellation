@@ -60,7 +60,7 @@ export function ChatWithDocs() {
       if (currentQuestion.length < questions[questionIndex].length) {
         timer = setTimeout(() => {
           setCurrentQuestion(
-            questions[questionIndex].slice(0, currentQuestion.length + 1)
+            questions[questionIndex].slice(0, currentQuestion.length + 1),
           );
         }, 50);
       } else {
