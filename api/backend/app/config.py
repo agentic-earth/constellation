@@ -5,10 +5,6 @@ from pydantic import Field, AnyHttpUrl, PostgresDsn
 from typing import Optional
 import os
 from pathlib import Path
-import dotenv
-
-ROOT_DIR = Path(__file__).resolve().parent.parent.parent
-dotenv.load_dotenv(ROOT_DIR / ".env", override=True)
 
 
 class Settings(BaseSettings):
@@ -51,8 +47,6 @@ class Settings(BaseSettings):
     )
 
     model_config = SettingsConfigDict(
-        env_file=ROOT_DIR / ".env",
-        env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",  # This will ignore any extra fields in the environment
     )
